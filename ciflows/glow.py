@@ -183,20 +183,21 @@ class Injective1x1Conv(Flow):
         # as the sum of the square singular values.
         try:
             svals = torch.linalg.svdvals(self.W)
+            svals = svals.to(x.device)
         except Exception as e:
             print(self.W)
             print(self.W.shape)
             raise Exception(e)
 
         # compute log of its regularized singular values and sum them
-        log_det = torch.log(svals + self.gamma**2 / (svals + torch.Tensor([1e-8])))
+        log_det = torch.log(svals + self.gamma**2 / (svals + torch.Tensor([1e-8]).to(x.device)))
         log_det = torch.sum(log_det) * (height * width)
 
         # compute the pseudo-inverse of the weight matrix: (W W^T + gamma^2 I)^{-1} W^T
         # Assume self.w is a tensor (W^T W + gamma^2 I)
         prefactor = torch.matmul(self.W.T, self.W) + self.gamma**2 * torch.eye(
             self.W.shape[1]
-        )
+        ).to(x.device)
 
         # Inverse of prefactor
         w_pinv = torch.matmul(torch.inverse(prefactor), self.W.T)

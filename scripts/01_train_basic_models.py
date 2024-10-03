@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import lightning as pl
@@ -12,6 +13,7 @@ from torchvision import transforms
 from torchvision.datasets import MNIST
 
 from ciflows.glow import InjectiveGlowBlock, Squeeze
+from ciflows.lightning import plFlowModel
 
 
 def get_model():
@@ -139,6 +141,7 @@ class MNISTDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=self.shuffle,
+            persistent_workers=True,
         )
 
     def val_dataloader(self):
@@ -146,6 +149,7 @@ class MNISTDataModule(pl.LightningDataModule):
             self.mnist_val,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            persistent_workers=True,
         )
 
     def test_dataloader(self):
@@ -163,12 +167,16 @@ if __name__ == "__main__":
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
+        accelerator = "cuda"
     elif torch.backends.mps.is_available():
         device = torch.device("mps")
+        accelerator = "mps"
     else:
         device = torch.device("cpu")
-    accelerator = device
+        accelerator = "cpu"
+
     print(f"Using device: {device}")
+    print(f"Using accelerator: {accelerator}")
 
     batch_size = 64
     max_epochs = 1000
@@ -177,17 +185,22 @@ if __name__ == "__main__":
     intervention_types = [None, 1, 2, 3]
     num_workers = 4
     gradient_clip_val = None  # 1.0
-    lr_scheduler = "cosine"
     check_val_every_n_epoch = 5
     monitor = "val_loss"
+
+    lr = 3e-4
+    lr_min = 1e-8
+    lr_scheduler = "cosine"
 
     # whether or not to shuffle dataset
     shuffle = True
 
     # output filename for the results
-    root = "../data/"
+    root = "./data/"
     model_name = "check_injflow_mnist_v1"
-    checkpoint_dir = Path(model_name)
+    checkpoint_dir = Path("./results") / model_name
+    checkpoint_dir.mkdir(exist_ok=True, parents=True)
+
     model_fname = f"{model_name}-model.pt"
 
     checkpoint_callback = ModelCheckpoint(
@@ -197,7 +210,12 @@ if __name__ == "__main__":
         every_n_epochs=check_val_every_n_epoch,
     )
 
-    logger = TensorBoardLogger("check_injflow_mnist_logs", name="check_injflow_mnist")
+    logger = TensorBoardLogger(
+        "check_injflow_mnist_logs",
+        name="check_injflow_mnist",
+        version="01",
+        log_graph=True,
+    )
     logger = None
 
     # Define the trainer
@@ -209,14 +227,16 @@ if __name__ == "__main__":
         callbacks=[checkpoint_callback],
         check_val_every_n_epoch=check_val_every_n_epoch,
         accelerator=accelerator,
+        # fast_dev_run=True,
     )
 
     # define the model
-    model = get_model()
+    flow_model = get_model()
+    model = plFlowModel(flow_model, lr=lr, lr_min=lr_min, lr_scheduler=lr_scheduler)
 
     # define the data loader
     data_module = MNISTDataModule(
-        root=root,
+        data_dir=root,
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
@@ -228,4 +248,5 @@ if __name__ == "__main__":
     )
 
     # save the final model
-    torch.save(model, checkpoint_dir / model_fname)
+    print(f"Saving model to {checkpoint_dir / 'final_model.pt'}")
+    torch.save(model, checkpoint_dir / f"{model_fname}_final.pt")

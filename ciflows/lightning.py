@@ -1,4 +1,4 @@
-import pytorch_lightning as pl
+import lightning as pl
 import torch
 import torch.optim as optim
 
@@ -28,7 +28,10 @@ class plFlowModel(pl.LightningModule):
             A learning rate scheduler, by default None. Can be 'cosine', or 'step'.
         """
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=['model'])
+
+        # XXX: This should change depending on the dataset
+        self.example_input_array = [torch.randn(2, 1, 28, 28), torch.randn(2, 1)]
 
         self.model = model
 
@@ -43,11 +46,19 @@ class plFlowModel(pl.LightningModule):
         """
         return self.model.sample(num_samples=num_samples, **params)
 
-    def forward(self, v) -> torch.Any:
-        return self.model.forward(v)
-
-    def inverse(self, x) -> torch.Any:
+    def forward(self, x, target=None) -> torch.Any:
+        """Foward pass.
+        
+        Note: This is opposite of the normalizing flow API convention.
+        """
         return self.model.inverse(x)
+
+    def inverse(self, v, target=None) -> torch.Any:
+        """Inverse pass.
+        
+        Note: This is opposite of the normalizing flow API convention.
+        """
+        return self.model.forward(v)
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=self.lr)
@@ -68,6 +79,8 @@ class plFlowModel(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, _ = batch
+        print('Inside training step: ')
+        print(x.shape)
         loss = self.model.forward_kld(x)
 
         # logging the loss
