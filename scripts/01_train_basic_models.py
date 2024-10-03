@@ -1,3 +1,4 @@
+import argparse
 import os
 from pathlib import Path
 
@@ -159,6 +160,10 @@ class MNISTDataModule(pl.LightningDataModule):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    args = parser.parse_args()
+    log_dir = args.log_dir
+
     seed = 1234
 
     # set seed
