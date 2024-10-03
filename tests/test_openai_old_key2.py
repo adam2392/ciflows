@@ -1,9 +1,8 @@
 import os
-import openai
+
 from openai import AzureOpenAI
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     api_key = os.getenv("OPENAI_API_KEY_NEW")  # need to fill this in
     client = AzureOpenAI(
         api_key=api_key,
@@ -13,10 +12,10 @@ if __name__ == '__main__':
 
     response = client.chat.completions.create(  # replace this value with the deployment name you chose when you deployed the associated model.
         # model='gpt-4',
-        model='gpt-4-turbo',
+        model="gpt-4-turbo",
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "2+3="}
+            {"role": "user", "content": "2+3="},
         ],
         temperature=0,
         # max_tokens=3,

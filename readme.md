@@ -1,4 +1,19 @@
-This is an evolving repo optimized for machine-learning projects aimed at designing a new algorithm. They require sweeping over different hyperparameters, comparing to baselines, and iteratively refining an algorithm. Based of [cookiecutter-data-science](https://github.com/drivendata/cookiecutter-data-science).
+# Causal Injective Flows (ciflows)
+
+This repository contains code for the paper "Causal injective flows for realistic image-editing". 
+
+The model is implemented in PyTorch and PyTorch Lightning, and takes as input images and corresponding intervention targets and distribution indices per image. The model is trained to minimize the loss function comprised of negative log likelihood, the volume preserving loss, and a regularization term for the reconstruction loss.
+
+The model bottlenecks the input image through a series of injective transformations until the latent representation is reached. The latent representation is then transformed to the output image through a series of injective transformations. The latent representation is a low-dimensional clustered linear causal DAG that defines the causal SCM among the latent generative factors of the image.
+
+# Installation
+
+To install the package, run the following command:
+
+```bash
+pip install -e .
+```
+
 
 # Organization
 - `project_name`: should be renamed, contains main code for modeling (e.g. model architecture)

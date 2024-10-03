@@ -1,21 +1,21 @@
 import argparse
-from copy import deepcopy
+import inspect
 import logging
+import os.path
 import random
 from collections import defaultdict
+from copy import deepcopy
 from os.path import join
-import numpy as np
-from sklearn.metrics import accuracy_score, roc_auc_score
-from sklearn.model_selection import train_test_split
-import joblib
-import imodels
-import inspect
-import os.path
+
 import imodelsx.cache_save_utils
+import joblib
+import numpy as np
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
 
 path_to_repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-import project_name.model
-import project_name.data
+import ciflows.data
+import ciflows.model
 
 
 def fit_model(model, X_train, y_train, feature_names, r):
@@ -111,11 +111,11 @@ if __name__ == "__main__":
     )
 
     if args.use_cache and already_cached:
-        logging.info(f"cached version exists! Successfully skipping :)\n\n\n")
+        logging.info("cached version exists! Successfully skipping :)\n\n\n")
         exit(0)
     for k in sorted(vars(args)):
         logger.info("\t" + k + " " + str(vars(args)[k]))
-    logging.info(f"\n\n\tsaving to " + save_dir_unique + "\n")
+    logging.info("\n\n\tsaving to " + save_dir_unique + "\n")
 
     # set seed
     np.random.seed(args.seed)
@@ -123,7 +123,7 @@ if __name__ == "__main__":
     # torch.manual_seed(args.seed)
 
     # load text data
-    dset, dataset_key_text = project_name.data.load_huggingface_dataset(
+    dset, dataset_key_text = ciflows.data.load_huggingface_dataset(
         dataset_name=args.dataset_name, subsample_frac=args.subsample_frac
     )
     (
@@ -132,7 +132,7 @@ if __name__ == "__main__":
         y_train,
         y_test,
         feature_names,
-    ) = project_name.data.convert_text_data_to_counts_array(dset, dataset_key_text)
+    ) = ciflows.data.convert_text_data_to_counts_array(dset, dataset_key_text)
 
     # load tabular data
     # https://csinva.io/imodels/util/data_util.html#imodels.util.data_util.get_clean_dataset
@@ -143,7 +143,7 @@ if __name__ == "__main__":
     )
 
     # load model
-    model = project_name.model.get_model(args)
+    model = ciflows.model.get_model(args)
 
     # set up saving dictionary + save params file
     r = defaultdict(list)
