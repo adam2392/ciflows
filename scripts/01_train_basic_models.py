@@ -1,7 +1,7 @@
 import argparse
 import os
 from pathlib import Path
-
+import logging
 import torch.nn as nn
 import lightning as pl
 import normflows as nf
@@ -72,16 +72,16 @@ def get_model():
     injective_flows = []
     for i in range(n_injective_layers):
         # Note: this is adding from V -> X
-        # n_chs = n_chs // 2
-        # injective_flows += [
-        #     InjectiveGlowBlock(
-        #         channels=n_chs,
-        #         hidden_channels=n_hidden,
-        #         activation=activation,
-        #         scale=True,
-        #         gamma=gamma,
-        #     )
-        # ]
+        n_chs = n_chs // 2
+        injective_flows += [
+            InjectiveGlowBlock(
+                channels=n_chs,
+                hidden_channels=n_hidden,
+                activation=activation,
+                scale=True,
+                gamma=gamma,
+            )
+        ]
 
         if debug:
             print(f"On layer {i + num_layers}, n_chs = {n_chs}")
@@ -117,15 +117,14 @@ def initialize_flow(model):
     Initialize a full normalizing flow model
     """
     for name, param in model.named_parameters():
-        if 'weight' in name:
+        if "weight" in name:
             # Layer-dependent initialization
-            if 'coupling' in name:
+            if "coupling" in name:
                 nn.init.normal_(param, mean=0.0, std=0.01)
             else:
                 nn.init.xavier_uniform_(param)
-        elif 'bias' in name:
+        elif "bias" in name:
             nn.init.constant_(param, 0.0)
-
 
 
 class MNISTDataModule(pl.LightningDataModule):
@@ -147,8 +146,12 @@ class MNISTDataModule(pl.LightningDataModule):
         )
 
     def setup(self, stage: str):
-        self.mnist_test = MNIST(self.data_dir, download=True, train=False, transform=self.transform)
-        mnist_full = MNIST(self.data_dir, download=True, train=True, transform=self.transform)
+        self.mnist_test = MNIST(
+            self.data_dir, download=True, train=False, transform=self.transform
+        )
+        mnist_full = MNIST(
+            self.data_dir, download=True, train=True, transform=self.transform
+        )
         self.mnist_train, self.mnist_val = random_split(
             mnist_full, [55000, 5000], generator=torch.Generator().manual_seed(42)
         )
@@ -218,7 +221,7 @@ if __name__ == "__main__":
 
     # output filename for the results
     root = "./data/"
-    model_name = "check_glowflow_mnist_v1"
+    model_name = "check_injglowflow_mnist_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -237,7 +240,9 @@ if __name__ == "__main__":
     #     version="01",
     #     log_graph=True,
     # )
-    logger = None
+    logger = logging.getLogger()
+    logging.basicConfig(level=logging.INFO)
+    logging.info(f"\n\n\tsaving to {model_fname} \n")
 
     # Define the trainer
     trainer = pl.Trainer(
