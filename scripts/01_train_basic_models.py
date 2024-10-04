@@ -160,10 +160,10 @@ class MNISTDataModule(pl.LightningDataModule):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    args = parser.parse_args()
-    log_dir = args.log_dir
-
+    # parser = argparse.ArgumentParser()
+    # args = parser.parse_args()
+    # log_dir = args.log_dir
+    log_dir = '/home/adam2392/projects/logs/'
     seed = 1234
 
     # set seed
