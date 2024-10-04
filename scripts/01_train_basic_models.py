@@ -2,6 +2,7 @@ import argparse
 import os
 from pathlib import Path
 
+import torch.nn as nn
 import lightning as pl
 import normflows as nf
 import numpy as np
@@ -71,16 +72,16 @@ def get_model():
     injective_flows = []
     for i in range(n_injective_layers):
         # Note: this is adding from V -> X
-        n_chs = n_chs // 2
-        injective_flows += [
-            InjectiveGlowBlock(
-                channels=n_chs,
-                hidden_channels=n_hidden,
-                activation=activation,
-                scale=True,
-                gamma=gamma,
-            )
-        ]
+        # n_chs = n_chs // 2
+        # injective_flows += [
+        #     InjectiveGlowBlock(
+        #         channels=n_chs,
+        #         hidden_channels=n_hidden,
+        #         activation=activation,
+        #         scale=True,
+        #         gamma=gamma,
+        #     )
+        # ]
 
         if debug:
             print(f"On layer {i + num_layers}, n_chs = {n_chs}")
@@ -109,6 +110,22 @@ def get_model():
     print(pytorch_total_params)
 
     return model
+
+
+def initialize_flow(model):
+    """
+    Initialize a full normalizing flow model
+    """
+    for name, param in model.named_parameters():
+        if 'weight' in name:
+            # Layer-dependent initialization
+            if 'coupling' in name:
+                nn.init.normal_(param, mean=0.0, std=0.01)
+            else:
+                nn.init.xavier_uniform_(param)
+        elif 'bias' in name:
+            nn.init.constant_(param, 0.0)
+
 
 
 class MNISTDataModule(pl.LightningDataModule):
@@ -187,7 +204,6 @@ if __name__ == "__main__":
     max_epochs = 1000
     devices = 1
     strategy = "auto"  # or ddp if distributed
-    intervention_types = [None, 1, 2, 3]
     num_workers = 4
     gradient_clip_val = None  # 1.0
     check_val_every_n_epoch = 5
@@ -202,7 +218,7 @@ if __name__ == "__main__":
 
     # output filename for the results
     root = "./data/"
-    model_name = "check_injflow_mnist_v1"
+    model_name = "check_glowflow_mnist_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -215,12 +231,12 @@ if __name__ == "__main__":
         every_n_epochs=check_val_every_n_epoch,
     )
 
-    logger = TensorBoardLogger(
-        "check_injflow_mnist_logs",
-        name="check_injflow_mnist",
-        version="01",
-        log_graph=True,
-    )
+    # logger = TensorBoardLogger(
+    #     "check_injflow_mnist_logs",
+    #     name="check_injflow_mnist",
+    #     version="01",
+    #     log_graph=True,
+    # )
     logger = None
 
     # Define the trainer
@@ -237,6 +253,7 @@ if __name__ == "__main__":
 
     # define the model
     flow_model = get_model()
+    initialize_flow(flow_model)
     model = plFlowModel(flow_model, lr=lr, lr_min=lr_min, lr_scheduler=lr_scheduler)
 
     # define the data loader
