@@ -142,8 +142,10 @@ class plFlowModel(pl.LightningModule):
             v_latent = self.model.inverse(x)
             x_reconstructed = self.model.forward(v_latent)
             loss = torch.nn.functional.mse_loss(x_reconstructed, x)
+            self.log('Working on MSE...')
         else:
             loss = self.model.forward_kld(x)
+            self.log('Working on NLL...')
 
         self.log("val_loss", loss)
         return loss
