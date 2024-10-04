@@ -130,8 +130,8 @@ class MNISTDataModule(pl.LightningDataModule):
         )
 
     def setup(self, stage: str):
-        self.mnist_test = MNIST(self.data_dir, train=False, transform=self.transform)
-        mnist_full = MNIST(self.data_dir, train=True, transform=self.transform)
+        self.mnist_test = MNIST(self.data_dir, download=True, train=False, transform=self.transform)
+        mnist_full = MNIST(self.data_dir, download=True, train=True, transform=self.transform)
         self.mnist_train, self.mnist_val = random_split(
             mnist_full, [55000, 5000], generator=torch.Generator().manual_seed(42)
         )
