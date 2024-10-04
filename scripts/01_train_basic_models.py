@@ -15,7 +15,7 @@ from torchvision import transforms
 from torchvision.datasets import MNIST
 
 from ciflows.glow import InjectiveGlowBlock, Squeeze
-from ciflows.lightning import plFlowModel
+from ciflows.lightning import plFlowModel, TwoStageTraining
 
 
 def get_model():
@@ -112,7 +112,6 @@ def get_model():
     return model
 
 
-
 def initialize_flow(model):
     """
     Initialize a full normalizing flow model
@@ -203,9 +202,14 @@ if __name__ == "__main__":
 
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
+    debug = False
+    if debug:
+        accelerator = "cpu"
+        fast_dev = True
 
     batch_size = 128
     max_epochs = 1000
+    n_steps_mse = 30
     devices = 1
     strategy = "auto"  # or ddp if distributed
     num_workers = 4
@@ -222,7 +226,7 @@ if __name__ == "__main__":
 
     # output filename for the results
     root = "./data/"
-    model_name = "check_glowflow_mnist_v1"
+    model_name = "check_injflow_mnist_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -251,22 +255,27 @@ if __name__ == "__main__":
         max_epochs=max_epochs,
         devices=devices,
         strategy=strategy,
-        callbacks=[checkpoint_callback],
+        callbacks=[checkpoint_callback, TwoStageTraining()],
         check_val_every_n_epoch=check_val_every_n_epoch,
         accelerator=accelerator,
-        # fast_dev_run=True,
+        fast_dev_run=fast_dev,
     )
 
-
-    epoch=99
-    step=43000
-    model_fname = checkpoint_dir / f'epoch={epoch}-step={step}.ckpt'
-    model = plFlowModel.load_from_checkpoint(model_fname)
+    # epoch=99
+    # step=43000
+    # model_fname = checkpoint_dir / f'epoch={epoch}-step={step}.ckpt'
+    # model = plFlowModel.load_from_checkpoint(model_fname)
 
     # define the model
-    # flow_model = get_model()
-    # initialize_flow(flow_model)
-    # model = plFlowModel(flow_model, lr=lr, lr_min=lr_min, lr_scheduler=lr_scheduler)
+    flow_model = get_model()
+    initialize_flow(flow_model)
+    model = plFlowModel(
+        flow_model,
+        lr=lr,
+        lr_min=lr_min,
+        lr_scheduler=lr_scheduler,
+        n_steps_mse=n_steps_mse,
+    )
 
     # define the data loader
     data_module = MNISTDataModule(

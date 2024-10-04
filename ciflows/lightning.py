@@ -1,9 +1,24 @@
 import lightning as pl
 import torch
 import torch.optim as optim
+from lightning.pytorch.callbacks import Callback
 
+
+from .glow import InjectiveGlowBlock
 from .loss import volume_change_surrogate
 from .model import InjectiveFlow
+
+
+class TwoStageTraining(Callback):
+    def on_train_epoch_start(self, trainer, pl_module):
+        if getattr(pl_module, 'n_steps_mse', None) is not None and trainer.current_epoch > pl_module.n_steps_mse:
+            trainer.optimizers = [pl_module.optimizer_nll]
+            # trainer.lr_schedulers = trainer.configure_schedulers([pl_module.])
+            # trainer.optimizer_frequencies = [] # or optimizers frequencies if you have any
+        else:
+            trainer.optimizers = [pl_module.optimizer_mse]
+            # trainer.lr_schedulers = trainer.configure_schedulers([pl_module.optimizer_mse])
+            # trainer.optimizer_frequencies = [] # or optimizers frequencies if you have any
 
 
 class plFlowModel(pl.LightningModule):
@@ -13,8 +28,9 @@ class plFlowModel(pl.LightningModule):
         lr: float = 1e-3,
         lr_min: float = 1e-8,
         lr_scheduler=None,
+        n_steps_mse=None
     ):
-        """Causal flow model lightning module.
+        """Injective flow model lightning module.
 
         Parameters
         ----------
@@ -26,6 +42,8 @@ class plFlowModel(pl.LightningModule):
             Min learning rate, by default 1e-8.
         lr_scheduler : str, optional
             A learning rate scheduler, by default None. Can be 'cosine', or 'step'.
+        n_steps_mse : int
+
         """
         super().__init__()
 
@@ -40,6 +58,21 @@ class plFlowModel(pl.LightningModule):
         self.lr = lr
         self.lr_scheduler = lr_scheduler
         self.lr_min = lr_min
+        self.n_steps_mse = n_steps_mse
+        self.step_counter = 0
+
+    def get_injective_and_other_params(self):
+        injective_params = []
+        other_params = []
+
+        for flow in self.model.flows:
+            # Check if the flow is an injective Glow block
+            if isinstance(flow, InjectiveGlowBlock):
+                injective_params += list(flow.parameters())
+            else:
+                other_params += list(flow.parameters())
+
+        return injective_params, other_params
 
     @torch.no_grad()
     def sample(self, num_samples=1, **params):
@@ -63,25 +96,41 @@ class plFlowModel(pl.LightningModule):
         return self.model.forward(v)
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr=self.lr)
-        if self.lr_scheduler == "cosine":
-            # cosine learning rate annealing
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer,
-                T_max=self.trainer.max_epochs,
-                eta_min=self.lr_min,
-                verbose=True,
-            )
-        elif self.lr_scheduler == "step":
-            # An scheduler is optional, but can help in flows to get the last bpd improvement
-            scheduler = optim.lr_scheduler.StepLR(optimizer, 1, gamma=0.99)
-        else:
-            scheduler = None
-        return [optimizer], [scheduler]
+        mse_params, nll_params = self.get_injective_and_other_params()
+        optimizer_mse = optim.Adam(mse_params, lr=self.lr)
+        optimizer_nll = optim.Adam(nll_params, lr=self.lr)
+
+        self.optimizer_mse = optimizer_mse
+        self.optimizer_b = optimizer_nll
+        scheduler_list = []
+        optimizer_list = [optimizer_mse, optimizer_nll]
+        for optimizer in optimizer_list:
+            if self.lr_scheduler == "cosine":
+                # cosine learning rate annealing
+                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                    optimizer,
+                    T_max=self.trainer.max_epochs,
+                    eta_min=self.lr_min,
+                    verbose=True,
+                )
+            elif self.lr_scheduler == "step":
+                # An scheduler is optional, but can help in flows to get the last bpd improvement
+                scheduler = optim.lr_scheduler.StepLR(optimizer, 1, gamma=0.99)
+            else:
+                scheduler = None
+            scheduler_list.append(scheduler)
+        # return optimizer_list, scheduler_list
+        return [optimizer_nll], [scheduler]
 
     def training_step(self, batch, batch_idx):
         x, _ = batch
-        loss = self.model.forward_kld(x)
+
+        if self.n_steps_mse is not None and self.step_counter < self.n_steps_mse:
+            v_latent = self.model.inverse(x)
+            x_reconstructed = self.model.forward(v_latent)
+            loss = torch.nn.functional.mse_loss(x_reconstructed, x)
+        else:
+            loss = self.model.forward_kld(x)
 
         # logging the loss
         self.log("train_loss", loss)
@@ -89,11 +138,15 @@ class plFlowModel(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x, _ = batch
-        loss = self.model.forward_kld(x)
+        if self.n_steps_mse is not None and self.step_counter < self.n_steps_mse:
+            v_latent = self.model.inverse(x)
+            x_reconstructed = self.model.forward(v_latent)
+            loss = torch.nn.functional.mse_loss(x_reconstructed, x)
+        else:
+            loss = self.model.forward_kld(x)
 
         self.log("val_loss", loss)
         return loss
-
 
 # TODO: finish implementation
 class plApproximateFlowModel(pl.LightningModule):
