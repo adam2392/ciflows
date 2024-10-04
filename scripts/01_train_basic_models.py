@@ -32,7 +32,7 @@ def get_model():
     n_chs = n_channels
     flows = []
 
-    debug = False
+    debug = True
 
     # add the initial mixing layers
     print("Beginning of mixing flows.")
