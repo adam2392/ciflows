@@ -87,10 +87,10 @@ class Injective1x1Conv(Flow):
 
         if self.activation == "linear":
             Q1, _ = torch.linalg.qr(
-                torch.randn(self.num_channels_in, self.num_channels_in)
+                torch.randn(self.num_channels_in, self.num_channels_in, dtype=torch.float32)
             )
             Q2, _ = torch.linalg.qr(
-                torch.randn(self.num_channels_in, self.num_channels_in)
+                torch.randn(self.num_channels_in, self.num_channels_in, dtype=torch.float32)
             )
             W = torch.cat([Q1, Q2], axis=0) / np.sqrt(2.0)
 

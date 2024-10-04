@@ -112,6 +112,7 @@ def get_model():
     return model
 
 
+
 def initialize_flow(model):
     """
     Initialize a full normalizing flow model
@@ -256,10 +257,16 @@ if __name__ == "__main__":
         # fast_dev_run=True,
     )
 
+
+    epoch=99
+    step=43000
+    model_fname = checkpoint_dir / f'epoch={epoch}-step={step}.ckpt'
+    model = plFlowModel.load_from_checkpoint(model_fname)
+
     # define the model
-    flow_model = get_model()
-    initialize_flow(flow_model)
-    model = plFlowModel(flow_model, lr=lr, lr_min=lr_min, lr_scheduler=lr_scheduler)
+    # flow_model = get_model()
+    # initialize_flow(flow_model)
+    # model = plFlowModel(flow_model, lr=lr, lr_min=lr_min, lr_scheduler=lr_scheduler)
 
     # define the data loader
     data_module = MNISTDataModule(
