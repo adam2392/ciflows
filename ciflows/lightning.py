@@ -28,7 +28,9 @@ class plFlowModel(pl.LightningModule):
             A learning rate scheduler, by default None. Can be 'cosine', or 'step'.
         """
         super().__init__()
-        self.save_hyperparameters(ignore=['model'])
+
+        # ensure that the model is saved and can be loaded later as a checkpoint
+        self.save_hyperparameters()
 
         # XXX: This should change depending on the dataset
         self.example_input_array = [torch.randn(2, 1, 28, 28), torch.randn(2, 1)]

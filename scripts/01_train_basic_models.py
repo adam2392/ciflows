@@ -163,7 +163,7 @@ if __name__ == "__main__":
     # parser = argparse.ArgumentParser()
     # args = parser.parse_args()
     # log_dir = args.log_dir
-    log_dir = '/home/adam2392/projects/logs/'
+    # log_dir = '/home/adam2392/projects/logs/'
     seed = 1234
 
     # set seed
@@ -183,7 +183,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    batch_size = 64
+    batch_size = 128
     max_epochs = 1000
     devices = 1
     strategy = "auto"  # or ddp if distributed

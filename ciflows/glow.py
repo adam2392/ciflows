@@ -94,6 +94,7 @@ class Injective1x1Conv(Flow):
             )
             W = torch.cat([Q1, Q2], axis=0) / np.sqrt(2.0)
 
+            print("inside initialization: ", W.shape)
             # Initialize the weight matrix as a random orthogonal matrix as shape (n_chs_in, n_chs_in // 2)
             self.W = nn.Parameter(W)
             print("inside initialization: ", self.W)
@@ -195,12 +196,21 @@ class Injective1x1Conv(Flow):
 
         # compute the pseudo-inverse of the weight matrix: (W W^T + gamma^2 I)^{-1} W^T
         # Assume self.w is a tensor (W^T W + gamma^2 I)
-        prefactor = torch.matmul(self.W.T, self.W) + self.gamma * torch.eye(
+        prefactor = torch.matmul(self.W.T, self.W) + self.gamma**2 * torch.eye(
             self.W.shape[1]
         ).to(x.device)
 
         # Inverse of prefactor
-        w_pinv = torch.matmul(torch.inverse(prefactor), self.W.T)
+        try:
+            w_pinv = torch.matmul(torch.inverse(prefactor), self.W.T)
+        except Exception as e:
+            print()
+            print('Prefactor: ')
+            print(prefactor)
+            print()
+            print("Shapes: ")
+            print(prefactor.shape, self.W.shape)
+            raise Exception(e)
 
         if self.activation == "relu":
             conv_filter = torch.cat([w_pinv, -w_pinv], dim=0)
