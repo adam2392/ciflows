@@ -247,7 +247,7 @@ if __name__ == "__main__":
 
     # Define the trainer
     trainer = pl.Trainer(
-        logger=logger,
+        logger=True,
         max_epochs=max_epochs,
         devices=devices,
         strategy=strategy,
