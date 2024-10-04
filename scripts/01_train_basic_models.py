@@ -24,7 +24,7 @@ def get_model():
     n_glow_blocks = 2
     use_lu = True
     gamma = 1e-2
-    activation = "relu"
+    activation = "linear"
 
     input_shape = (1, 28, 28)
     n_channels = input_shape[0]

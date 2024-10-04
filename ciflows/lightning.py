@@ -79,8 +79,6 @@ class plFlowModel(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, _ = batch
-        print('Inside training step: ')
-        print(x.shape)
         loss = self.model.forward_kld(x)
 
         # logging the loss

@@ -195,7 +195,7 @@ class Injective1x1Conv(Flow):
 
         # compute the pseudo-inverse of the weight matrix: (W W^T + gamma^2 I)^{-1} W^T
         # Assume self.w is a tensor (W^T W + gamma^2 I)
-        prefactor = torch.matmul(self.W.T, self.W) + self.gamma**2 * torch.eye(
+        prefactor = torch.matmul(self.W.T, self.W) + self.gamma * torch.eye(
             self.W.shape[1]
         ).to(x.device)
 
