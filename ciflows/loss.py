@@ -40,24 +40,6 @@ def sample_orthonormal_vectors(x: torch.Tensor, n_samples: int = 1000):
     return q * sqrt(total_dim)
 
 
-def reconstruction_loss(x: torch.Tensor, xhat: torch.Tensor):
-    """Compute the reconstruction loss between x and xhat.
-
-    Parameters
-    ----------
-    x : torch.Tensor of shape (batch_size, ...)
-        The original data.
-    xhat : torch.Tensor of shape (batch_size, ...)
-        The reconstructed data.
-
-    Returns
-    -------
-    torch.Tensor of shape (batch_size,)
-        The reconstruction loss.
-    """
-    return torch.sum((x - xhat) ** 2, dim=tuple(range(1, x.dim())))
-
-
 def volume_change_surrogate(
     x: torch.Tensor, encoder, decoder, hutchinson_samples: int = 1000
 ):

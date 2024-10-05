@@ -101,7 +101,7 @@ class plFlowModel(pl.LightningModule):
         optimizer_nll = optim.Adam(nll_params, lr=self.lr)
 
         self.optimizer_mse = optimizer_mse
-        self.optimizer_b = optimizer_nll
+        self.optimizer_nll = optimizer_nll
         scheduler_list = []
         optimizer_list = [optimizer_mse, optimizer_nll]
         for optimizer in optimizer_list:
