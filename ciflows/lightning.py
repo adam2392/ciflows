@@ -136,6 +136,7 @@ class plFlowModel(pl.LightningModule):
         self.log("train_loss", loss)
         if batch_idx % 100 == 0:
             print(f"train_loss: {loss}")
+        self.step_counter += 1
         return loss
 
     def validation_step(self, batch, batch_idx):
