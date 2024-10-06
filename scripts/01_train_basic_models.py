@@ -134,6 +134,7 @@ class MNISTDataModule(pl.LightningDataModule):
         batch_size: int = 64,
         num_workers: int = 4,
         shuffle=True,
+        fast_dev_run=False,
     ):
         super().__init__()
         self.data_dir = data_dir
@@ -144,6 +145,7 @@ class MNISTDataModule(pl.LightningDataModule):
         self.transform = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.5,), (-0.5,))]
         )
+        self.fast_dev_run = fast_dev_run
 
     def setup(self, stage: str):
         self.mnist_test = MNIST(
@@ -152,9 +154,16 @@ class MNISTDataModule(pl.LightningDataModule):
         mnist_full = MNIST(
             self.data_dir, download=True, train=True, transform=self.transform
         )
-        self.mnist_train, self.mnist_val = random_split(
-            mnist_full, [55000, 5000], generator=torch.Generator().manual_seed(42)
-        )
+        if self.fast_dev_run:
+            self.mnist_train, self.mnist_val = random_split(
+                mnist_full,
+                [100, 60_000 - 100],
+                generator=torch.Generator().manual_seed(42),
+            )
+        else:
+            self.mnist_train, self.mnist_val = random_split(
+                mnist_full, [55000, 5000], generator=torch.Generator().manual_seed(42)
+            )
 
     def train_dataloader(self):
         return DataLoader(
@@ -204,13 +213,14 @@ if __name__ == "__main__":
     print(f"Using accelerator: {accelerator}")
     debug = False
     fast_dev = False
+    max_epochs = 1000
     if debug:
         accelerator = "cpu"
         fast_dev = True
+        max_epochs = 1
 
     batch_size = 128
-    max_epochs = 1000
-    n_steps_mse = 30
+    n_steps_mse = 500
     devices = 1
     strategy = "auto"  # or ddp if distributed
     num_workers = 4
@@ -227,7 +237,7 @@ if __name__ == "__main__":
 
     # output filename for the results
     root = "./data/"
-    model_name = "check_injflow_mnist_v1"
+    model_name = "check_injflow_mnist_v2"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -246,20 +256,28 @@ if __name__ == "__main__":
     #     version="01",
     #     log_graph=True,
     # )
-    logger = logging.getLogger()
+    # logger = logging.getLogger()
     logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    # configure logging at the root level of Lightning
+    # logging.getLogger("lightning.pytorch").setLevel(level=logging.INFO)
+    # logging.basicConfig(level=logging.INFO)
     logging.info(f"\n\n\tsaving to {model_fname} \n")
 
     # Define the trainer
     trainer = pl.Trainer(
-        logger=True,
+        logger=False,
         max_epochs=max_epochs,
         devices=devices,
         strategy=strategy,
         callbacks=[checkpoint_callback, TwoStageTraining()],
         check_val_every_n_epoch=check_val_every_n_epoch,
         accelerator=accelerator,
-        fast_dev_run=fast_dev,
+        # fast_dev_run=fast_dev,
+        # log_every_n_steps=1,
+        # max_epochs=1,
+        # limit_train_batches=1,
+        # limit_val_batches=1,
     )
 
     # epoch=99
@@ -284,6 +302,7 @@ if __name__ == "__main__":
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
+        # fast_dev_run=fast_dev,
     )
 
     trainer.fit(

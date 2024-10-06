@@ -134,6 +134,8 @@ class plFlowModel(pl.LightningModule):
 
         # logging the loss
         self.log("train_loss", loss)
+        if batch_idx % 100 == 0:
+            print(f"train_loss: {loss}")
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -148,6 +150,10 @@ class plFlowModel(pl.LightningModule):
         self.log("Nsteps_mse", self.n_steps_mse)
         self.log("step_counter", self.step_counter)
         self.log("val_loss", loss)
+        
+        # Print the loss to the console
+        if batch_idx % 100 == 0:
+            print(f"Nsteps_mse {self.n_steps_mse}, step_counter: {self.step_counter}, val_loss: {loss}")
         return loss
 
 # TODO: finish implementation
