@@ -242,6 +242,7 @@ class plApproximateFlowModel(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x, _ = batch
+        beta = self.beta.to(x.device)
 
         # get the surrogate loss, latent representation, and reconstructed tensor
         surrogate_loss, v_hat, x_hat = volume_change_surrogate(
@@ -251,12 +252,12 @@ class plApproximateFlowModel(pl.LightningModule):
             hutchinson_samples=self.hutchinson_samples,
         )
         # compute reconstruction loss
-        loss_reconstruction = torch.nn.functional.mse_loss(x_hat, x)
+        loss_reconstruction = torch.nn.functional.mse_loss(x_hat, x).to(x.device)
 
         # get negative log likelihoood
-        loss_nll = -self.latent.log_prob(v_hat).mean() - surrogate_loss
+        loss_nll = (-self.latent.log_prob(v_hat).mean() - surrogate_loss).to(x.device)
 
-        loss = self.beta * loss_reconstruction + loss_nll
+        loss = beta * loss_reconstruction + loss_nll
         # Print the loss to the console
         if batch_idx % 100 == 0:
             print(f"val_loss: {loss}")
