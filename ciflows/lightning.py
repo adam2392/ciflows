@@ -189,7 +189,7 @@ class plApproximateFlowModel(pl.LightningModule):
         self.lr_scheduler = lr_scheduler
         self.lr_min = lr_min
         self.hutchinson_samples = hutchinson_samples
-        self.beta = beta
+        self.beta = torch.Tensor([beta])
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=self.lr)
