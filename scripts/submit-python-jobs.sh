@@ -2,6 +2,8 @@
 
 # Directory containing the Python script
 SCRIPT_NAME="01_train_basic_models.py"
+SCRIPT_NAME="02_train_approx_models.py"
+
 LOG_DIR="/home/adam2392/projects/logs/"
 
 # Number of GPUs available

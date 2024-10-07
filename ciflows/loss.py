@@ -34,20 +34,20 @@ def sample_orthonormal_vectors(x: torch.Tensor, n_samples: int = 1000):
     v = torch.randn(batch_size, total_dim, n_samples, dtype=x.dtype)
 
     # QR decomposition to get orthonormal columns
-    q = torch.linalg.qr(v).Q.reshape(*x.shape, n_samples)
+    q = torch.linalg.qr(v).Q.reshape(batch_size, total_dim, n_samples)
 
     # scale by sqrt(total_dim) to ensure E[v v^T] = I
     return q * sqrt(total_dim)
 
 
 def volume_change_surrogate(
-    x: torch.Tensor, encoder, decoder, hutchinson_samples: int = 1000
+    x: torch.Tensor, encoder, decoder, hutchinson_samples: int = 1000, eta_samples=None
 ):
     """Compute volume change in change-of-variables formula using surrogate method.
 
     The surrogate is given by:
     $$
-    v^T f_\theta'(x) \texttt{SG}(g_\phi'(z) v).
+    v^T f_\\theta'(x) \\texttt{SG}(g_\\phi'(z) v).
     $$
     The gradient of the surrogate is the gradient of the volume change term.
 
@@ -57,53 +57,69 @@ def volume_change_surrogate(
         The input data.
     encoder : Callable
         The encoder fucntion, taking input x and returning v of shape (batch_size, latent_dim).
-    decoder : _type_
+    decoder : Callable
         The decoder function, taking input z and returning xhat of shape (batch_size, ...).
     hutchinson_samples : int, optional
         The number of hutchinson samples to draw, by default 1000.
 
     Returns
     -------
-    torch.Tensor of shape (batch_size,)
-        The surrogate loss, latent representation, and reconstructed tensor.
+    surrogate_loss : torch.Tensor
+        The surrogate loss sum over all batches and hutchinson samples.
+    v : torch.Tensor of shape (batch_size, latent_dim)
+        The latent representation.
+    xhat : torch.Tensor of shape (batch_size, ...)
+        The reconstructed tensor of shape ``x``.
     """
-    # project to the manifold and store projection distance fo rthe regularization term
-    eta_samples = sample_orthonormal_vectors(x, hutchinson_samples)
+    surrogate_loss = 0.0
 
     # ensure gradients wrt x are computed
     x.requires_grad_()
 
-    # encode the data to get the latent representation
-    v = encoder(x)
+    with torch.set_grad_enabled(True):
+        # encode the data to get the latent representation
+        v = encoder(x)
+        B, n_patches, embed_dim = v.shape
 
-    surrogate_loss = torch.zeros_like(v[:, 0])
+        # project to the manifold and store projection distance for the regularization term
+        # eta_samples = sample_orthonormal_vectors(x, hutchinson_samples)
+        if eta_samples is None:
+            eta_samples = torch.zeros((B, n_patches, embed_dim, hutchinson_samples))
 
-    for k in range(len(eta_samples)):
-        eta = eta_samples[k]
+            # from transformer encoding
+            eta_samples = sample_orthonormal_vectors(v, hutchinson_samples)
+            eta_samples = eta_samples.reshape(
+                B, n_patches, embed_dim, hutchinson_samples
+            )
 
-        # compute forward-mode AD for the decoder
-        # Note: this is efficient compared to reverse-mode AD because
-        # it is assumed the decoder maps from a low-dimensional space
-        # to a high-dimensional space
-        with dual_level():
-            # pass in (f(x), eta) to compute eta^T * f'(x)
-            dual_v = make_dual(v, eta)
+        for k in range(hutchinson_samples):
+            eta = eta_samples[..., k]
 
-            # map the latent representation, and the Hutchinson samples
-            # to the decoder high-dimensional manifold
-            dual_x1 = decoder(dual_v)
+            # compute forward-mode AD for the decoder
+            # Note: this is efficient compared to reverse-mode AD because
+            # it is assumed the decoder maps from a low-dimensional space
+            # to a high-dimensional space
+            with dual_level():
+                # pass in (f(x), eta) to compute eta^T * f'(x)
+                dual_v = make_dual(v, eta)
 
-            # v1 = \eta^T f'(x) (VJP)
-            xhat, v1 = unpack_dual(dual_x1)
+                # map the latent representation, and the Hutchinson samples
+                # to the decoder high-dimensional manifold
+                dual_x1 = decoder(dual_v)
 
-        # compute g'(v) eta using reverse-mode AD given:
-        # - v = f(x)
-        # - x = original data
-        # - eta = random Hutchinson vector
-        # v2 = g'(v) eta (JVP)
-        (v2,) = grad(v, x, eta, create_graph=True)
+                # v1 = \eta^T f'(x) (VJP)
+                xhat, v1 = unpack_dual(dual_x1)
 
-        # detach v1 to avoid computing the gradient of the
-        surrogate_loss += sum_except_batch(v2 * v1.detach()) / hutchinson_samples
+            # compute g'(v) eta using reverse-mode AD given:
+            # - v = f(x)
+            # - x = original data
+            # - eta = random Hutchinson vector
+            # v2 = g'(v) eta (JVP)
+            (v2,) = grad(v, x, eta, create_graph=True)
+
+            # detach v1 to avoid computing the gradient of the surrogate loss
+            # print("v1 and v2 don't match?", v2.shape, v1.detach().shape, hutchinson_samples)
+            res = torch.multiply(v2, v1.detach()).reshape(B, -1)
+            surrogate_loss += torch.sum(res) / hutchinson_samples
 
     return surrogate_loss, v, xhat

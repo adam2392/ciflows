@@ -191,7 +191,9 @@ class Injective1x1Conv(Flow):
             raise Exception(e)
 
         # compute log of its regularized singular values and sum them
-        log_det = torch.log(svals + self.gamma**2 / (svals + torch.Tensor([1e-8]).to(x.device)))
+        log_det = torch.log(
+            svals + self.gamma**2 / (svals + torch.Tensor([1e-8]).to(x.device))
+        )
         log_det = torch.sum(log_det) * (height * width)
 
         # compute the pseudo-inverse of the weight matrix: (W W^T + gamma^2 I)^{-1} W^T
@@ -205,7 +207,7 @@ class Injective1x1Conv(Flow):
             w_pinv = torch.matmul(torch.inverse(prefactor), self.W.T)
         except Exception as e:
             print()
-            print('Prefactor: ')
+            print("Prefactor: ")
             print(prefactor)
             print()
             print("Shapes: ")

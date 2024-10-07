@@ -1,12 +1,13 @@
 import argparse
+import logging
 import os
 from pathlib import Path
-import logging
-import torch.nn as nn
+
 import lightning as pl
 import normflows as nf
 import numpy as np
 import torch
+import torch.nn as nn
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import TensorBoardLogger
 from normflows.flows.affine import GlowBlock
@@ -15,7 +16,7 @@ from torchvision import transforms
 from torchvision.datasets import MNIST
 
 from ciflows.glow import InjectiveGlowBlock, Squeeze
-from ciflows.lightning import plFlowModel, TwoStageTraining
+from ciflows.lightning import TwoStageTraining, plFlowModel
 
 
 def get_model():

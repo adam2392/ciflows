@@ -3,7 +3,6 @@ import torch
 import torch.optim as optim
 from lightning.pytorch.callbacks import Callback
 
-
 from .glow import InjectiveGlowBlock
 from .loss import volume_change_surrogate
 from .model import InjectiveFlow
@@ -11,7 +10,10 @@ from .model import InjectiveFlow
 
 class TwoStageTraining(Callback):
     def on_train_epoch_start(self, trainer, pl_module):
-        if getattr(pl_module, 'n_steps_mse', None) is not None and trainer.current_epoch > pl_module.n_steps_mse:
+        if (
+            getattr(pl_module, "n_steps_mse", None) is not None
+            and trainer.current_epoch > pl_module.n_steps_mse
+        ):
             trainer.optimizers = [pl_module.optimizer_nll]
             # trainer.lr_schedulers = trainer.configure_schedulers([pl_module.])
             # trainer.optimizer_frequencies = [] # or optimizers frequencies if you have any
@@ -28,7 +30,7 @@ class plFlowModel(pl.LightningModule):
         lr: float = 1e-3,
         lr_min: float = 1e-8,
         lr_scheduler=None,
-        n_steps_mse=None
+        n_steps_mse=None,
     ):
         """Injective flow model lightning module.
 
@@ -83,14 +85,14 @@ class plFlowModel(pl.LightningModule):
 
     def forward(self, x, target=None) -> torch.Any:
         """Foward pass.
-        
+
         Note: This is opposite of the normalizing flow API convention.
         """
         return self.model.inverse(x)
 
     def inverse(self, v, target=None) -> torch.Any:
         """Inverse pass.
-        
+
         Note: This is opposite of the normalizing flow API convention.
         """
         return self.model.forward(v)
@@ -151,11 +153,14 @@ class plFlowModel(pl.LightningModule):
         self.log("Nsteps_mse", self.n_steps_mse)
         self.log("step_counter", self.step_counter)
         self.log("val_loss", loss)
-        
+
         # Print the loss to the console
         if batch_idx % 100 == 0:
-            print(f"Nsteps_mse {self.n_steps_mse}, step_counter: {self.step_counter}, val_loss: {loss}")
+            print(
+                f"Nsteps_mse {self.n_steps_mse}, step_counter: {self.step_counter}, val_loss: {loss}"
+            )
         return loss
+
 
 # TODO: finish implementation
 class plApproximateFlowModel(pl.LightningModule):
@@ -164,13 +169,99 @@ class plApproximateFlowModel(pl.LightningModule):
     Here, we define an approximate flow model for training.
     """
 
-    def __init__(self, model, lr=1e-3, lr_min=1e-8, lr_scheduler=None):
+    def __init__(
+        self,
+        latent,
+        encoder,
+        decoder,
+        lr=1e-3,
+        lr_min=1e-8,
+        lr_scheduler=None,
+        hutchinson_samples=100,
+        beta=1.0,
+    ):
         super().__init__()
         self.save_hyperparameters()
-        self.model = model
+        self.latent = latent
+        self.encoder = encoder
+        self.decoder = decoder
         self.lr = lr
         self.lr_scheduler = lr_scheduler
         self.lr_min = lr_min
+        self.hutchinson_samples = hutchinson_samples
+        self.beta = beta
+
+    def configure_optimizers(self):
+        optimizer = optim.Adam(self.parameters(), lr=self.lr)
+        if self.lr_scheduler == "cosine":
+            # cosine learning rate annealing
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer,
+                T_max=self.trainer.max_epochs,
+                eta_min=self.lr_min,
+                verbose=True,
+            )
+        elif self.lr_scheduler == "step":
+            # An scheduler is optional, but can help in flows to get the last bpd improvement
+            scheduler = optim.lr_scheduler.StepLR(optimizer, 1, gamma=0.99)
+        else:
+            scheduler = None
+        return [optimizer], [scheduler]
+
+    def training_step(self, batch, batch_idx):
+        x, _ = batch
+
+        # get the surrogate loss, latent representation, and reconstructed tensor
+        surrogate_loss, v_hat, x_hat = volume_change_surrogate(
+            x,
+            self.encoder,
+            self.decoder,
+            hutchinson_samples=self.hutchinson_samples,
+        )
+        # compute reconstruction loss
+        loss_reconstruction = torch.nn.functional.mse_loss(x_hat, x)
+
+        # get negative log likelihoood
+        embed_dim = self.decoder.embed_dim
+        v_hat = v_hat.view(-1, embed_dim)
+        loss_nll = -self.latent.log_prob(v_hat).mean() - surrogate_loss
+
+        loss = self.beta * loss_reconstruction + loss_nll
+
+        self.log("train_loss", loss)
+        return loss
+
+    @torch.no_grad()
+    def sample(self, num_samples=1, **params):
+        """
+        Sample a batch of images from the flow.
+        """
+        # sample latent space
+        v = self.latent.sample((num_samples,), **params)
+        return self.decoder(v)
+
+    def validation_step(self, batch, batch_idx):
+        x, _ = batch
+
+        # get the surrogate loss, latent representation, and reconstructed tensor
+        surrogate_loss, v_hat, x_hat = volume_change_surrogate(
+            x,
+            self.encoder,
+            self.decoder,
+            hutchinson_samples=self.hutchinson_samples,
+        )
+        # compute reconstruction loss
+        loss_reconstruction = torch.nn.functional.mse_loss(x_hat, x)
+
+        # get negative log likelihoood
+        loss_nll = -self.latent.log_prob(v_hat).mean() - surrogate_loss
+
+        loss = self.beta * loss_reconstruction + loss_nll
+        # Print the loss to the console
+        if batch_idx % 100 == 0:
+            print(f"val_loss: {loss}")
+        self.log("val_loss", loss)
+        return loss
 
 
 class plCausalModel(plFlowModel):

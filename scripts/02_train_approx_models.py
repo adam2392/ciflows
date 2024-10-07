@@ -1,12 +1,13 @@
 import argparse
+import logging
 import os
 from pathlib import Path
-import logging
-import torch.nn as nn
+
 import lightning as pl
 import normflows as nf
 import numpy as np
 import torch
+import torch.nn as nn
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import TensorBoardLogger
 from normflows.flows.affine import GlowBlock
@@ -15,114 +16,54 @@ from torchvision import transforms
 from torchvision.datasets import MNIST
 
 from ciflows.glow import InjectiveGlowBlock, Squeeze
-from ciflows.lightning import plFlowModel, TwoStageTraining
+from ciflows.lightning import plApproximateFlowModel
+from ciflows.vit import VisionTransformerDecoder, VisionTransformerEncoder
 
 
 def get_encoder():
     pass
 
+
 def get_decoder():
     pass
+
 
 def get_latent_distr():
     pass
 
 
 def get_model():
-    n_hidden = 64
-    n_mixing_layers = 2
-    n_injective_layers = 3
-    n_glow_blocks = 2
-    use_lu = True
-    gamma = 1e-2
-    activation = "linear"
 
     input_shape = (1, 28, 28)
-    n_channels = input_shape[0]
+    img_size = input_shape[1]
+    in_channels = input_shape[0]
+    patch_size = 4
+    embed_dim = 64
 
-    n_chs = n_channels
-    flows = []
+    n_heads = 4
+    hidden_dim = 1024
+    n_layers = 3
+
+    # output shape
+    n_patches = (img_size // patch_size) ** 2
+    output_shape = (64,)
 
     debug = True
 
     # add the initial mixing layers
-    print("Beginning of mixing flows.")
-    mixing_flows = []
-    # Add flow layers starting from the latent representation
-    for i in range(n_mixing_layers):
-        # n_chs = C * 4^(L - i)
-        n_chs = n_channels * 4 ** (n_mixing_layers - i)
-
-        if debug:
-            print(f"On layer {n_mixing_layers - i}, n_chs = {n_chs}")
-        for j in range(n_glow_blocks):
-            mixing_flows += [
-                GlowBlock(
-                    channels=n_chs,
-                    hidden_channels=n_hidden,
-                    use_lu=use_lu,
-                    scale=True,
-                )
-            ]
-        mixing_flows += [Squeeze()]
-
-    # reverse the mixing flows to go from X -> V.
-    mixing_flows = mixing_flows[::-1]
-    i = 1
-    for flow in mixing_flows:
-        if hasattr(flow, "n_channels"):
-            print(f"On layer {i}, n_chs = {flow.n_channels}")
-            i += 1
-    num_layers = i
-
-    print("Beginning of injective flows.")
-    n_chs = n_channels * 4 ** (n_mixing_layers - 0)
-    debug = True
-    # add injective blocks
-    injective_flows = []
-    for i in range(n_injective_layers):
-        # Note: this is adding from V -> X
-        n_chs = n_chs // 2
-        injective_flows += [
-            InjectiveGlowBlock(
-                channels=n_chs,
-                hidden_channels=n_hidden,
-                activation=activation,
-                scale=True,
-                gamma=gamma,
-            )
-        ]
-
-        if debug:
-            print(f"On layer {i + num_layers}, n_chs = {n_chs}")
-        for j in range(n_glow_blocks):
-            injective_flows += [
-                GlowBlock(
-                    channels=n_chs,
-                    hidden_channels=n_hidden,
-                    use_lu=use_lu,
-                    scale=True,
-                )
-            ]
-
-    # Note: this is constructed as X -> V, so we need to reverse the flows
-    # to adhere to the normflows convention of V -> X
-    flows = mixing_flows
-    flows.extend(injective_flows)
-    flows = flows[::-1]
-
-    print("n_channels: ", n_chs)
-    q0 = nf.distributions.DiagGaussian((n_chs, 7, 7))
-
-    model = nf.NormalizingFlow(q0=q0, flows=flows)
-
-    pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(pytorch_total_params)
-
-    return model
+    print("Beginning of setting up transformer models...")
+    # Instantiate the encoder and decoder
+    encoder = VisionTransformerEncoder(
+        img_size, patch_size, in_channels, embed_dim, n_heads, hidden_dim, n_layers
+    )
+    decoder = VisionTransformerDecoder(
+        img_size, patch_size, in_channels, embed_dim, n_heads, hidden_dim, n_layers
+    )
+    q0 = nf.distributions.DiagGaussian(output_shape)
+    return q0, encoder, decoder
 
 
-def initialize_flow(model):
+def initialize_model(model):
     """
     Initialize a full normalizing flow model
     """
@@ -132,7 +73,10 @@ def initialize_flow(model):
             if "coupling" in name:
                 nn.init.normal_(param, mean=0.0, std=0.01)
             else:
-                nn.init.xavier_uniform_(param)
+                try:
+                    nn.init.xavier_uniform_(param)
+                except ValueError:
+                    nn.init.normal_(param, mean=0.0, std=0.01)
         elif "bias" in name:
             nn.init.constant_(param, 0.0)
 
@@ -212,15 +156,14 @@ if __name__ == "__main__":
 
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
-    debug = False
+    debug = True
     fast_dev = False
     if debug:
         accelerator = "cpu"
         fast_dev = True
 
-    batch_size = 128
+    batch_size = 256
     max_epochs = 1000
-    n_steps_mse = 30
     devices = 1
     strategy = "auto"  # or ddp if distributed
     num_workers = 4
@@ -231,13 +174,14 @@ if __name__ == "__main__":
     lr = 3e-4
     lr_min = 1e-8
     lr_scheduler = "cosine"
+    hutchinson_samples = 5
 
     # whether or not to shuffle dataset
     shuffle = True
 
     # output filename for the results
     root = "./data/"
-    model_name = "check_injflow_mnist_v1"
+    model_name = "check_fff_mnist_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -266,7 +210,7 @@ if __name__ == "__main__":
         max_epochs=max_epochs,
         devices=devices,
         strategy=strategy,
-        callbacks=[checkpoint_callback, TwoStageTraining()],
+        callbacks=[checkpoint_callback],
         check_val_every_n_epoch=check_val_every_n_epoch,
         accelerator=accelerator,
         fast_dev_run=fast_dev,
@@ -278,15 +222,21 @@ if __name__ == "__main__":
     # model = plFlowModel.load_from_checkpoint(model_fname)
 
     # define the model
-    flow_model = get_model()
-    initialize_flow(flow_model)
-    model = plFlowModel(
-        flow_model,
+    q0, encoder, decoder = get_model()
+    initialize_model(encoder)
+    initialize_model(decoder)
+    model = plApproximateFlowModel(
+        latent=q0,
+        encoder=encoder,
+        decoder=decoder,
         lr=lr,
         lr_min=lr_min,
         lr_scheduler=lr_scheduler,
-        n_steps_mse=n_steps_mse,
+        hutchinson_samples=hutchinson_samples,
     )
+
+    pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(pytorch_total_params)
 
     # define the data loader
     data_module = MNISTDataModule(
