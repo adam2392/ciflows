@@ -71,7 +71,7 @@ def volume_change_surrogate(
     xhat : torch.Tensor of shape (batch_size, ...)
         The reconstructed tensor of shape ``x``.
     """
-    surrogate_loss = 0.0
+    surrogate_loss = torch.Tensor([0.0]).to(x.device)
 
     # ensure gradients wrt x are computed
     x.requires_grad_()

@@ -155,7 +155,7 @@ if __name__ == "__main__":
         accelerator = "cpu"
 
     print(f"Using device: {device}")
-    print(f"Using accelerator: {accelerator}")
+    print(f"Using ccelerator: {accelerator}")
     debug = False
     fast_dev = False
     if debug:
