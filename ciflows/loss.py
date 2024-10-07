@@ -74,9 +74,9 @@ def volume_change_surrogate(
     surrogate_loss = torch.Tensor([0.0]).to(x.device)
 
     # ensure gradients wrt x are computed
-    x.requires_grad_()
-
     with torch.set_grad_enabled(True):
+        x.requires_grad_()
+
         # encode the data to get the latent representation
         v = encoder(x)
         B, n_patches, embed_dim = v.shape
@@ -84,10 +84,10 @@ def volume_change_surrogate(
         # project to the manifold and store projection distance for the regularization term
         # eta_samples = sample_orthonormal_vectors(x, hutchinson_samples)
         if eta_samples is None:
-            eta_samples = torch.zeros((B, n_patches, embed_dim, hutchinson_samples))
+            # eta_samples = torch.zeros((B, n_patches, embed_dim, hutchinson_samples), device=x.device)
 
             # from transformer encoding
-            eta_samples = sample_orthonormal_vectors(v, hutchinson_samples)
+            eta_samples = sample_orthonormal_vectors(v, hutchinson_samples).to(x.device)
             eta_samples = eta_samples.reshape(
                 B, n_patches, embed_dim, hutchinson_samples
             )
