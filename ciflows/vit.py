@@ -186,36 +186,74 @@ class VisionTransformerDecoder(nn.Module):
 
         # Final layer to map back to original patch dimension
         self.output_projection = nn.Linear(
-            embed_dim, self.patch_size * self.patch_size * self.in_channels
+            embed_dim, self.img_size * self.img_size * self.in_channels
         )
+
+    # def forward(self, encoding):
+    #     B, n_patches, embed_dim = encoding.shape
+
+    #     assert (
+    #         embed_dim == self.embed_dim
+    #     ), f"Embedding dimension should match the encoding: {embed_dim} != {self.embed_dim}"
+
+    #     # patch embed and positional embedding
+    #     # Adjust positional embedding to match the number of patches
+    #     if n_patches != self.n_patches:
+    #         # Interpolate positional embeddings to match the input number of patches
+    #         pos_embed_resized = torch.functional.F.interpolate(
+    #             self.pos_embed[:, :self.n_patches, :].permute(0, 2, 1),
+    #             size=n_patches, mode="linear"
+    #         ).permute(0, 2, 1)
+    #     else:
+    #         pos_embed_resized = self.pos_embed
+
+    #     # Apply positional embeddings
+    #     x = encoding + pos_embed_resized
+
+    #     print(pos_embed_resized.shape, encoding.shape, x.shape)
+    #     print('Decoding...', x.shape, encoding.shape, self.pos_embed.shape)
+    #     for layer in self.decoder_layers:
+    #         x = x + layer(x, encoding)
+
+    #     print('Finished decoing?')
+    #     # Map back to original patch dimension (unflatten the patches)
+    #     patches = self.output_projection(x)
+    #     patches = patches.view(
+    #         B, n_patches, self.patch_size, self.patch_size, self.in_channels
+    #     )
+    #     patches = patches.permute(
+    #         0, 4, 2, 3, 1
+    #     )  # [B, 3, patch_size, patch_size, num_patches]
+
+    #     # Reconstruct the original image by reshaping patches
+    #     print(patches.shape)
+    #     img = patches.reshape(B, self.in_channels, self.img_size, self.img_size)
+    #     return img  # Reconstructed image
 
     def forward(self, encoding):
         B, n_patches, embed_dim = encoding.shape
         assert (
-            n_patches == self.n_patches
-        ), f"Number of patches should match the encoding: {n_patches} != {self.n_patches}"
-        assert (
             embed_dim == self.embed_dim
-        ), f"Embedding dimension should match the encoding: {embed_dim} != {self.embed_dim}"
+        ), f"Expected embed_dim={self.embed_dim}, but got {embed_dim}"
 
-        # patch embed and positional embedding
-        x = encoding + self.pos_embed
+        # If positional embeddings are used, add them (optional)
+        x = encoding + self.pos_embed[:, :n_patches, :]  # Positional embedding addition
 
+        # Pass through Transformer decoder layers
         for layer in self.decoder_layers:
-            x = x + layer(x, encoding)
+            x = layer(
+                x, encoding
+            )  # Optionally use the encoding as context for the transformer decoder
 
-        # project to the output patches
+        # Flatten batches and patches into a single dimension (Batches * Patches, Embed_dim)
+        x = x.view(B * n_patches, embed_dim)
+
+        # Project from `embed_dim` back to original patch size (Batches * Patches, Patch Size)
         patches = self.output_projection(x)
 
-        # Map back to original patch dimension (unflatten the patches)
-        patches = self.output_projection(x)
-        patches = patches.view(
-            B, n_patches, self.patch_size, self.patch_size, self.in_channels
+        # Reconstruct the original image from patches
+        img = patches.reshape(
+            B * n_patches, self.in_channels, self.img_size, self.img_size
         )
-        patches = patches.permute(
-            0, 4, 2, 3, 1
-        )  # [B, 3, patch_size, patch_size, num_patches]
 
-        # Reconstruct the original image by reshaping patches
-        img = patches.reshape(B, self.in_channels, self.img_size, self.img_size)
         return img  # Reconstructed image

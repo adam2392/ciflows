@@ -113,8 +113,33 @@ def test_vit_decoder():
         reconstructed_img.shape
     )  # Output will be [batch_size, channels, height, width]
     assert reconstructed_img.shape == (
-        1,
+        49,
         3,
         28,
         28,
     ), f"Expected output shape {(1, 3, 28, 28)}, but got {reconstructed_img.shape}"
+
+
+def test_vit_decoder_from_latent():
+    # Example Usage
+    encoder_output = torch.randn(16, 1, 768)  # (B, n_patches, embed_dim)
+    decoder = VisionTransformerDecoder(
+        img_size=28,
+        patch_size=4,
+        in_channels=3,
+        embed_dim=768,
+        n_heads=2,
+        hidden_dim=1024,
+        n_layers=2,
+        dropout=0.1,
+    )
+    reconstructed_img = decoder(encoder_output)
+    print(
+        reconstructed_img.shape
+    )  # Output will be [batch_size, channels, height, width]
+    assert reconstructed_img.shape == (
+        16,
+        3,
+        28,
+        28,
+    ), f"Expected output shape {(16, 3, 28, 28)}, but got {reconstructed_img.shape}"

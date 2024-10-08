@@ -236,8 +236,9 @@ class plApproximateFlowModel(pl.LightningModule):
         """
         Sample a batch of images from the flow.
         """
-        # sample latent space
-        v = self.latent.sample((num_samples,), **params)
+        # sample latent space and reshape to (batches, 1, embed_dim)
+        v = self.latent.sample(num_samples, **params)
+        v = v.reshape(num_samples, 1, -1)
         return self.decoder(v)
 
     def validation_step(self, batch, batch_idx):
