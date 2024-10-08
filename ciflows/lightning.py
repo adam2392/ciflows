@@ -242,7 +242,7 @@ class plApproximateFlowModel(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x, _ = batch
-        # beta = self.beta.to(x.device)
+        self.beta = self.beta.to(x.device)
 
         # get the surrogate loss, latent representation, and reconstructed tensor
         surrogate_loss, v_hat, x_hat = volume_change_surrogate(
