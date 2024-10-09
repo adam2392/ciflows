@@ -113,11 +113,12 @@ def test_vit_decoder():
         reconstructed_img.shape
     )  # Output will be [batch_size, channels, height, width]
     assert reconstructed_img.shape == (
+        1,
         49,
         3,
         28,
         28,
-    ), f"Expected output shape {(1, 3, 28, 28)}, but got {reconstructed_img.shape}"
+    ), f"Expected output shape {(1, 49, 3, 28, 28)}, but got {reconstructed_img.shape}"
 
 
 def test_vit_decoder_from_latent():
@@ -139,7 +140,8 @@ def test_vit_decoder_from_latent():
     )  # Output will be [batch_size, channels, height, width]
     assert reconstructed_img.shape == (
         16,
+        1,
         3,
         28,
         28,
-    ), f"Expected output shape {(16, 3, 28, 28)}, but got {reconstructed_img.shape}"
+    ), f"Expected output shape {(16, 1, 3, 28, 28)}, but got {reconstructed_img.shape}"
