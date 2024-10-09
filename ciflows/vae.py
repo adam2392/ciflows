@@ -19,16 +19,17 @@ class ResidualBlock(nn.Module):
             if in_channels != out_channels
             else nn.Identity()
         )
-
+        self.relu1 = nn.ReLU()
+        self.relu2 = nn.ReLU()
         # Add dropout layers
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        out = F.relu(self.conv1(x))  # First convolution + ReLU
+        out = self.relu1(self.conv1(x))  # First convolution + ReLU
         out = self.dropout(out)
         out = self.conv2(out)  # Second convolution
-        out += self.shortcut(x)  # Add the shortcut (input)
-        out = F.relu(out)
+        out = out +  self.shortcut(x)  # Add the shortcut (input)
+        out = self.relu2(out)
         out = self.dropout(out)
         return out
 
@@ -45,6 +46,8 @@ class UpsampleBlock(nn.Module):
             if in_channels != out_channels
             else nn.Identity()
         )
+        self.relu1 = nn.ReLU()
+        self.relu2 = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
@@ -61,11 +64,10 @@ class UpsampleBlock(nn.Module):
             Upsample block.
         """
         out = self.upsample(x)
-        out = F.relu(self.conv(out))
+        out = self.relu1(self.conv(out))
         out = self.dropout(out)
-        shortcut = self.upsample(self.shortcut(x))
-        out += shortcut
-        out = F.relu(out)
+        out = out + self.upsample(self.shortcut(x))
+        out = self.relu2(out)
         out = self.dropout(out)
         return out
 
@@ -200,6 +202,7 @@ class Decoder(nn.Module):
             self.upsample_layers.append(UpsampleBlock(in_ch, out_ch, dropout=dropout))
 
         self.final_conv = UpsampleBlock(32, out_channels, dropout=dropout)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x = self.ffm(x)
@@ -213,6 +216,6 @@ class Decoder(nn.Module):
         x = self.bottleneck_layers(x)
         x = self.upsample_layers(x)
         x = self.final_conv(x)
-        x = torch.sigmoid(x)
+        x = self.sigmoid(x)
         return x
 
