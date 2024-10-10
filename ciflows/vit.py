@@ -13,9 +13,7 @@ def get_img_patches(x: Tensor, patch_size: int):
     num_patches = (img_size // patch_size) ** 2
 
     # split the tensor into patches as a 6D tensor with (B, C, n_patches_in_height, n_patches_in_width, patch_size, patch_size)
-    x = x.unfold(2, patch_size, patch_size).unfold(
-        3, patch_size, patch_size
-    )
+    x = x.unfold(2, patch_size, patch_size).unfold(3, patch_size, patch_size)
     # B, C, n_patches, patch_dim * patch_dim
     x = x.contiguous().view(B, C, -1, patch_size * patch_size)
 
@@ -246,7 +244,9 @@ class VisionTransformerDecoder(nn.Module):
         )  # [B, 3, img_size, img_size, num_patches]
 
         # Reconstruct the original image by reshaping patches
-        img = patches.reshape(B, n_patches, self.in_channels, self.img_size, self.img_size)
+        img = patches.reshape(
+            B, n_patches, self.in_channels, self.img_size, self.img_size
+        )
         return img  # Reconstructed image
 
     # def forward(self, encoding):

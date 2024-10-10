@@ -4,7 +4,7 @@ import torch.optim as optim
 from lightning.pytorch.callbacks import Callback
 
 from .glow import InjectiveGlowBlock
-from .loss import volume_change_surrogate
+from .loss import volume_change_surrogate, volume_change_surrogate_transformer
 from .model import InjectiveFlow
 
 
@@ -83,14 +83,14 @@ class plFlowModel(pl.LightningModule):
         """
         return self.model.sample(num_samples=num_samples, **params)
 
-    def forward(self, x, target=None) -> torch.Any:
+    def forward(self, x, target=None):
         """Foward pass.
 
         Note: This is opposite of the normalizing flow API convention.
         """
         return self.model.inverse(x)
 
-    def inverse(self, v, target=None) -> torch.Any:
+    def inverse(self, v, target=None):
         """Inverse pass.
 
         Note: This is opposite of the normalizing flow API convention.
@@ -212,7 +212,7 @@ class plApproximateFlowModel(pl.LightningModule):
         x, _ = batch
 
         # get the surrogate loss, latent representation, and reconstructed tensor
-        surrogate_loss, v_hat, x_hat = volume_change_surrogate(
+        surrogate_loss, v_hat, x_hat = volume_change_surrogate_transformer(
             x,
             self.encoder,
             self.decoder,
@@ -246,7 +246,7 @@ class plApproximateFlowModel(pl.LightningModule):
         self.beta = self.beta.to(x.device)
 
         # get the surrogate loss, latent representation, and reconstructed tensor
-        surrogate_loss, v_hat, x_hat = volume_change_surrogate(
+        surrogate_loss, v_hat, x_hat = volume_change_surrogate_transformer(
             x,
             self.encoder,
             self.decoder,

@@ -6,7 +6,8 @@ import torch
 import torch.autograd as autograd
 from torch.autograd import grad
 
-from ciflows.loss import sample_orthonormal_vectors, volume_change_surrogate
+from ciflows.loss import (sample_orthonormal_vectors, volume_change_surrogate,
+                          volume_change_surrogate_transformer)
 from ciflows.vit import VisionTransformerDecoder, VisionTransformerEncoder
 
 SurrogateOutput = namedtuple(
@@ -40,7 +41,7 @@ def test_volume_change_surrogate_shape():
     x = torch.randn(batch_size, in_channels, img_size, img_size)
 
     # Run the function
-    surrogate_loss, v, xhat = volume_change_surrogate(
+    surrogate_loss, v, xhat = volume_change_surrogate_transformer(
         x, encoder, decoder, hutchinson_samples=hutchinson_samples
     )
 
@@ -177,7 +178,7 @@ def test_compare_surrogates():
     #     eta_samples[:, idx, ...] = sample_orthonormal_vectors(v, hutchinson_samples)
 
     # Run version 2
-    surrogate_loss_v2, v_v2, xhat_v2 = volume_change_surrogate(
+    surrogate_loss_v2, v_v2, xhat_v2 = volume_change_surrogate_transformer(
         x,
         encoder,
         decoder,

@@ -1,6 +1,7 @@
 import pytest
 import torch
-from ciflows.vae import Encoder, Decoder
+
+from ciflows.vae import Decoder, Encoder
 
 
 @pytest.mark.parametrize("input_channels", [1, 3])
