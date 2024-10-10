@@ -445,7 +445,7 @@ class Conv_VAE(nn.Module):
     def log_prob(self, vhat):
         # compute the log probability of the latent encoding
         log_p = -0.5 * self.hidden_size * torch.log(
-            torch.Tensor([2 * torch.pi])
+            torch.Tensor([2 * torch.pi], device=vhat.device)
         ) - torch.sum(
             self.log_scale
             + 0.5 * torch.pow((vhat - self.loc) / torch.exp(self.log_scale), 2)
