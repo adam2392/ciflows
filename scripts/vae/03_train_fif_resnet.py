@@ -122,7 +122,7 @@ if __name__ == "__main__":
     batch_size = 256
     num_workers = 4
     shuffle = True
-    latent_dim = 12
+    latent_dim = 128
 
     beta = 5.0
 
@@ -135,7 +135,7 @@ if __name__ == "__main__":
     strategy = "auto"  # or ddp if distributed
 
     root = "./data/"
-    model_name = "check_fif_convvae_mnist_latentdim12_beta5_v3"
+    model_name = "check_fif_convvae_mnist_latentdim128_beta5_v2"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
