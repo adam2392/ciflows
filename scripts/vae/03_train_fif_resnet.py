@@ -152,13 +152,6 @@ if __name__ == "__main__":
         accelerator = "cpu"
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
-    debug = False
-    fast_dev = False
-    max_epochs = 1000
-    if debug:
-        accelerator = "cpu"
-        fast_dev = True
-        max_epochs = 1
 
     # Initialize your Encoder and Decoder
     channels = 1  # For grayscale images (like MNIST); set to 3 for RGB (like CelebA)
@@ -178,6 +171,17 @@ if __name__ == "__main__":
         hutchinson_samples=2,
         beta=beta,
     )
+
+    debug = False
+    fast_dev = False
+    max_epochs = 1000
+    if debug:
+        accelerator = "cpu"
+        fast_dev = True
+        max_epochs = 1
+    else:
+        torch.set_float32_matmul_precision('high')
+        model = torch.compile(model)
 
     def count_trainable_parameters(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
