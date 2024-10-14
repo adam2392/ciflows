@@ -122,7 +122,7 @@ if __name__ == "__main__":
     batch_size = 256
     num_workers = 4
     shuffle = True
-    latent_dim = 256
+    latent_dim = 12
 
     beta = 5.0
 
