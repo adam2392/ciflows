@@ -135,7 +135,7 @@ if __name__ == "__main__":
     strategy = "auto"  # or ddp if distributed
 
     root = "./data/"
-    model_name = "check_fff_convvae_mnist_v1"
+    model_name = "check_fif_convvae_mnist_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
