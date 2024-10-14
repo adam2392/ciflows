@@ -1,6 +1,4 @@
-import argparse
 import logging
-import os
 from pathlib import Path
 
 import lightning as pl
@@ -9,13 +7,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 from lightning.pytorch.callbacks import ModelCheckpoint
-from lightning.pytorch.loggers import TensorBoardLogger
-from normflows.flows.affine import GlowBlock
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.datasets import MNIST
 
-from ciflows.glow import InjectiveGlowBlock, Squeeze
 from ciflows.lightning import plApproximateFlowModel
 from ciflows.vit import VisionTransformerDecoder, VisionTransformerEncoder
 

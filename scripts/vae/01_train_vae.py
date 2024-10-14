@@ -2,13 +2,12 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from tqdm import tqdm
 
-from ciflows.vae import Conv_VAE, Decoder, Encoder
+from ciflows.vae import Conv_VAE
 
 
 # Define the loss function (reconstruction + KL divergence)

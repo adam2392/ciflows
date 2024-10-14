@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from normflows.distributions import DiagGaussian
 
 
 class ResidualBlock(nn.Module):
@@ -401,6 +399,13 @@ class Conv_VAE(nn.Module):
             self.register_buffer("loc", torch.zeros(1, hidden_size))
             self.register_buffer("log_scale", torch.zeros(1, hidden_size))
 
+        # self.latent = torch.distributions.Independent(
+        #     torch.distributions.Normal(
+        #         loc=torch.zeros(latent_dim, device=device),
+        #         scale=torch.ones(latent_dim, device=device),
+        #     ),
+        #     1
+        # )
         # Decoder
         self.decoder = ConvDecoder(hidden_size, channels, height, width)
         # self.decoder = nn.Sequential(

@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 # Double Convolution Block (Conv -> ReLU -> Conv -> ReLU)

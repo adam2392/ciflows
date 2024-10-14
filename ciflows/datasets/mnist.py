@@ -1,12 +1,9 @@
-from pathlib import Path
 
 import lightning as pl
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.datasets import MNIST
-from tqdm import tqdm
 
 
 class MNISTDataModule(pl.LightningDataModule):

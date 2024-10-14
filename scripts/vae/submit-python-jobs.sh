@@ -3,6 +3,7 @@
 # Directory containing the Python script
 SCRIPT_NAME="01_train_vae.py"
 SCRIPT_NAME="02_train_fff_vae.py"
+SCRIPT_NAME="03_train_fif_resnet.py"
 
 LOG_DIR="/home/adam2392/projects/logs/"
 
@@ -34,7 +35,7 @@ CMD="python3 $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 
 # Optionally, you can use a job scheduler like `nohup` to run the command in the background
 # or `&` to run the command in the background
-LOG_FILE="fffvae_mnist_${SCRIPT_NAME}_seed_${TRAINING_SEED}.log"
+LOG_FILE="fif_mnist_${SCRIPT_NAME}_seed_${TRAINING_SEED}.log"
 nohup $CMD > $LOG_FILE 2>&1 &
 
 echo $TRAINING_SEED

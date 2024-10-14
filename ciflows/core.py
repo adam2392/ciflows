@@ -1,5 +1,4 @@
 import torch
-import torch.autograd.forward_ad as fwAD
 import torch.nn as nn
 
 from ciflows.loss import volume_change_surrogate
@@ -18,7 +17,6 @@ from ciflows.vae import ConvDecoder, ConvEncoder
 
 #     out = model(input)
 #     jvp = fwAD.unpack_dual(out).tangent
-
 
 
 # Define a simple linear encoder and decoder

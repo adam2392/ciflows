@@ -1,4 +1,3 @@
-import pytest
 import torch
 
 from ciflows.vit import (PatchEmbedding, TransformerEncoderLayer,

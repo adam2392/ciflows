@@ -4,16 +4,19 @@ import lightning as pl
 import torch
 import torch.optim as optim
 from lightning.pytorch.callbacks import ModelCheckpoint
+from normflows.distributions import DiagGaussian
 
 from ciflows.datasets.mnist import MNISTDataModule
 from ciflows.loss import volume_change_surrogate
-from ciflows.vae import Conv_VAE
+from ciflows.resnet import ConvNetDecoder, ConvNetEncoder
 
 
 class plFFFConvVAE(pl.LightningModule):
     def __init__(
         self,
-        model,
+        encoder,
+        decoder,
+        latent,
         lr=3e-4,
         lr_min: float = 1e-8,
         lr_scheduler=None,
@@ -24,24 +27,19 @@ class plFFFConvVAE(pl.LightningModule):
         # ensure that the model is saved and can be loaded later as a checkpoint
         self.save_hyperparameters()
 
-        self.model = model
+        self.encoder = encoder
+        self.decoder = decoder
+        self.latent = latent
+
         self.lr = lr
         self.lr_min = lr_min
         self.lr_scheduler = lr_scheduler
         self.hutchinson_samples = hutchinson_samples
         self.beta = torch.Tensor([beta])
 
-    @property
-    def encoder(self):
-        return self.model.encoder
-
-    @property
-    def decoder(self):
-        return self.model.decoder
-
     def forward(self, x, target=None):
         """Foward pass."""
-        return self.model(x)
+        return self.encoder(x)
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=self.lr)
@@ -75,7 +73,7 @@ class plFFFConvVAE(pl.LightningModule):
 
         # get negative log likelihoood
         v_hat = v_hat.view(B, -1)
-        loss_nll = -self.model.log_prob(v_hat).mean() - surrogate_loss
+        loss_nll = -self.latent.log_prob(v_hat).mean() - surrogate_loss
 
         loss = self.beta * loss_reconstruction + loss_nll
 
@@ -88,7 +86,7 @@ class plFFFConvVAE(pl.LightningModule):
         Sample a batch of images from the flow.
         """
         # sample latent space and reshape to (batches, 1, embed_dim)
-        v = self.model.latent.sample(num_samples, **params)
+        v = self.latent.sample(num_samples, **params)
         v = v.reshape(num_samples, 1, -1)
         return self.decoder(v)
 
@@ -109,7 +107,7 @@ class plFFFConvVAE(pl.LightningModule):
 
         # get negative log likelihoood
         v_hat = v_hat.view(B, -1)
-        loss_nll = -self.model.log_prob(v_hat).mean() - surrogate_loss
+        loss_nll = -self.latent.log_prob(v_hat).mean() - surrogate_loss
 
         loss = self.beta * loss_reconstruction + loss_nll
         # Print the loss to the console
@@ -166,8 +164,19 @@ if __name__ == "__main__":
     channels = 1  # For grayscale images (like MNIST); set to 3 for RGB (like CelebA)
     height = 28  # Height of the input image (28 for MNIST)
     width = 28  # Width of the input image (28 for MNIST)
-    model = Conv_VAE(channels=channels, height=height, width=width, hidden_size=16).to(
-        device
+    encoder = ConvNetEncoder(latent_dim=128, in_channels=channels)
+    decoder = ConvNetDecoder(latent_dim=128, out_channels=channels)
+    latent = DiagGaussian(128)
+
+    model = plFFFConvVAE(
+        encoder,
+        decoder,
+        latent,
+        lr=lr,
+        lr_min=lr_min,
+        lr_scheduler=lr_scheduler,
+        hutchinson_samples=2,
+        beta=beta,
     )
 
     def count_trainable_parameters(model):
@@ -207,17 +216,6 @@ if __name__ == "__main__":
         # max_epochs=1,
         # limit_train_batches=1,
         # limit_val_batches=1,
-    )
-
-    # define the model
-    # initialize_flow(model)
-    model = plFFFConvVAE(
-        model,
-        lr=lr,
-        lr_min=lr_min,
-        lr_scheduler=lr_scheduler,
-        hutchinson_samples=2,
-        beta=beta,
     )
 
     # define the data loader

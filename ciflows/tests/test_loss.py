@@ -4,10 +4,8 @@ from math import prod, sqrt
 import torch
 # Define both versions of your surrogate function
 import torch.autograd as autograd
-from torch.autograd import grad
 
-from ciflows.loss import (sample_orthonormal_vectors, volume_change_surrogate,
-                          volume_change_surrogate_transformer)
+from ciflows.loss import (sample_orthonormal_vectors, volume_change_surrogate_transformer)
 from ciflows.vit import VisionTransformerDecoder, VisionTransformerEncoder
 
 SurrogateOutput = namedtuple(
