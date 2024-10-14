@@ -119,13 +119,12 @@ class plFFFConvVAE(pl.LightningModule):
 
 if __name__ == "__main__":
     # Set up training configurations
-    batch_size = 128
-    save_interval = 50
+    batch_size = 256
     num_workers = 4
     shuffle = True
-    latent_dim = 12
+    latent_dim = 256
 
-    beta = 1.0
+    beta = 5.0
 
     lr = 3e-4
     lr_min = 1e-8
@@ -136,7 +135,7 @@ if __name__ == "__main__":
     strategy = "auto"  # or ddp if distributed
 
     root = "./data/"
-    model_name = "check_fif_convvae_mnist_latentdim12_v2"
+    model_name = "check_fif_convvae_mnist_latentdim12_beta5_v3"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
