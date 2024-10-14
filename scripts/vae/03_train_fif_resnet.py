@@ -123,6 +123,7 @@ if __name__ == "__main__":
     save_interval = 50
     num_workers = 4
     shuffle = True
+    latent_dim = 12
 
     beta = 1.0
 
@@ -135,7 +136,7 @@ if __name__ == "__main__":
     strategy = "auto"  # or ddp if distributed
 
     root = "./data/"
-    model_name = "check_fif_convvae_mnist_v1"
+    model_name = "check_fif_convvae_mnist_latentdim12_v2"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -164,9 +165,9 @@ if __name__ == "__main__":
     channels = 1  # For grayscale images (like MNIST); set to 3 for RGB (like CelebA)
     height = 28  # Height of the input image (28 for MNIST)
     width = 28  # Width of the input image (28 for MNIST)
-    encoder = ConvNetEncoder(latent_dim=128, in_channels=channels)
-    decoder = ConvNetDecoder(latent_dim=128, out_channels=channels)
-    latent = DiagGaussian(128)
+    encoder = ConvNetEncoder(latent_dim=latent_dim, in_channels=channels)
+    decoder = ConvNetDecoder(latent_dim=latent_dim, out_channels=channels)
+    latent = DiagGaussian(latent_dim)
 
     model = plFFFConvVAE(
         encoder,
