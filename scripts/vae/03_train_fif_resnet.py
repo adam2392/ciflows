@@ -122,7 +122,7 @@ class plFFFConvVAE(pl.LightningModule):
 
 if __name__ == "__main__":
     # Set up training configurations
-    batch_size = 256
+    batch_size = 1024
     num_workers = 8
     shuffle = True
 
@@ -137,9 +137,9 @@ if __name__ == "__main__":
     epoch = 994
     step=213925
     model_name = "check_fif_convvae_mnist_latentdim12_beta5_v3"
-    model_name = "check_fif_convvae_mnist_latentdim128_beta50_v1"
+    model_name = "check_fif_convvae_mnist_latentdim128_beta100_v1"
 
-    beta = 50.0
+    beta = 100
 
     lr = 3e-4
     lr_min = 1e-8
