@@ -73,13 +73,13 @@ class plFFFConvVAE(pl.LightningModule):
 
         # get negative log likelihoood
         v_hat = v_hat.view(B, -1)
-        loss_nll = -self.latent.log_prob(v_hat).mean() - surrogate_loss
+        loss_nll = -self.latent.log_prob(v_hat) - surrogate_loss
 
         loss = (self.beta * loss_reconstruction + loss_nll).mean()
 
         if batch_idx % 100 == 0:
             print()
-            print(f"train_loss: {loss.item():.3f} | recon_loss: {loss_reconstruction.item():.3f} | nll_loss: {loss_nll.item():.3f} | surrogate_loss: {surrogate_loss.item():.3f}")
+            print(f"train_loss: {loss.item():.3f} | recon_loss: {loss_reconstruction.item():.3f} | nll_loss: {loss_nll.mean().item():.3f} | surrogate_loss: {surrogate_loss.mean().item():.3f}")
         self.log("train_loss", loss)
         return loss
 
