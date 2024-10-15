@@ -122,14 +122,20 @@ class plFFFConvVAE(pl.LightningModule):
 if __name__ == "__main__":
     # Set up training configurations
     batch_size = 256
-    num_workers = 4
+    num_workers = 8
     shuffle = True
-    latent_dim = 128
 
     load_from_checkpoint = True
+    # latentdim128-beta5
+    latent_dim = 128
     epoch = 209
     step = 45150
     model_name = "check_fif_convvae_mnist_latentdim128_beta5_v2"
+    # latentdim12-beta5
+    # latent_dim = 12
+    # epoch = 109
+    # step=23650
+    # model_name = "check_fif_convvae_mnist_latentdim12_beta5_v3"
 
     beta = 5.0
 
@@ -167,20 +173,20 @@ if __name__ == "__main__":
     decoder = ConvNetDecoder(latent_dim=latent_dim, out_channels=channels)
     latent = DiagGaussian(latent_dim)
 
-    model = plFFFConvVAE(
-        encoder,
-        decoder,
-        latent,
-        lr=lr,
-        lr_min=lr_min,
-        lr_scheduler=lr_scheduler,
-        hutchinson_samples=2,
-        beta=beta,
-    )
-
     if load_from_checkpoint:
         # Load the model from a checkpoint
-        model.load_from_checkpoint(checkpoint_dir / f"epoch={epoch}-step={step}.ckpt")
+        model = plFFFConvVAE.load_from_checkpoint(checkpoint_dir / f"epoch={epoch}-step={step}.ckpt")
+    else:
+        model = plFFFConvVAE(
+            encoder,
+            decoder,
+            latent,
+            lr=lr,
+            lr_min=lr_min,
+            lr_scheduler=lr_scheduler,
+            hutchinson_samples=2,
+            beta=beta,
+        )
 
     debug = False
     fast_dev = False
