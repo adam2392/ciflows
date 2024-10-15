@@ -69,7 +69,8 @@ class plFFFConvVAE(pl.LightningModule):
             hutchinson_samples=self.hutchinson_samples,
         )
         # compute reconstruction loss
-        loss_reconstruction = torch.nn.functional.mse_loss(x_hat, x)
+        # loss_reconstruction = torch.nn.functional.mse_loss(x_hat, x)
+        loss_reconstruction = ((x - x_hat) ** 2).sum(-1)
 
         # get negative log likelihoood
         v_hat = v_hat.view(B, -1)
@@ -79,7 +80,7 @@ class plFFFConvVAE(pl.LightningModule):
 
         if batch_idx % 100 == 0:
             print()
-            print(f"train_loss: {loss.item():.3f} | recon_loss: {loss_reconstruction.item():.3f} | nll_loss: {loss_nll.mean().item():.3f} | surrogate_loss: {surrogate_loss.mean().item():.3f}")
+            print(f"train_loss: {loss.item():.3f} | recon_loss: {loss_reconstruction.mean().item():.3f} | nll_loss: {loss_nll.mean().item():.3f} | surrogate_loss: {surrogate_loss.mean().item():.3f}")
         self.log("train_loss", loss)
         return loss
 
@@ -133,16 +134,17 @@ if __name__ == "__main__":
     # step = 45150
     # model_name = "check_fif_convvae_mnist_latentdim128_beta5_v2"
     # latentdim12-beta5
-    latent_dim = 128
+    latent_dim = 64
     epoch = 994
     step=213925
     model_name = "check_fif_convvae_mnist_latentdim12_beta5_v3"
-    model_name = "check_fif_convvae_mnist_latentdim128_beta100_v1"
+    model_name = "check_fif_convvae_mnist_latentdim64_beta100_v1"
 
     beta = 100
 
+    hutchinson_samples = 1
     lr = 3e-4
-    lr_min = 1e-8
+    lr_min = 1e-7
     lr_scheduler = "cosine"
     monitor = "train_loss"
     check_val_every_n_epoch = 5
@@ -172,7 +174,7 @@ if __name__ == "__main__":
     height = 28  # Height of the input image (28 for MNIST)
     width = 28  # Width of the input image (28 for MNIST)
     encoder = ConvNetEncoder(latent_dim=latent_dim, in_channels=channels)
-    decoder = ConvNetDecoder(latent_dim=latent_dim, out_channels=channels)
+    decoder = ConvNetDecoder(latent_dim=latent_dim, out_channels=channels, hidden_dim=1024)
     latent = DiagGaussian(latent_dim)
 
     if load_from_checkpoint:
@@ -186,7 +188,7 @@ if __name__ == "__main__":
             lr=lr,
             lr_min=lr_min,
             lr_scheduler=lr_scheduler,
-            hutchinson_samples=2,
+            hutchinson_samples=hutchinson_samples,
             beta=beta,
         )
 
