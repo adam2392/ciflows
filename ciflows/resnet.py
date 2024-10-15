@@ -73,12 +73,12 @@ class ConvTBlock(nn.Module):
 
 
 class ConvNetEncoder(nn.Module):
-    def __init__(self, latent_dim, in_channels, hidden_dim=512, debug=False):
+    def __init__(self, latent_dim, in_channels, hidden_dim=512, start_channels=32, debug=False):
         super(ConvNetEncoder, self).__init__()
 
         self.convblocks = nn.Sequential()
         for idx in range(4):
-            out_channels = 32 * 2**idx
+            out_channels = start_channels * 2**idx
             if debug:
                 print(
                     f"Adding conv{idx+1} with in_channels={in_channels} and out_channels={out_channels}"
@@ -113,7 +113,7 @@ class ConvNetEncoder(nn.Module):
 
 
 class ConvNetDecoder(nn.Module):
-    def __init__(self, latent_dim, out_channels, hidden_dim=512, debug=False):
+    def __init__(self, latent_dim, out_channels, hidden_dim=512, start_channels=32, debug=False):
         super(ConvNetDecoder, self).__init__()
 
         # 4x Residual Blocks with inner_dim=512
@@ -125,7 +125,7 @@ class ConvNetDecoder(nn.Module):
         )
 
         # Linear layer from latent space
-        self.projection_dim = 256
+        self.projection_dim = start_channels * 8
         self.fc = nn.Linear(latent_dim, self.projection_dim)
 
         # Transposed Convolution layers to reconstruct the input
@@ -135,10 +135,10 @@ class ConvNetDecoder(nn.Module):
         # First, upsample without padding (1) -> (3) -> (7)
         kernel_size = 3
         padding = 0
-        in_channels = 32 * 2 ** (n_layers)
+        in_channels = start_channels * 2 ** (n_layers)
         out_chs = out_channels
         for idx in range(2):
-            out_channels = int(32 * 2 ** (n_layers - 1 - idx))
+            out_channels = int(start_channels * 2 ** (n_layers - 1 - idx))
             if debug:
                 print(
                     f"Adding convT{idx} with in_channels={in_channels} and out_channels={out_channels}"
@@ -158,7 +158,7 @@ class ConvNetDecoder(nn.Module):
         kernel_size = 4
         padding = 1
         for idx in range(2, n_layers):
-            out_channels = int(32 * 2 ** (n_layers - 1 - idx))
+            out_channels = int(start_channels * 2 ** (n_layers - 1 - idx))
             if debug:
                 print(
                     f"Adding convT{idx} with in_channels={in_channels} and out_channels={out_channels}"
@@ -189,8 +189,8 @@ class ConvNetDecoder(nn.Module):
         B = z.size(0)
         z = self.resblocks(z)
         z = self.fc(z)
-        img_size = int(np.sqrt(self.projection_dim / 256))
-        z = z.view(B, 256, img_size, img_size)  # Reshape to image-like dimensions
+        img_size = int(np.sqrt(self.projection_dim / self.projection_dim))
+        z = z.view(B, -1, img_size, img_size)  # Reshape to image-like dimensions
 
         z = self.convblocks(z)
         # for layer in self.convblocks:
@@ -213,7 +213,7 @@ if __name__ == "__main__":
 
     def test_fiffconvnet_encoder():
         print("Testing FIFFConvNetEncoder...")
-        encoder = ConvNetEncoder(latent_dim=128, in_channels=1)
+        encoder = ConvNetEncoder(latent_dim=128, in_channels=1, start_channels=32*4)
         x = torch.randn(2, 1, 28, 28)  # MNIST image input
         out = encoder(x)
         assert out.shape == (2, 128), f"Expected shape (1, 128), but got {out.shape}"
@@ -221,7 +221,7 @@ if __name__ == "__main__":
 
     def test_fiffconvnet_decoder():
         print("Testing FIFFConvNetDecoder...")
-        decoder = ConvNetDecoder(latent_dim=128, out_channels=1)
+        decoder = ConvNetDecoder(latent_dim=128, out_channels=1, start_channels=32*4)
         z = torch.randn(2, 128)  # Latent vector input
         out = decoder(z)
         assert out.shape == (

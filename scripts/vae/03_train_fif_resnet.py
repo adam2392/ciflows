@@ -70,12 +70,15 @@ class plFFFConvVAE(pl.LightningModule):
         )
         # compute reconstruction loss
         # loss_reconstruction = torch.nn.functional.mse_loss(x_hat, x)
-        loss_reconstruction = ((x - x_hat) ** 2).sum(-1)
+        loss_reconstruction = ((x - x_hat) ** 2).reshape(B, -1).sum(-1)
 
+        # print(x.shape, x_hat.shape)
+        # assert torch.allclose(x.shape, x_hat.shape, atol=1e-5)
         # get negative log likelihoood
         v_hat = v_hat.view(B, -1)
         loss_nll = -self.latent.log_prob(v_hat) - surrogate_loss
 
+        # print(loss_reconstruction.shape, loss_nll.shape)
         loss = (self.beta * loss_reconstruction + loss_nll).mean()
 
         if batch_idx % 100 == 0:
@@ -138,7 +141,7 @@ if __name__ == "__main__":
     epoch = 994
     step=213925
     model_name = "check_fif_convvae_mnist_latentdim12_beta5_v3"
-    model_name = "check_fif_convvae_mnist_latentdim64_beta100_v1"
+    model_name = "check_fif_convvae_mnist_batch1024_latentdim64_beta100_v1"
 
     beta = 100
 
@@ -173,8 +176,8 @@ if __name__ == "__main__":
     channels = 1  # For grayscale images (like MNIST); set to 3 for RGB (like CelebA)
     height = 28  # Height of the input image (28 for MNIST)
     width = 28  # Width of the input image (28 for MNIST)
-    encoder = ConvNetEncoder(latent_dim=latent_dim, in_channels=channels)
-    decoder = ConvNetDecoder(latent_dim=latent_dim, out_channels=channels, hidden_dim=1024)
+    encoder = ConvNetEncoder(latent_dim=latent_dim, in_channels=channels, hidden_dim=1024, start_channels=32*4, debug=True)
+    decoder = ConvNetDecoder(latent_dim=latent_dim, out_channels=channels, hidden_dim=1024, start_channels=32*4, debug=True)
     latent = DiagGaussian(latent_dim)
 
     if load_from_checkpoint:
@@ -199,6 +202,7 @@ if __name__ == "__main__":
         accelerator = "cpu"
         fast_dev = True
         max_epochs = 1
+        batch_size = 2
     else:
         torch.set_float32_matmul_precision('high')
         # model = torch.compile(model)
