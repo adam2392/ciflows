@@ -160,7 +160,7 @@ def volume_change_surrogate(
     xhat : torch.Tensor of shape (batch_size, ...)
         The reconstructed tensor of shape ``x``.
     """
-    surrogate_loss = torch.Tensor([0.0]).to(x.device)
+    surrogate_loss = 0.0
 
     # ensure gradients wrt x are computed
     with torch.set_grad_enabled(True):
@@ -205,7 +205,7 @@ def volume_change_surrogate(
             # print("v1 and v2 don't match?", v2.shape, v1.detach().shape, hutchinson_samples)
             # print(v2.shape, v1.detach().shape)
             res = torch.multiply(v2, v1.detach()).reshape(B, -1)
-            surrogate_loss += torch.sum(res) / hutchinson_samples
+            surrogate_loss += torch.sum(res, dim=1) / hutchinson_samples
 
     return surrogate_loss, v, xhat
 
