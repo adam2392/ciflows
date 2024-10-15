@@ -181,7 +181,7 @@ if __name__ == "__main__":
         max_epochs = 1
     else:
         torch.set_float32_matmul_precision('high')
-        model = torch.compile(model)
+        # model = torch.compile(model)
 
     def count_trainable_parameters(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
