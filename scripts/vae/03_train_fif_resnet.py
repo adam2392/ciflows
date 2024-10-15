@@ -132,10 +132,10 @@ if __name__ == "__main__":
     step = 45150
     model_name = "check_fif_convvae_mnist_latentdim128_beta5_v2"
     # latentdim12-beta5
-    # latent_dim = 12
-    # epoch = 109
-    # step=23650
-    # model_name = "check_fif_convvae_mnist_latentdim12_beta5_v3"
+    latent_dim = 12
+    epoch = 109
+    step=23650
+    model_name = "check_fif_convvae_mnist_latentdim12_beta5_v3"
 
     beta = 5.0
 
