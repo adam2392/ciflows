@@ -75,7 +75,7 @@ class plFFFConvVAE(pl.LightningModule):
         v_hat = v_hat.view(B, -1)
         loss_nll = -self.latent.log_prob(v_hat).mean() - surrogate_loss
 
-        loss = self.beta * loss_reconstruction + loss_nll
+        loss = (self.beta * loss_reconstruction + loss_nll).mean()
 
         if batch_idx % 100 == 0:
             print()
@@ -112,10 +112,10 @@ class plFFFConvVAE(pl.LightningModule):
         v_hat = v_hat.view(B, -1)
         loss_nll = -self.latent.log_prob(v_hat).mean() - surrogate_loss
 
-        loss = self.beta * loss_reconstruction + loss_nll
+        loss = (self.beta * loss_reconstruction + loss_nll).mean()
         # Print the loss to the console
         if batch_idx % 100 == 0:
-            print(f"val_loss: {loss}")
+            print(f"val_loss: {loss.item():.3f}")
         self.log("val_loss", loss)
         return loss
 
