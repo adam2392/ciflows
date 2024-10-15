@@ -78,7 +78,8 @@ class plFFFConvVAE(pl.LightningModule):
         loss = self.beta * loss_reconstruction + loss_nll
 
         if batch_idx % 100 == 0:
-            print(f"train_loss: {loss}")
+            print()
+            print(f"train_loss: {loss} | recon_loss: {loss_reconstruction} | nll_loss: {loss_nll} | surrogate_loss: {surrogate_loss}")
         self.log("train_loss", loss)
         return loss
 
@@ -133,8 +134,8 @@ if __name__ == "__main__":
     model_name = "check_fif_convvae_mnist_latentdim128_beta5_v2"
     # latentdim12-beta5
     latent_dim = 12
-    epoch = 109
-    step=23650
+    epoch = 994
+    step=213925
     model_name = "check_fif_convvae_mnist_latentdim12_beta5_v3"
 
     beta = 5.0
