@@ -77,6 +77,8 @@ class plFFFConvVAE(pl.LightningModule):
 
         loss = self.beta * loss_reconstruction + loss_nll
 
+        if batch_idx % 100 == 0:
+            print(f"train_loss: {loss}")
         self.log("train_loss", loss)
         return loss
 
@@ -124,18 +126,22 @@ if __name__ == "__main__":
     shuffle = True
     latent_dim = 128
 
+    load_from_checkpoint = True
+    epoch = 209
+    step = 45150
+    model_name = "check_fif_convvae_mnist_latentdim128_beta5_v2"
+
     beta = 5.0
 
     lr = 3e-4
     lr_min = 1e-8
     lr_scheduler = "cosine"
-    monitor = "val_loss"
+    monitor = "train_loss"
     check_val_every_n_epoch = 5
     devices = 1
     strategy = "auto"  # or ddp if distributed
 
     root = "./data/"
-    model_name = "check_fif_convvae_mnist_latentdim128_beta5_v2"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -171,6 +177,10 @@ if __name__ == "__main__":
         hutchinson_samples=2,
         beta=beta,
     )
+
+    if load_from_checkpoint:
+        # Load the model from a checkpoint
+        model.load_from_checkpoint(checkpoint_dir / f"epoch={epoch}-step={step}.ckpt")
 
     debug = False
     fast_dev = False
