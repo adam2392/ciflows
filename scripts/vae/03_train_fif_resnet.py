@@ -130,7 +130,7 @@ if __name__ == "__main__":
     num_workers = 8
     shuffle = True
 
-    load_from_checkpoint = False
+    load_from_checkpoint = True
     # latentdim128-beta5
     # latent_dim = 128
     # epoch = 209
@@ -138,8 +138,8 @@ if __name__ == "__main__":
     # model_name = "check_fif_convvae_mnist_latentdim128_beta5_v2"
     # latentdim12-beta5
     latent_dim = 64
-    epoch = 954
-    step=51570
+    epoch = 689
+    step=37260
     # model_name = "check_fif_convvae_mnist_latentdim12_beta5_v3"
     model_name = "check_fif_convvae_mnist_batch1024_latentdim64_beta100_v1"
 
@@ -147,7 +147,7 @@ if __name__ == "__main__":
 
     max_epochs = 50_000
     hutchinson_samples = 1
-    lr = 3e-4
+    lr = 3e-6
     lr_min = 1e-7
     lr_scheduler = "cosine"
     monitor = "train_loss"
