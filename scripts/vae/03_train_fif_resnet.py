@@ -145,6 +145,7 @@ if __name__ == "__main__":
 
     beta = 100
 
+    max_epochs = 1000
     hutchinson_samples = 1
     lr = 3e-4
     lr_min = 1e-7
@@ -176,13 +177,17 @@ if __name__ == "__main__":
     channels = 1  # For grayscale images (like MNIST); set to 3 for RGB (like CelebA)
     height = 28  # Height of the input image (28 for MNIST)
     width = 28  # Width of the input image (28 for MNIST)
-    encoder = ConvNetEncoder(latent_dim=latent_dim, in_channels=channels, hidden_dim=1024, start_channels=32*4, debug=True)
-    decoder = ConvNetDecoder(latent_dim=latent_dim, out_channels=channels, hidden_dim=1024, start_channels=32*4, debug=True)
+    encoder = ConvNetEncoder(latent_dim=latent_dim, in_channels=channels, hidden_dim=1024, start_channels=32*4, debug=False)
+    decoder = ConvNetDecoder(latent_dim=latent_dim, out_channels=channels, hidden_dim=1024, start_channels=32*4, debug=False)
     latent = DiagGaussian(latent_dim)
 
     if load_from_checkpoint:
         # Load the model from a checkpoint
-        model = plFFFConvVAE.load_from_checkpoint(checkpoint_dir / f"epoch={epoch}-step={step}.ckpt")
+        checkpoint_path = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
+        model = plFFFConvVAE.load_from_checkpoint(checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
+        current_max_epochs = checkpoint["epoch"]
+        max_epochs += current_max_epochs
     else:
         model = plFFFConvVAE(
             encoder,
@@ -197,7 +202,6 @@ if __name__ == "__main__":
 
     debug = False
     fast_dev = False
-    max_epochs = 1000
     if debug:
         accelerator = "cpu"
         fast_dev = True
