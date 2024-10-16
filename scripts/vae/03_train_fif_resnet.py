@@ -147,7 +147,7 @@ if __name__ == "__main__":
 
     max_epochs = 1000
     hutchinson_samples = 1
-    lr = 3e-4
+    lr = 3e-5
     lr_min = 1e-7
     lr_scheduler = "cosine"
     monitor = "train_loss"
