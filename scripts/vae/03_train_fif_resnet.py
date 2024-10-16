@@ -42,7 +42,7 @@ class plFFFConvVAE(pl.LightningModule):
         return self.encoder(x)
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr=self.lr)
+        optimizer = optim.AdamW(self.parameters(), lr=self.lr)
         if self.lr_scheduler == "cosine":
             # cosine learning rate annealing
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
@@ -147,7 +147,8 @@ if __name__ == "__main__":
 
     max_epochs = 50_000
     hutchinson_samples = 1
-    lr = 3e-6
+    gradient_clip_val = 1.0
+    lr = 3e-4
     lr_min = 1e-7
     lr_scheduler = "cosine"
     monitor = "train_loss"
@@ -190,6 +191,7 @@ if __name__ == "__main__":
         current_max_epochs = checkpoint["epoch"]
         max_epochs += current_max_epochs
     else:
+        checkpoint_path = None
         model = plFFFConvVAE(
             encoder,
             decoder,
@@ -244,6 +246,7 @@ if __name__ == "__main__":
         callbacks=[checkpoint_callback],
         check_val_every_n_epoch=check_val_every_n_epoch,
         accelerator=accelerator,
+        gradient_clip_val=gradient_clip_val,
         # fast_dev_run=fast_dev,
         # log_every_n_steps=1,
         # max_epochs=1,
@@ -263,6 +266,7 @@ if __name__ == "__main__":
     trainer.fit(
         model,
         datamodule=data_module,
+        ckpt_path=checkpoint_path
     )
 
     # save the final model
