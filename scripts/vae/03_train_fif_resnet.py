@@ -130,7 +130,7 @@ if __name__ == "__main__":
     num_workers = 8
     shuffle = True
 
-    load_from_checkpoint = False
+    load_from_checkpoint = True
     # latentdim128-beta5
     # latent_dim = 128
     # epoch = 209
@@ -138,9 +138,9 @@ if __name__ == "__main__":
     # model_name = "check_fif_convvae_mnist_latentdim128_beta5_v2"
     # latentdim12-beta5
     latent_dim = 64
-    epoch = 994
-    step=213925
-    model_name = "check_fif_convvae_mnist_latentdim12_beta5_v3"
+    epoch = 954
+    step=51570
+    # model_name = "check_fif_convvae_mnist_latentdim12_beta5_v3"
     model_name = "check_fif_convvae_mnist_batch1024_latentdim64_beta100_v1"
 
     beta = 100
