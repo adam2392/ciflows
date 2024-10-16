@@ -138,14 +138,14 @@ if __name__ == "__main__":
     # model_name = "check_fif_convvae_mnist_latentdim128_beta5_v2"
     # latentdim12-beta5
     latent_dim = 64
-    epoch = 689
-    step=37260
+    epoch = 24
+    step=1350
     # model_name = "check_fif_convvae_mnist_latentdim12_beta5_v3"
     model_name = "check_fif_convvae_mnist_batch1024_latentdim64_beta100_v1"
 
     beta = 100
 
-    max_epochs = 50_000
+    max_epochs = 1000
     hutchinson_samples = 1
     gradient_clip_val = 1.0
     lr = 3e-4
