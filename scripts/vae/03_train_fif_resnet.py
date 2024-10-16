@@ -266,7 +266,7 @@ if __name__ == "__main__":
     trainer.fit(
         model,
         datamodule=data_module,
-        ckpt_path=checkpoint_path
+        # ckpt_path=checkpoint_path
     )
 
     # save the final model
