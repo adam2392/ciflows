@@ -130,7 +130,7 @@ if __name__ == "__main__":
     num_workers = 8
     shuffle = True
 
-    load_from_checkpoint = True
+    load_from_checkpoint = False
     # latentdim128-beta5
     # latent_dim = 128
     # epoch = 209
@@ -145,9 +145,9 @@ if __name__ == "__main__":
 
     beta = 100
 
-    max_epochs = 1000
+    max_epochs = 50_000
     hutchinson_samples = 1
-    lr = 3e-5
+    lr = 3e-4
     lr_min = 1e-7
     lr_scheduler = "cosine"
     monitor = "train_loss"
@@ -182,6 +182,7 @@ if __name__ == "__main__":
     latent = DiagGaussian(latent_dim)
 
     if load_from_checkpoint:
+        # XXX: Unsure why the loading from checkpoint does not work?
         # Load the model from a checkpoint
         checkpoint_path = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
         model = plFFFConvVAE.load_from_checkpoint(checkpoint_path)
