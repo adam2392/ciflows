@@ -1,4 +1,5 @@
 import logging
+import math
 from pathlib import Path
 
 import lightning as pl
@@ -12,8 +13,8 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.datasets import MNIST
 
-from ciflows.glow import InjectiveGlowBlock, Squeeze
-from ciflows.lightning import TwoStageTraining, plFlowModel
+from ciflows.flows import TwoStageTraining, plFlowModel
+from ciflows.flows.glow import InjectiveGlowBlock, Squeeze
 
 
 def get_model():
@@ -209,22 +210,17 @@ if __name__ == "__main__":
 
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
-    debug = False
-    fast_dev = False
-    max_epochs = 1000
-    if debug:
-        accelerator = "cpu"
-        fast_dev = True
-        max_epochs = 1
 
-    batch_size = 128
-    n_steps_mse = 500
+    batch_size = 256
     devices = 1
     strategy = "auto"  # or ddp if distributed
     num_workers = 4
-    gradient_clip_val = None  # 1.0
+    gradient_clip_val = 1.0  # 1.0
     check_val_every_n_epoch = 5
     monitor = "val_loss"
+
+    n_steps_mse = 500
+    mse_chkpoint_name = f"mse_chkpoint_{n_steps_mse}"
 
     lr = 3e-4
     lr_min = 1e-8
@@ -235,11 +231,38 @@ if __name__ == "__main__":
 
     # output filename for the results
     root = "./data/"
-    model_name = "check_injflow_mnist_v2"
+    model_name = "injflow_mnist_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
-    model_fname = f"{model_name}-model.pt"
+    # epoch=99
+    # step=43000
+    # model_fname = checkpoint_dir / f'epoch={epoch}-step={step}.ckpt'
+    # model = plFlowModel.load_from_checkpoint(model_fname)
+
+    # define the model
+    flow_model = get_model()
+    initialize_flow(flow_model)
+    model = plFlowModel(
+        flow_model,
+        lr=lr,
+        lr_min=lr_min,
+        lr_scheduler=lr_scheduler,
+        n_steps_mse=n_steps_mse,
+        checkpoint_dir=checkpoint_dir,
+        checkpoint_name=mse_chkpoint_name,
+    )
+
+    debug = False
+    fast_dev = False
+    max_epochs = 2000
+    if debug:
+        accelerator = "cpu"
+        fast_dev = True
+        max_epochs = 1
+    else:
+        torch.set_float32_matmul_precision("high")
+        # model = torch.compile(model)
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=checkpoint_dir,
@@ -257,10 +280,13 @@ if __name__ == "__main__":
     # logger = logging.getLogger()
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
+    print()
+    print(f"Model name: {model_name}")
+    print()
+
     # configure logging at the root level of Lightning
     # logging.getLogger("lightning.pytorch").setLevel(level=logging.INFO)
     # logging.basicConfig(level=logging.INFO)
-    logging.info(f"\n\n\tsaving to {model_fname} \n")
 
     # Define the trainer
     trainer = pl.Trainer(
@@ -271,27 +297,12 @@ if __name__ == "__main__":
         callbacks=[checkpoint_callback, TwoStageTraining()],
         check_val_every_n_epoch=check_val_every_n_epoch,
         accelerator=accelerator,
+        gradient_clip_val=gradient_clip_val,
         # fast_dev_run=fast_dev,
         # log_every_n_steps=1,
         # max_epochs=1,
         # limit_train_batches=1,
         # limit_val_batches=1,
-    )
-
-    # epoch=99
-    # step=43000
-    # model_fname = checkpoint_dir / f'epoch={epoch}-step={step}.ckpt'
-    # model = plFlowModel.load_from_checkpoint(model_fname)
-
-    # define the model
-    flow_model = get_model()
-    initialize_flow(flow_model)
-    model = plFlowModel(
-        flow_model,
-        lr=lr,
-        lr_min=lr_min,
-        lr_scheduler=lr_scheduler,
-        n_steps_mse=n_steps_mse,
     )
 
     # define the data loader
@@ -309,5 +320,5 @@ if __name__ == "__main__":
     )
 
     # save the final model
-    print(f"Saving model to {checkpoint_dir / 'final_model.pt'}")
-    torch.save(model, checkpoint_dir / f"{model_fname}_final.pt")
+    print(f"Saving model to {checkpoint_dir / '{model_name}_final.pt'}")
+    torch.save(model, checkpoint_dir / f"{model_name}_final.pt")

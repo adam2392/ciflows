@@ -73,7 +73,9 @@ class ConvTBlock(nn.Module):
 
 
 class ConvNetEncoder(nn.Module):
-    def __init__(self, latent_dim, in_channels, hidden_dim=512, start_channels=32, debug=False):
+    def __init__(
+        self, latent_dim, in_channels, hidden_dim=512, start_channels=32, debug=False
+    ):
         super(ConvNetEncoder, self).__init__()
 
         self.convblocks = nn.Sequential()
@@ -113,7 +115,9 @@ class ConvNetEncoder(nn.Module):
 
 
 class ConvNetDecoder(nn.Module):
-    def __init__(self, latent_dim, out_channels, hidden_dim=512, start_channels=32, debug=False):
+    def __init__(
+        self, latent_dim, out_channels, hidden_dim=512, start_channels=32, debug=False
+    ):
         super(ConvNetDecoder, self).__init__()
 
         # 4x Residual Blocks with inner_dim=512
@@ -213,7 +217,7 @@ if __name__ == "__main__":
 
     def test_fiffconvnet_encoder():
         print("Testing FIFFConvNetEncoder...")
-        encoder = ConvNetEncoder(latent_dim=128, in_channels=1, start_channels=32*4)
+        encoder = ConvNetEncoder(latent_dim=128, in_channels=1, start_channels=32 * 4)
         x = torch.randn(2, 1, 28, 28)  # MNIST image input
         out = encoder(x)
         assert out.shape == (2, 128), f"Expected shape (1, 128), but got {out.shape}"
@@ -221,7 +225,7 @@ if __name__ == "__main__":
 
     def test_fiffconvnet_decoder():
         print("Testing FIFFConvNetDecoder...")
-        decoder = ConvNetDecoder(latent_dim=128, out_channels=1, start_channels=32*4)
+        decoder = ConvNetDecoder(latent_dim=128, out_channels=1, start_channels=32 * 4)
         z = torch.randn(2, 128)  # Latent vector input
         out = decoder(z)
         assert out.shape == (

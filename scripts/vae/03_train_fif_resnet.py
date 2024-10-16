@@ -83,7 +83,9 @@ class plFFFConvVAE(pl.LightningModule):
 
         if batch_idx % 100 == 0:
             print()
-            print(f"train_loss: {loss.item():.3f} | recon_loss: {loss_reconstruction.mean().item():.3f} | nll_loss: {loss_nll.mean().item():.3f} | surrogate_loss: {surrogate_loss.mean().item():.3f}")
+            print(
+                f"train_loss: {loss.item():.3f} | recon_loss: {loss_reconstruction.mean().item():.3f} | nll_loss: {loss_nll.mean().item():.3f} | surrogate_loss: {surrogate_loss.mean().item():.3f}"
+            )
         self.log("train_loss", loss)
         return loss
 
@@ -139,7 +141,7 @@ if __name__ == "__main__":
     # latentdim12-beta5
     latent_dim = 64
     epoch = 24
-    step=1350
+    step = 1350
     # model_name = "check_fif_convvae_mnist_latentdim12_beta5_v3"
     model_name = "check_fif_convvae_mnist_batch1024_latentdim64_beta100_v1"
 
@@ -178,8 +180,20 @@ if __name__ == "__main__":
     channels = 1  # For grayscale images (like MNIST); set to 3 for RGB (like CelebA)
     height = 28  # Height of the input image (28 for MNIST)
     width = 28  # Width of the input image (28 for MNIST)
-    encoder = ConvNetEncoder(latent_dim=latent_dim, in_channels=channels, hidden_dim=1024, start_channels=32*4, debug=False)
-    decoder = ConvNetDecoder(latent_dim=latent_dim, out_channels=channels, hidden_dim=1024, start_channels=32*4, debug=False)
+    encoder = ConvNetEncoder(
+        latent_dim=latent_dim,
+        in_channels=channels,
+        hidden_dim=1024,
+        start_channels=32 * 4,
+        debug=False,
+    )
+    decoder = ConvNetDecoder(
+        latent_dim=latent_dim,
+        out_channels=channels,
+        hidden_dim=1024,
+        start_channels=32 * 4,
+        debug=False,
+    )
     latent = DiagGaussian(latent_dim)
 
     if load_from_checkpoint:
@@ -187,7 +201,9 @@ if __name__ == "__main__":
         # Load the model from a checkpoint
         checkpoint_path = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
         model = plFFFConvVAE.load_from_checkpoint(checkpoint_path)
-        checkpoint = torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
+        checkpoint = torch.load(
+            checkpoint_path, map_location=lambda storage, loc: storage
+        )
         current_max_epochs = checkpoint["epoch"]
         max_epochs += current_max_epochs
     else:
@@ -211,7 +227,7 @@ if __name__ == "__main__":
         max_epochs = 1
         batch_size = 2
     else:
-        torch.set_float32_matmul_precision('high')
+        torch.set_float32_matmul_precision("high")
         # model = torch.compile(model)
 
     def count_trainable_parameters(model):
