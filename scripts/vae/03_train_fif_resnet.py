@@ -145,7 +145,7 @@ if __name__ == "__main__":
 
     beta = 100
 
-    max_epochs = 1000
+    max_epochs = 10_000
     hutchinson_samples = 1
     gradient_clip_val = 1.0
     lr = 3e-4
