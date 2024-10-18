@@ -17,13 +17,9 @@ from ciflows.flows import TwoStageTraining, plFlowModel
 from ciflows.flows.glow import InjectiveGlowBlock, Squeeze
 
 
-def get_model():
-    n_hidden = 64
-    n_mixing_layers = 2
-    n_injective_layers = 3
-    n_glow_blocks = 2
+def get_model():    
     use_lu = True
-    gamma = 1e-2
+    gamma = 1e-3
     activation = "linear"
 
     input_shape = (1, 28, 28)
@@ -34,6 +30,8 @@ def get_model():
 
     debug = False
 
+    n_hidden = 256
+    n_glow_blocks = 3
     n_mixing_layers = 2
     n_injective_layers = 3
     n_layers = n_mixing_layers + n_injective_layers
@@ -199,7 +197,7 @@ if __name__ == "__main__":
     check_val_every_n_epoch = 5
     monitor = "val_loss"
 
-    n_steps_mse = 500
+    n_steps_mse = 100
     mse_chkpoint_name = f"mse_chkpoint_{n_steps_mse}"
 
     lr = 3e-4
@@ -233,7 +231,7 @@ if __name__ == "__main__":
         checkpoint_name=mse_chkpoint_name,
     )
 
-    debug = False
+    debug = True
     fast_dev = False
     max_epochs = 2000
     if debug:

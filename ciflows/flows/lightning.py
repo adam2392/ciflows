@@ -6,7 +6,7 @@ import torch.optim as optim
 from lightning.pytorch.callbacks import Callback
 
 from ..loss import volume_change_surrogate, volume_change_surrogate_transformer
-from .glow import InjectiveGlowBlock
+from .glow import InjectiveGlowBlock, Injective1x1Conv
 from .model import InjectiveFlow
 
 
@@ -16,17 +16,21 @@ class TwoStageTraining(Callback):
             getattr(pl_module, "n_steps_mse", None) is not None
             and trainer.current_epoch > pl_module.n_steps_mse
         ):
+            if trainer.current_epoch == pl_module.n_steps_mse + 1:
+                print("Training with NLL loss")
             trainer.optimizers = [pl_module.optimizer_nll]
             # trainer.lr_schedulers = trainer.configure_schedulers([pl_module.])
             # trainer.optimizer_frequencies = [] # or optimizers frequencies if you have any
 
             # Save a checkpoint after the transition to NLL
             checkpoint_path = os.path.join(
-                self.checkpoint_dir, f"{self.checkpoint_name}.ckpt"
+                trainer.checkpoint_dir, f"{trainer.checkpoint_name}.ckpt"
             )
             trainer.save_checkpoint(checkpoint_path)
             print(f"Checkpoint saved at {checkpoint_path}")
         else:
+            if trainer.current_epoch == 0:
+                print("Training with MSE loss")
             trainer.optimizers = [pl_module.optimizer_mse]
             # trainer.lr_schedulers = trainer.configure_schedulers([pl_module.optimizer_mse])
             # trainer.optimizer_frequencies = [] # or optimizers frequencies if you have any
@@ -76,15 +80,37 @@ class plFlowModel(pl.LightningModule):
         self.checkpoint_name = checkpoint_name
 
     def get_injective_and_other_params(self):
-        injective_params = []
-        other_params = []
+        # injective_params = []
+        # other_params = []
 
+        # for flow in self.model.flows:
+        #     # Check if the flow is an injective Glow block
+        #     # print(flow._get_name()) 
+
+        #     if isinstance(flow, InjectiveGlowBlock):
+        #         for block in flow.flows:
+        #             if isinstance(block, Injective1x1Conv):
+        #                 injective_params += list(block.parameters())
+        #             else:
+        #                 other_params += list(block.parameters())
+        #     else:
+        #         other_params += list(flow.parameters())
+        # Get all trainable parameters in the model
+        all_params = list(self.model.parameters())
+
+        # Collect injective parameters
+        injective_params = []
         for flow in self.model.flows:
-            # Check if the flow is an injective Glow block
             if isinstance(flow, InjectiveGlowBlock):
-                injective_params += list(flow.parameters())
-            else:
-                other_params += list(flow.parameters())
+                for block in flow.flows:
+                    if isinstance(block, Injective1x1Conv):
+                        injective_params += list(block.parameters())
+
+        # Convert injective_params to a set for set operations
+        injective_params_set = set(injective_params)
+
+        # Use set difference to get non-injective (other) parameters
+        other_params = [p for p in all_params if p not in injective_params_set]
 
         return injective_params, other_params
 
@@ -111,6 +137,17 @@ class plFlowModel(pl.LightningModule):
 
     def configure_optimizers(self):
         mse_params, nll_params = self.get_injective_and_other_params()
+        # Check the number of parameters in each optimizer
+        num_mse_params = sum(p.numel() for p in mse_params)
+        num_nll_params = sum(p.numel() for p in nll_params)
+        
+        print(f"Number of parameters in optimizer_mse: {num_mse_params}")
+        print(f"Number of parameters in optimizer_nll: {num_nll_params}")
+        print(f'Total number of parameters: {num_mse_params + num_nll_params}')
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        print(f"Total number of trainable parameters: {trainable_params}")
+        assert trainable_params == num_mse_params + num_nll_params
+
         optimizer_mse = optim.Adam(mse_params, lr=self.lr)
         optimizer_nll = optim.Adam(nll_params, lr=self.lr)
 
@@ -142,7 +179,13 @@ class plFlowModel(pl.LightningModule):
         if self.n_steps_mse is not None and self.current_epoch < self.n_steps_mse:
             v_latent = self.model.inverse(x)
             x_reconstructed = self.model.forward(v_latent)
-            loss = torch.nn.functional.mse_loss(x_reconstructed, x)
+
+            # reconstruct the latents
+            v_latent_recon = self.model.inverse(x_reconstructed)
+
+            loss = torch.nn.functional.mse_loss(x_reconstructed, x) + torch.nn.functional.mse_loss(
+                v_latent_recon, v_latent
+            )
         else:
             loss = self.model.forward_kld(x)
 
@@ -158,7 +201,12 @@ class plFlowModel(pl.LightningModule):
         if self.n_steps_mse is not None and self.current_epoch < self.n_steps_mse:
             v_latent = self.model.inverse(x)
             x_reconstructed = self.model.forward(v_latent)
-            loss = torch.nn.functional.mse_loss(x_reconstructed, x)
+            # reconstruct the latents
+            v_latent_recon = self.model.inverse(x_reconstructed)
+
+            loss = torch.nn.functional.mse_loss(x_reconstructed, x) + torch.nn.functional.mse_loss(
+                v_latent_recon, v_latent
+            )
         else:
             loss = self.model.forward_kld(x)
 
