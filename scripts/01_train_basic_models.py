@@ -17,30 +17,37 @@ from ciflows.flows import TwoStageTraining, plFlowModel
 from ciflows.flows.glow import InjectiveGlowBlock, Squeeze
 
 
-def get_model():    
+def get_model():
     use_lu = True
-    gamma = 1e-3
+    gamma = 1e-6
     activation = "linear"
 
-    input_shape = (1, 28, 28)
+    n_hidden = 512
+    n_glow_blocks = 4
+    n_mixing_layers = 2
+    n_injective_layers = 4
+    n_layers = n_mixing_layers + n_injective_layers
+
+    input_shape = (1, 32, 32)
     n_channels = input_shape[0]
+    img_size = input_shape[1]
 
     n_chs = n_channels
     flows = []
 
     debug = False
 
-    n_hidden = 256
-    n_glow_blocks = 3
-    n_mixing_layers = 2
-    n_injective_layers = 3
-    n_layers = n_mixing_layers + n_injective_layers
-
     n_chs = int(n_channels * 4**n_mixing_layers * (1 / 2) ** n_injective_layers)
     print("Starting at latent representation: ", n_chs)
-    q0 = nf.distributions.DiagGaussian((n_chs, 7, 7), trainable=False)
+    latent_size = int(img_size / (2**n_mixing_layers))
+    q0 = nf.distributions.DiagGaussian((n_chs, latent_size, latent_size))
 
     for i in range(n_injective_layers):
+        if i == 0:
+            split_mode = "checkerboard"
+        else:
+            split_mode = "channel"
+
         for j in range(n_glow_blocks):
             flows += [
                 GlowBlock(
@@ -48,6 +55,7 @@ def get_model():
                     hidden_channels=n_hidden,
                     use_lu=use_lu,
                     scale=True,
+                    split_mode=split_mode,
                 )
             ]
 
@@ -60,6 +68,7 @@ def get_model():
                 scale=True,
                 gamma=gamma,
                 debug=debug,
+                split_mode=split_mode,
             )
         ]
         n_chs = n_chs * 2
@@ -120,7 +129,11 @@ class MNISTDataModule(pl.LightningDataModule):
         self.shuffle = shuffle
 
         self.transform = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize((0.5,), (-0.5,))]
+            [
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,)),
+                transforms.Resize((32, 32)),
+            ]
         )
         self.fast_dev_run = fast_dev_run
 
@@ -189,15 +202,15 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    batch_size = 256
+    batch_size = 64
     devices = 1
     strategy = "auto"  # or ddp if distributed
-    num_workers = 4
-    gradient_clip_val = None # 1.0
+    num_workers = 6
+    gradient_clip_val = None  # 1.0
     check_val_every_n_epoch = 5
     monitor = "val_loss"
 
-    n_steps_mse = 100
+    n_steps_mse = 50
     mse_chkpoint_name = f"mse_chkpoint_{n_steps_mse}"
 
     lr = 3e-4
@@ -233,7 +246,7 @@ if __name__ == "__main__":
 
     debug = False
     fast_dev = False
-    max_epochs = 2000
+    max_epochs = 300
     if debug:
         accelerator = "cpu"
         fast_dev = True

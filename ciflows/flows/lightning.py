@@ -70,7 +70,7 @@ class plFlowModel(pl.LightningModule):
         self.save_hyperparameters()
 
         # XXX: This should change depending on the dataset
-        self.example_input_array = [torch.randn(2, 1, 28, 28), torch.randn(2, 1)]
+        self.example_input_array = [torch.randn(2, 1, 32, 32), torch.randn(2, 1)]
 
         self.model = model
 
@@ -104,9 +104,10 @@ class plFlowModel(pl.LightningModule):
         injective_params = []
         for flow in self.model.flows:
             if isinstance(flow, InjectiveGlowBlock):
-                for block in flow.flows:
-                    if isinstance(block, Injective1x1Conv):
-                        injective_params += list(block.parameters())
+                injective_params += list(flow.parameters())
+                # for block in flow.flows:
+                #     if isinstance(block, Injective1x1Conv):
+                #         injective_params += list(block.parameters())
 
         # Convert injective_params to a set for set operations
         injective_params_set = set(injective_params)
@@ -128,14 +129,14 @@ class plFlowModel(pl.LightningModule):
 
         Note: This is opposite of the normalizing flow API convention.
         """
-        return self.model.inverse(x)
+        return self.model.forward(x)
 
     def inverse(self, v, target=None):
         """Inverse pass.
 
         Note: This is opposite of the normalizing flow API convention.
         """
-        return self.model.forward(v)
+        return self.model.inverse(v)
 
     def configure_optimizers(self):
         mse_params, nll_params = self.get_injective_and_other_params()

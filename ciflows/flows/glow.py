@@ -278,9 +278,9 @@ class InjectiveGlowBlock(Flow):
         """
         super().__init__()
         self.flows: List[Flow] = nn.ModuleList([])
-        if channels < 2:
+        if channels < 1:
             raise ValueError(
-                "Channels must be at least 2, as injective 1x1 convs will "
+                "Channels must be at least 1, as injective 1x1 convs will "
                 "decrease the number of channels by half after each block."
             )
 
