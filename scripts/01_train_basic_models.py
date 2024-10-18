@@ -202,7 +202,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    batch_size = 64
+    batch_size = 128
     devices = 1
     strategy = "auto"  # or ddp if distributed
     num_workers = 6

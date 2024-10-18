@@ -186,6 +186,12 @@ class plFlowModel(pl.LightningModule):
             # reconstruct the latents
             v_latent_recon = self.model.inverse(x_reconstructed)
 
+            # check if any nans
+            if torch.isnan(x_reconstructed).any():
+                print("x_reconstructed has nans")
+            if torch.isnan(v_latent_recon).any():
+                print("v_latent_recon has nans")
+
             loss = torch.nn.functional.mse_loss(x_reconstructed, x) + torch.nn.functional.mse_loss(
                 v_latent_recon, v_latent
             )
@@ -194,7 +200,7 @@ class plFlowModel(pl.LightningModule):
 
         # logging the loss
         self.log("train_loss", loss)
-        if batch_idx % 100 == 0:
+        if self.current_epoch % 5 == 0:
             print()
             print(f"train_loss: {loss} | epoch_counter: {self.current_epoch}")
         return loss
@@ -217,7 +223,7 @@ class plFlowModel(pl.LightningModule):
         self.log("val_loss", loss)
 
         # Print the loss to the console
-        if batch_idx % 100 == 0:
+        if self.current_epoch % 5 == 0:
             print()
             print(
                 f"Nsteps_mse {self.n_steps_mse}, epoch_counter: {self.current_epoch}, val_loss: {loss}"
