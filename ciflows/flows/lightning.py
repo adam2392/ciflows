@@ -87,7 +87,7 @@ class plFlowModel(pl.LightningModule):
 
         # for flow in self.model.flows:
         #     # Check if the flow is an injective Glow block
-        #     # print(flow._get_name()) 
+        #     # print(flow._get_name())
 
         #     if isinstance(flow, InjectiveGlowBlock):
         #         for block in flow.flows:
@@ -143,11 +143,13 @@ class plFlowModel(pl.LightningModule):
         # Check the number of parameters in each optimizer
         num_mse_params = sum(p.numel() for p in mse_params)
         num_nll_params = sum(p.numel() for p in nll_params)
-        
+
         print(f"Number of parameters in optimizer_mse: {num_mse_params}")
         print(f"Number of parameters in optimizer_nll: {num_nll_params}")
-        print(f'Total number of parameters: {num_mse_params + num_nll_params}')
-        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        print(f"Total number of parameters: {num_mse_params + num_nll_params}")
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
         print(f"Total number of trainable parameters: {trainable_params}")
         assert trainable_params == num_mse_params + num_nll_params
 
@@ -192,15 +194,15 @@ class plFlowModel(pl.LightningModule):
             if torch.isnan(v_latent_recon).any():
                 print("v_latent_recon has nans")
 
-            loss = torch.nn.functional.mse_loss(x_reconstructed, x) + torch.nn.functional.mse_loss(
-                v_latent_recon, v_latent
-            )
+            loss = torch.nn.functional.mse_loss(
+                x_reconstructed, x
+            ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
         else:
             loss = self.model.forward_kld(x)
 
         # logging the loss
         self.log("train_loss", loss)
-        if self.current_epoch % 5 == 0:
+        if self.current_epoch % 5 == 0 and self.batch_idx == 0:
             print()
             print(f"train_loss: {loss} | epoch_counter: {self.current_epoch}")
         return loss
@@ -213,9 +215,9 @@ class plFlowModel(pl.LightningModule):
             # reconstruct the latents
             v_latent_recon = self.model.inverse(x_reconstructed)
 
-            loss = torch.nn.functional.mse_loss(x_reconstructed, x) + torch.nn.functional.mse_loss(
-                v_latent_recon, v_latent
-            )
+            loss = torch.nn.functional.mse_loss(
+                x_reconstructed, x
+            ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
         else:
             loss = self.model.forward_kld(x)
 
@@ -223,7 +225,7 @@ class plFlowModel(pl.LightningModule):
         self.log("val_loss", loss)
 
         # Print the loss to the console
-        if self.current_epoch % 5 == 0:
+        if self.current_epoch % 5 == 0 and self.batch_idx == 0:
             print()
             print(
                 f"Nsteps_mse {self.n_steps_mse}, epoch_counter: {self.current_epoch}, val_loss: {loss}"
