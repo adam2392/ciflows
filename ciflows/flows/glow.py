@@ -208,13 +208,13 @@ class Injective1x1Conv(Flow):
         # Assume self.w is a tensor (W^T W + gamma^2 I)
         prefactor = torch.matmul(self.W, self.W.T) + self.gamma**2 * torch.eye(
             self.W.shape[0]
-        )
+        ).to(x.device)
 
         # Inverse of prefactor
         w_pinv = torch.matmul(self.W.T, torch.linalg.inv(prefactor))
 
         if self.activation == "relu":
-            conv_filter = torch.cat([w_pinv, -w_pinv], dim=0)
+            conv_filter = torch.cat([w_pinv, -w_pinv], dim=0).to(x.device)
         else:
             conv_filter = w_pinv
 
