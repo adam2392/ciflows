@@ -231,7 +231,7 @@ if __name__ == "__main__":
         checkpoint_name=mse_chkpoint_name,
     )
 
-    debug = True
+    debug = False
     fast_dev = False
     max_epochs = 2000
     if debug:
