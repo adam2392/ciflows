@@ -72,7 +72,6 @@ class plFlowModel(pl.LightningModule):
         self.lr_scheduler = lr_scheduler
         self.lr_min = lr_min
         self.n_steps_mse = n_steps_mse
-        self.step_counter = 0
         self.checkpoint_dir = checkpoint_dir
         self.checkpoint_name = checkpoint_name
 
@@ -140,7 +139,7 @@ class plFlowModel(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, _ = batch
 
-        if self.n_steps_mse is not None and self.step_counter < self.n_steps_mse:
+        if self.n_steps_mse is not None and self.current_epoch < self.n_steps_mse:
             v_latent = self.model.inverse(x)
             x_reconstructed = self.model.forward(v_latent)
             loss = torch.nn.functional.mse_loss(x_reconstructed, x)
@@ -151,13 +150,12 @@ class plFlowModel(pl.LightningModule):
         self.log("train_loss", loss)
         if batch_idx % 100 == 0:
             print()
-            print(f"train_loss: {loss} | step_counter: {self.step_counter}")
-        self.step_counter += 1
+            print(f"train_loss: {loss} | epoch_counter: {self.current_epoch}")
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, _ = batch
-        if self.n_steps_mse is not None and self.step_counter < self.n_steps_mse:
+        if self.n_steps_mse is not None and self.current_epoch < self.n_steps_mse:
             v_latent = self.model.inverse(x)
             x_reconstructed = self.model.forward(v_latent)
             loss = torch.nn.functional.mse_loss(x_reconstructed, x)
@@ -172,6 +170,6 @@ class plFlowModel(pl.LightningModule):
         if batch_idx % 100 == 0:
             print()
             print(
-                f"Nsteps_mse {self.n_steps_mse}, step_counter: {self.step_counter}, val_loss: {loss}"
+                f"Nsteps_mse {self.n_steps_mse}, epoch_counter: {self.current_epoch}, val_loss: {loss}"
             )
         return loss
