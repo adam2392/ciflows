@@ -202,7 +202,7 @@ class plFlowModel(pl.LightningModule):
 
         # logging the loss
         self.log("train_loss", loss)
-        if self.current_epoch % 5 == 0 and self.batch_idx == 0:
+        if self.current_epoch % 5 == 0 and batch_idx == 0:
             print()
             print(f"train_loss: {loss} | epoch_counter: {self.current_epoch}")
         return loss
@@ -225,7 +225,7 @@ class plFlowModel(pl.LightningModule):
         self.log("val_loss", loss)
 
         # Print the loss to the console
-        if self.current_epoch % 5 == 0 and self.batch_idx == 0:
+        if self.current_epoch % 5 == 0 and batch_idx == 0:
             print()
             print(
                 f"Nsteps_mse {self.n_steps_mse}, epoch_counter: {self.current_epoch}, val_loss: {loss}"
