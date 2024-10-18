@@ -163,7 +163,6 @@ class plFlowModel(pl.LightningModule):
             loss = self.model.forward_kld(x)
 
         self.log("Nsteps_mse", self.n_steps_mse)
-        self.log("step_counter", self.step_counter)
         self.log("val_loss", loss)
 
         # Print the loss to the console
