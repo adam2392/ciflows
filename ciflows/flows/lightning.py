@@ -17,6 +17,7 @@ class TwoStageTraining(Callback):
             and trainer.current_epoch > pl_module.n_steps_mse
         ):
             if trainer.current_epoch == pl_module.n_steps_mse + 1:
+                print()
                 print("Training with NLL loss")
             trainer.optimizers = [pl_module.optimizer_nll]
             # trainer.lr_schedulers = trainer.configure_schedulers([pl_module.])
@@ -24,12 +25,13 @@ class TwoStageTraining(Callback):
 
             # Save a checkpoint after the transition to NLL
             checkpoint_path = os.path.join(
-                trainer.checkpoint_dir, f"{trainer.checkpoint_name}.ckpt"
+                pl_module.checkpoint_dir, f"{pl_module.checkpoint_name}.ckpt"
             )
             trainer.save_checkpoint(checkpoint_path)
             print(f"Checkpoint saved at {checkpoint_path}")
         else:
             if trainer.current_epoch == 0:
+                print()
                 print("Training with MSE loss")
             trainer.optimizers = [pl_module.optimizer_mse]
             # trainer.lr_schedulers = trainer.configure_schedulers([pl_module.optimizer_mse])

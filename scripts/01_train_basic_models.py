@@ -38,7 +38,7 @@ def get_model():
 
     n_chs = int(n_channels * 4**n_mixing_layers * (1 / 2) ** n_injective_layers)
     print("Starting at latent representation: ", n_chs)
-    q0 = nf.distributions.DiagGaussian((n_chs, 7, 7))
+    q0 = nf.distributions.DiagGaussian((n_chs, 7, 7), trainable=False)
 
     for i in range(n_injective_layers):
         for j in range(n_glow_blocks):
