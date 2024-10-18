@@ -32,20 +32,19 @@ def get_model():
     n_chs = n_channels
     flows = []
 
-    debug = True
+    debug = False
 
-    # add the initial mixing layers
-    print("Beginning of mixing flows.")
-    mixing_flows = []
-    # Add flow layers starting from the latent representation
-    for i in range(n_mixing_layers):
-        # n_chs = C * 4^(L - i)
-        n_chs = n_channels * 4 ** (n_mixing_layers - i)
+    n_mixing_layers = 2
+    n_injective_layers = 3
+    n_layers = n_mixing_layers + n_injective_layers
 
-        if debug:
-            print(f"On layer {n_mixing_layers - i}, n_chs = {n_chs}")
+    n_chs = int(n_channels * 4**n_mixing_layers * (1 / 2) ** n_injective_layers)
+    print("Starting at latent representation: ", n_chs)
+    q0 = nf.distributions.DiagGaussian((n_chs, 7, 7))
+
+    for i in range(n_injective_layers):
         for j in range(n_glow_blocks):
-            mixing_flows += [
+            flows += [
                 GlowBlock(
                     channels=n_chs,
                     hidden_channels=n_hidden,
@@ -53,39 +52,25 @@ def get_model():
                     scale=True,
                 )
             ]
-        mixing_flows += [Squeeze()]
 
-    # reverse the mixing flows to go from X -> V.
-    mixing_flows = mixing_flows[::-1]
-    i = 1
-    for flow in mixing_flows:
-        if hasattr(flow, "n_channels"):
-            print(f"On layer {i}, n_chs = {flow.n_channels}")
-            i += 1
-    num_layers = i
-
-    print("Beginning of injective flows.")
-    n_chs = n_channels * 4 ** (n_mixing_layers - 0)
-    debug = True
-    # add injective blocks
-    injective_flows = []
-    for i in range(n_injective_layers):
-        # Note: this is adding from V -> X
-        n_chs = n_chs // 2
-        injective_flows += [
+        # input to inj flow is what is at the X -> V layer
+        flows += [
             InjectiveGlowBlock(
                 channels=n_chs,
                 hidden_channels=n_hidden,
                 activation=activation,
                 scale=True,
                 gamma=gamma,
+                debug=debug,
             )
         ]
-
+        n_chs = n_chs * 2
         if debug:
-            print(f"On layer {i + num_layers}, n_chs = {n_chs}")
+            print(f"On layer {n_layers - i}, n_chs = {n_chs//2} -> {n_chs}")
+
+    for i in range(n_mixing_layers):
         for j in range(n_glow_blocks):
-            injective_flows += [
+            flows += [
                 GlowBlock(
                     channels=n_chs,
                     hidden_channels=n_hidden,
@@ -93,15 +78,10 @@ def get_model():
                     scale=True,
                 )
             ]
-
-    # Note: this is constructed as X -> V, so we need to reverse the flows
-    # to adhere to the normflows convention of V -> X
-    flows = mixing_flows
-    flows.extend(injective_flows)
-    flows = flows[::-1]
-
-    print("n_channels: ", n_chs)
-    q0 = nf.distributions.DiagGaussian((n_chs, 7, 7))
+        flows += [Squeeze()]
+        n_chs = n_chs // 4
+        if debug:
+            print(f"On layer {n_mixing_layers - i}, n_chs = {n_chs}")
 
     model = nf.NormalizingFlow(q0=q0, flows=flows)
 
@@ -215,7 +195,7 @@ if __name__ == "__main__":
     devices = 1
     strategy = "auto"  # or ddp if distributed
     num_workers = 4
-    gradient_clip_val = 1.0  # 1.0
+    gradient_clip_val = None # 1.0
     check_val_every_n_epoch = 5
     monitor = "val_loss"
 
@@ -231,7 +211,7 @@ if __name__ == "__main__":
 
     # output filename for the results
     root = "./data/"
-    model_name = "injflow_mnist_v1"
+    model_name = "injflow_twostage_batch256_gradclipNone_mnist_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 

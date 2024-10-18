@@ -66,7 +66,12 @@ class Squeeze(Flow):
 
 class Injective1x1Conv(Flow):
     def __init__(
-        self, num_channels_in: int, activation: str = "linear", gamma: float = 0.0
+        self,
+        num_channels_in: int,
+        num_channels_v: int = None,
+        activation: str = "linear",
+        gamma: float = 0.0,
+        preset_W=None,
     ):
         """Injective 1x1 convolution with support for injective cases (e.g., relu).
 
@@ -74,7 +79,7 @@ class Injective1x1Conv(Flow):
         ----------
         num_channels_in : int
             The number of input channels for this layer. This should be the number
-            of channels from the latent representation.
+            of channels from the input towards the latent representation
         activation : str, optional
             The activation, by default 'linear'. Can be 'relu'.
         gamma : float, optional
@@ -82,33 +87,34 @@ class Injective1x1Conv(Flow):
         """
         super().__init__()
         self.num_channels_in = num_channels_in
+        if num_channels_v is None:
+            num_channels_v = num_channels_in // 2
+        self.num_channels_v = num_channels_v
         self.activation = activation
         self.gamma = gamma
 
         if self.activation == "linear":
-            Q1, _ = torch.linalg.qr(
-                torch.randn(self.num_channels_in, self.num_channels_in)
-            )
-            Q2, _ = torch.linalg.qr(
-                torch.randn(self.num_channels_in, self.num_channels_in)
-            )
-            W = torch.cat([Q1, Q2], axis=0) / np.sqrt(2.0)
+            Q1, _ = torch.linalg.qr(torch.randn(num_channels_v, num_channels_v))
+            Q2, _ = torch.linalg.qr(torch.randn(num_channels_v, num_channels_v))
+            W = torch.cat([Q1, Q2], axis=1) / np.sqrt(2.0)
 
-            print("inside initialization: ", W.shape)
+            # print("inside initialization: ", W.shape)
             # Initialize the weight matrix as a random orthogonal matrix as shape (n_chs_in, n_chs_in // 2)
-            self.W = nn.Parameter(W)
-            print("inside initialization: ", self.W)
         else:
-            Q, _ = torch.linalg.qr(
-                torch.randn(self.num_channels_in, self.num_channels_in)
-            )
-            # Initialize the weight matrix as a random orthogonal matrix as shape (n_chs_in // 2, n_chs_in // 2)
-            self.W = nn.Parameter(Q)
+            W, _ = torch.linalg.qr(torch.randn(num_channels_v, num_channels_v))
+        if preset_W is not None:
+            W = preset_W
+        # Initialize the weight matrix as a random orthogonal matrix as shape (n_chs_in // 2, n_chs_in // 2)
+        self.W = nn.Parameter(W)
+        # print("inside initialization: ", self.W)
 
-    def forward(self, v):
-        """Forward pass through "decoder" from latent representation to output.
+    def inverse(self, v):
+        """Forward pass through "encoder" from input to output (latent representation).
 
-        Increasing channels by a factor of 2 to get the output representation again.
+        Decreasing channels by a factor of 2 to get output.
+
+        XXX: needs to be inverse if with normflows, and refactor to use n_channels as the
+        number of channels in the "X" data.
 
         Parameters
         ----------
@@ -141,9 +147,12 @@ class Injective1x1Conv(Flow):
         log_det *= -1
 
         if self.activation == "relu":
-            W = torch.cat([self.W, -self.W], dim=0)
+            # For injective, we are combining halves
+            x_a = v[:, : self.num_channels_v, :, :]
+            x_b = v[:, self.num_channels_v :, :, :]
+            x = x_a - x_b
         else:
-            W = self.W
+            x = v
 
         debug = False
         if debug:
@@ -153,19 +162,19 @@ class Injective1x1Conv(Flow):
 
         # Apply the weight to project data from latent space to output space
         # x_ = convolve(W, v)
-        W = W.view(self.num_channels_in * 2, self.num_channels_in, 1, 1)
-        x_ = torch.nn.functional.conv2d(v, W)
+        W = self.W.view(self.W.shape[0], self.W.shape[1], 1, 1)
+        x_ = torch.nn.functional.conv2d(x, W, stride=1, padding=0)
 
         return x_, log_det
 
-    def inverse(self, x):
-        """Reverse' pass, going through the encoder to get the latent representation.
+    def forward(self, x):
+        """Reverse' pass, going through the decoder to get the input images.
 
-        Decreasing channels by a factor of 2.
+        Increasing channels by a factor of 2.
 
         Parameters
         ----------
-        x : torch.Tensor of shape (batch_size, num_channels_in * 2, height, width)
+        x : torch.Tensor of shape (batch_size, num_channels_in // 2, height, width)
             Input data
 
         Returns
@@ -176,15 +185,14 @@ class Injective1x1Conv(Flow):
         _, channels, height, width = x.shape
 
         assert (
-            channels == self.num_channels_in * 2
-        ), f"Expected {self.num_channels_in * 2} channels, got {channels}."
+            channels == self.num_channels_v
+        ), f"Expected {self.num_channels_v} channels, got {channels}."
 
         # y = f(x) = Wx
         # SVD decomposition of the weight vector to get the log det J_{f}^T J_{f}
         # as the sum of the square singular values.
         try:
-            svals = torch.linalg.svdvals(self.W)
-            svals = svals.to(x.device)
+            svals = torch.linalg.svdvals(self.W).to(x.device)
         except Exception as e:
             print(self.W)
             print(self.W.shape)
@@ -198,21 +206,12 @@ class Injective1x1Conv(Flow):
 
         # compute the pseudo-inverse of the weight matrix: (W W^T + gamma^2 I)^{-1} W^T
         # Assume self.w is a tensor (W^T W + gamma^2 I)
-        prefactor = torch.matmul(self.W.T, self.W) + self.gamma**2 * torch.eye(
-            self.W.shape[1]
-        ).to(x.device)
+        prefactor = torch.matmul(self.W, self.W.T) + self.gamma**2 * torch.eye(
+            self.W.shape[0]
+        )
 
         # Inverse of prefactor
-        try:
-            w_pinv = torch.matmul(torch.inverse(prefactor), self.W.T)
-        except Exception as e:
-            print()
-            print("Prefactor: ")
-            print(prefactor)
-            print()
-            print("Shapes: ")
-            print(prefactor.shape, self.W.shape)
-            raise Exception(e)
+        w_pinv = torch.matmul(self.W.T, torch.linalg.inv(prefactor))
 
         if self.activation == "relu":
             conv_filter = torch.cat([w_pinv, -w_pinv], dim=0)
@@ -221,12 +220,13 @@ class Injective1x1Conv(Flow):
 
         # Reshaping to fit the 1x1 convolution kernel dimensions
         # 1, 1, n_chs_in, n_chs_out
-        conv_filter = conv_filter.view(
-            self.num_channels_in, self.num_channels_in * 2, 1, 1
-        )
+        conv_filter = conv_filter.view(conv_filter.size(0), conv_filter.size(1), 1, 1)
 
         # Apply convolution (assuming x is in NCHW format by default in PyTorch)
-        v_ = torch.nn.functional.conv2d(x, conv_filter)
+        v_ = torch.nn.functional.conv2d(x, conv_filter, stride=1, padding=0)
+        v_ = torch.nn.functional.relu(v_)
+
+        log_det *= -1
         return v_, log_det
 
 
@@ -306,15 +306,15 @@ class InjectiveGlowBlock(Flow):
 
         # channels = channels * 2  # after injective 1x1 conv
         # Invertible 1x1 convolution
-        self.flows += [Injective1x1Conv(channels, activation=activation, gamma=gamma)]
+        channels = channels * 2  # after injective 1x1 conv
+        self.flows += [Injective1x1Conv(num_channels_in=channels, num_channels_v=channels//2, activation=activation, gamma=gamma)]
 
         # Activation normalization
-        channels = channels * 2  # after injective 1x1 conv
         self.flows += [ActNorm((channels,) + (1, 1))]
         self.debug = debug
 
     def forward(self, v):
-        """Forward pass of the flow
+        """Forward pass of the flow towards input images.
 
         Parameters
         ----------
@@ -331,7 +331,7 @@ class InjectiveGlowBlock(Flow):
         log_det_tot = torch.zeros(v.shape[0], dtype=v.dtype, device=v.device)
         for flow in self.flows:
             if self.debug:
-                print(flow, v.shape)
+                print(flow._get_name(), v.shape)
             v, ld = flow(v)
             log_det_tot += ld
         return v, log_det_tot

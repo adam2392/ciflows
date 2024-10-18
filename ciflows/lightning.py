@@ -83,7 +83,7 @@ class plApproximateFlowModel(pl.LightningModule):
         Sample a batch of images from the flow.
         """
         # sample latent space and reshape to (batches, 1, embed_dim)
-        v = self.latent.sample(num_samples, **params)
+        v, _ = self.latent.sample(num_samples, **params)
         v = v.reshape(num_samples, 1, -1)
         return self.decoder(v)
 
