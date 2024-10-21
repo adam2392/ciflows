@@ -242,7 +242,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    batch_size = 128
+    batch_size = 1024
     devices = 1
     strategy = "auto"  # or ddp if distributed
     num_workers = 6
@@ -262,7 +262,7 @@ if __name__ == "__main__":
 
     # output filename for the results
     root = "./data/"
-    model_name = "injflow_twostage_batch256_gradclipNone_mnist_v1"
+    model_name = "injflow_twostage_batch1024_gradclipNone_mnist_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
