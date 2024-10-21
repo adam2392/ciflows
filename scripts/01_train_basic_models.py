@@ -250,7 +250,7 @@ if __name__ == "__main__":
     check_val_every_n_epoch = 1
     monitor = "val_loss"
 
-    n_steps_mse = 10
+    n_steps_mse = 20
     mse_chkpoint_name = f"mse_chkpoint_{n_steps_mse}"
 
     lr = 3e-4
@@ -262,7 +262,7 @@ if __name__ == "__main__":
 
     # output filename for the results
     root = "./data/"
-    model_name = "injflow_twostage_batch1024_gradclipNone_mnist_trainableq0_v1"
+    model_name = "injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse20_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -289,8 +289,8 @@ if __name__ == "__main__":
         fast_dev = True
         max_epochs = 1
         batch_size = 2
-    else:
-        torch.set_float32_matmul_precision("high")
+    # else:
+        # torch.set_float32_matmul_precision("high")
         # model = torch.compile(model)
 
     model = plInjFlowModel(

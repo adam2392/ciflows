@@ -12,30 +12,34 @@ from .model import InjectiveFlow
 
 
 class TwoStageTraining(Callback):
-    def on_train_epoch_start(self, trainer, pl_module):
-        if (
-            getattr(pl_module, "n_steps_mse", None) is not None
-            and trainer.current_epoch > pl_module.n_steps_mse
-        ):
-            if trainer.current_epoch == pl_module.n_steps_mse + 1:
-                print()
-                print("Training with NLL loss")
-            trainer.optimizers = [pl_module.optimizer_nll]
-            # trainer.lr_schedulers = trainer.configure_schedulers([pl_module.])
-            # trainer.optimizer_frequencies = [] # or optimizers frequencies if you have any
+    switched = False
 
-            # Save a checkpoint after the transition to NLL
-            checkpoint_path = os.path.join(
-                pl_module.checkpoint_dir, f"{pl_module.checkpoint_name}.ckpt"
-            )
-            trainer.save_checkpoint(checkpoint_path)
-            print(f"Checkpoint saved at {checkpoint_path}")
-        else:
+    def on_train_epoch_start(self, trainer, pl_module):
+        if pl_module.current_epoch < pl_module.n_steps_mse:
             if trainer.current_epoch == 0:
                 print()
                 print("Training with MSE loss")
             trainer.optimizers = [pl_module.optimizer_mse]
             # trainer.lr_schedulers = trainer.configure_schedulers([pl_module.optimizer_mse])
+            # trainer.optimizer_frequencies = [] # or optimizers frequencies if you have any
+        else:
+            #     if (
+            #     getattr(pl_module, "n_steps_mse", None) is not None
+            #     and trainer.current_epoch > pl_module.n_steps_mse
+            # ):
+            if not self.switched:
+                print()
+                print("Training with NLL loss")
+                # Save a checkpoint after the transition to NLL
+                checkpoint_path = os.path.join(
+                    pl_module.checkpoint_dir, f"{pl_module.checkpoint_name}.ckpt"
+                )
+                trainer.save_checkpoint(checkpoint_path)
+                print(f"Checkpoint saved at {checkpoint_path}")
+
+            self.switched = True
+            trainer.optimizers = [pl_module.optimizer_nll]
+            # trainer.lr_schedulers = trainer.configure_schedulers([pl_module.])
             # trainer.optimizer_frequencies = [] # or optimizers frequencies if you have any
 
 
@@ -135,7 +139,7 @@ class plInjFlowModel(pl.LightningModule):
         return self.inj_model.forward(samples), ldj
 
     def forward(self, x, target=None):
-        """Foward pass.
+        """Foward pass from vlatent to input images.
 
         Note: This is opposite of the normalizing flow API convention.
         """
@@ -146,7 +150,7 @@ class plInjFlowModel(pl.LightningModule):
         return x
 
     def inverse(self, v, target=None):
-        """Inverse pass.
+        """Inverse pass from input images to latent space.
 
         Note: This is opposite of the normalizing flow API convention.
         """
@@ -193,6 +197,13 @@ class plInjFlowModel(pl.LightningModule):
             else:
                 scheduler = None
             scheduler_list.append(scheduler)
+
+        self.scheduler_nll = torch.optim.lr_scheduler.CosineAnnealingLR(
+                    optimizer,
+                    T_max=self.trainer.max_epochs,
+                    eta_min=self.lr_min,
+                    verbose=True,
+                )
         # return optimizer_list, scheduler_list
         return [optimizer_nll], [scheduler]
 
@@ -223,7 +234,11 @@ class plInjFlowModel(pl.LightningModule):
 
         # logging the loss
         self.log("train_loss", loss)
-        if self.current_epoch % self.check_val_every_n_epoch == 0 and batch_idx == 0 or self.debug:
+        if (
+            self.current_epoch % self.check_val_every_n_epoch == 0
+            and batch_idx == 0
+            or self.debug
+        ):
             print()
             print(f"train_loss: {loss} | epoch_counter: {self.current_epoch}")
         return loss
@@ -247,7 +262,11 @@ class plInjFlowModel(pl.LightningModule):
         self.log("val_loss", loss)
 
         # Print the loss to the console
-        if self.current_epoch % self.check_val_every_n_epoch == 0 and batch_idx == 0 or self.debug:
+        if (
+            self.current_epoch % self.check_val_every_n_epoch == 0
+            and batch_idx == 0
+            or self.debug
+        ):
             print()
             print(
                 f"Nsteps_mse {self.n_steps_mse}, epoch_counter: {self.current_epoch}, val_loss: {loss}"
