@@ -105,7 +105,7 @@ def get_inj_model():
 
 def get_bij_model(n_chs, latent_size):
     use_lu = True
-    n_hidden = 256
+    n_hidden = 512
     n_glow_blocks = 6
 
     flows = []
@@ -146,7 +146,7 @@ def initialize_flow(model):
         if "weight" in name:
             # Layer-dependent initialization
             if "coupling" in name:
-                nn.init.normal_(param, mean=0.0, std=0.01)
+                nn.init.normal_(param, mean=0.0, std=1.0)
             else:
                 nn.init.xavier_uniform_(param)
         elif "bias" in name:
@@ -262,7 +262,10 @@ if __name__ == "__main__":
 
     # output filename for the results
     root = "./data/"
-    model_name = "injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse20_v2"
+
+    # v2 = trainable q0
+    # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
+    model_name = "injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse20_v3"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
