@@ -205,8 +205,8 @@ class plInjFlowModel(pl.LightningModule):
         # print(f"Total number of trainable parameters: {trainable_params}")
         # assert trainable_params == num_mse_params + num_nll_params
 
-        optimizer_mse = optim.Adam(mse_params, lr=self.lr)
-        optimizer_nll = optim.Adam(nll_params, lr=self.lr)
+        optimizer_mse = optim.AdamW(mse_params, lr=self.lr)
+        optimizer_nll = optim.AdamW(nll_params, lr=self.lr // 2)
 
         self.optimizer_mse = optimizer_mse
         self.optimizer_nll = optimizer_nll

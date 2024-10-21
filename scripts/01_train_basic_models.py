@@ -23,8 +23,8 @@ def get_inj_model():
     activation = "linear"
 
     net_actnorm = False
-    n_hidden = 512
-    n_glow_blocks = 3
+    n_hidden = 256
+    n_glow_blocks = 2
     n_mixing_layers = 2
     n_injective_layers = 4
     n_layers = n_mixing_layers + n_injective_layers
@@ -109,8 +109,8 @@ def get_inj_model():
 def get_bij_model(n_chs, latent_size):
     use_lu = True
     net_actnorm = False
-    n_hidden = 512
-    n_glow_blocks = 6
+    n_hidden = 256
+    n_glow_blocks = 10
 
     flows = []
 
@@ -273,7 +273,7 @@ if __name__ == "__main__":
 
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
-    model_name = "injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse20_v5"
+    model_name = "adamw_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse20_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
