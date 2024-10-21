@@ -246,7 +246,7 @@ if __name__ == "__main__":
     devices = 1
     strategy = "auto"  # or ddp if distributed
     num_workers = 6
-    gradient_clip_val = None  # 1.0
+    gradient_clip_val = 1.0
     check_val_every_n_epoch = 1
     monitor = "val_loss"
 
