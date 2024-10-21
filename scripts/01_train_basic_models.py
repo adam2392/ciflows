@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.datasets import MNIST
 
-from ciflows.flows import TwoStageTraining, plInjFlowModel
+from ciflows.flows import plInjFlowModel
 from ciflows.flows.glow import InjectiveGlowBlock, Squeeze
 
 
@@ -22,6 +22,7 @@ def get_inj_model():
     gamma = 1e-6
     activation = "linear"
 
+    net_actnorm = False
     n_hidden = 512
     n_glow_blocks = 3
     n_mixing_layers = 2
@@ -60,6 +61,7 @@ def get_inj_model():
                     use_lu=use_lu,
                     scale=True,
                     split_mode=split_mode,
+                    net_actnorm=net_actnorm,
                 )
             ]
 
@@ -73,6 +75,7 @@ def get_inj_model():
                 gamma=gamma,
                 debug=debug,
                 split_mode=split_mode,
+                net_actnorm=net_actnorm,
             )
         ]
         n_chs = n_chs * 2
@@ -105,6 +108,7 @@ def get_inj_model():
 
 def get_bij_model(n_chs, latent_size):
     use_lu = True
+    net_actnorm = False
     n_hidden = 512
     n_glow_blocks = 6
 
@@ -127,6 +131,7 @@ def get_bij_model(n_chs, latent_size):
                 use_lu=use_lu,
                 scale=True,
                 split_mode=split_mode,
+                net_actnorm=net_actnorm,
             )
         ]
 
@@ -250,6 +255,7 @@ if __name__ == "__main__":
     num_workers = 6
     gradient_clip_val = 1.0
     check_val_every_n_epoch = 1
+    check_samples_every_n_epoch = 5
     monitor = "val_loss"
 
     n_steps_mse = 20
@@ -267,7 +273,7 @@ if __name__ == "__main__":
 
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
-    model_name = "injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse20_v4"
+    model_name = "injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse20_v5"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -292,8 +298,10 @@ if __name__ == "__main__":
     if debug:
         accelerator = "cpu"
         fast_dev = True
-        max_epochs = 1
-        batch_size = 2
+        max_epochs = 5
+        n_steps_mse = 2
+        batch_size = 16
+        check_samples_every_n_epoch = 1
     # else:
     # torch.set_float32_matmul_precision("high")
     # model = torch.compile(model)
@@ -309,6 +317,7 @@ if __name__ == "__main__":
         checkpoint_name=mse_chkpoint_name,
         debug=debug,
         check_val_every_n_epoch=check_val_every_n_epoch,
+        check_samples_every_n_epoch=check_samples_every_n_epoch,
     )
 
     checkpoint_callback = ModelCheckpoint(

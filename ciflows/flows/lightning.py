@@ -1,13 +1,13 @@
 import os
+import time
 from pathlib import Path
+
 import lightning as pl
+import matplotlib.pyplot as plt
 import normflows as nf
 import torch
 import torch.optim as optim
 from lightning.pytorch.callbacks import Callback
-
-import matplotlib.pyplot as plt
-
 
 from ..loss import volume_change_surrogate, volume_change_surrogate_transformer
 from .glow import Injective1x1Conv, InjectiveGlowBlock
@@ -57,6 +57,7 @@ class plInjFlowModel(pl.LightningModule):
         n_steps_mse=None,
         checkpoint_dir=None,
         checkpoint_name=None,
+        check_samples_every_n_epoch=None,
         debug=False,
         check_val_every_n_epoch=1,
     ):
@@ -96,6 +97,7 @@ class plInjFlowModel(pl.LightningModule):
         self.checkpoint_name = checkpoint_name
         self.debug = debug
         self.check_val_every_n_epoch = check_val_every_n_epoch
+        self.check_samples_every_n_epoch = check_samples_every_n_epoch
 
     # def get_injective_and_other_params(self):
     #     # injective_params = []
@@ -162,21 +164,26 @@ class plInjFlowModel(pl.LightningModule):
         v = self.bij_model.inverse(v)
         return v
 
-    def sample_and_save_images(self, batch_idx):
+    def sample_and_save_images(self, epoch_idx):
         # Generate random samples
         with torch.no_grad():
-            samples = self.bij_model.sample(16)  # Assuming flow_model has a sample method
+            samples, _ = self.bij_model.sample(
+                16
+            )  # Assuming flow_model has a sample method
 
+            # pass through the injective layer
+            samples = self.inj_model.forward(samples)
 
         # Plot the samples
         fig, axes = plt.subplots(4, 4, figsize=(8, 8))
         for i, ax in enumerate(axes.flatten()):
             ax.imshow(samples[i].cpu().numpy().squeeze(), cmap="gray")
-            ax.axis('off')
-        
+            ax.axis("off")
+
         # Save the figure
-        save_path = Path(self.checkpoint_dir) / 'log_images'
-        plt.savefig(save_path / f'sample_{batch_idx}.png')
+        save_path = Path(self.checkpoint_dir) / "log_images"
+        save_path.mkdir(exist_ok=True, parents=True)
+        plt.savefig(save_path / f"sample_{epoch_idx}.png")
         plt.close()
 
     def configure_optimizers(self):
@@ -222,15 +229,17 @@ class plInjFlowModel(pl.LightningModule):
             scheduler_list.append(scheduler)
 
         scheduler_nll = torch.optim.lr_scheduler.CosineAnnealingLR(
-                    optimizer,
-                    T_max=self.trainer.max_epochs,
-                    eta_min=self.lr_min,
-                    verbose=True,
-                )
+            optimizer,
+            T_max=self.trainer.max_epochs,
+            eta_min=self.lr_min,
+            verbose=True,
+        )
         # return optimizer_list, scheduler_list
         return [optimizer_mse, optimizer_nll], [scheduler, scheduler_nll]
 
-    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure):
+    def optimizer_step(
+        self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure
+    ):
         print()
         # Only step optimizer 1 during the first phase
         if epoch < self.n_steps_mse and optimizer_idx == 0:
@@ -249,7 +258,7 @@ class plInjFlowModel(pl.LightningModule):
         optimizer_mse, optimizer_nll = self.optimizers()
         # multiple schedulers
         sch1, sch2 = self.lr_schedulers()
-        
+
         if self.n_steps_mse is not None and self.current_epoch < self.n_steps_mse:
             v_latent = self.inj_model.inverse(x)
             x_reconstructed = self.inj_model.forward(v_latent)
@@ -273,9 +282,13 @@ class plInjFlowModel(pl.LightningModule):
             self.manual_backward(loss)
 
             # clip gradients
-            self.clip_gradients(optimizer_mse, gradient_clip_val=1.0, gradient_clip_algorithm='norm')
+            self.clip_gradients(
+                optimizer_mse, gradient_clip_val=1.0, gradient_clip_algorithm="norm"
+            )
             optimizer_mse.step()
             sch1.step()
+
+            lr = optimizer_mse.param_groups[0]["lr"]
         else:
             inj_v = self.inj_model.inverse(x)
             loss = self.bij_model.forward_kld(inj_v)
@@ -284,9 +297,13 @@ class plInjFlowModel(pl.LightningModule):
             self.manual_backward(loss)
 
             # clip gradients
-            self.clip_gradients(optimizer_nll, gradient_clip_val=1.0, gradient_clip_algorithm='norm')
+            self.clip_gradients(
+                optimizer_nll, gradient_clip_val=1.0, gradient_clip_algorithm="norm"
+            )
             optimizer_nll.step()
             sch2.step()
+
+            lr = optimizer_nll.param_groups[0]["lr"]
 
         # logging the loss
         self.log("train_loss", loss)
@@ -295,9 +312,33 @@ class plInjFlowModel(pl.LightningModule):
             and batch_idx == 0
             or self.debug
         ):
+
             print()
-            print(f"train_loss: {loss} | epoch_counter: {self.current_epoch}")
+            print(
+                f"train_loss: {loss} | lr: {lr} | epoch_counter: {self.current_epoch}"
+            )
+
+        if (
+            self.check_samples_every_n_epoch is not None
+            and self.current_epoch % self.check_samples_every_n_epoch == 0
+            and batch_idx == 0
+        ):
+            self.sample_and_save_images(self.current_epoch)
         return loss
+
+    def on_epoch_start(self):
+        # Record the start time at the beginning of the epoch
+        self.start_time = time.time()
+
+    def on_epoch_end(self):
+        # Calculate the duration of the epoch
+        epoch_duration = time.time() - self.start_time
+
+        self.log("epoch_duration", epoch_duration, on_step=False, on_epoch=True)
+
+        # Optionally print or log to console
+        if self.debug:
+            print(f"Epoch {self.current_epoch} took {epoch_duration:.2f} seconds")
 
     def validation_step(self, batch, batch_idx):
         x, _ = batch
