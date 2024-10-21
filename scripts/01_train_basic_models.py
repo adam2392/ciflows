@@ -8,13 +8,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 from lightning.pytorch.callbacks import ModelCheckpoint
-from normflows.flows.affine import GlowBlock
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.datasets import MNIST
 
 from ciflows.flows import plInjFlowModel
-from ciflows.flows.glow import InjectiveGlowBlock, Squeeze
+from ciflows.flows.glow import InjectiveGlowBlock, Squeeze, GlowBlock
 
 
 def get_inj_model():
@@ -273,7 +272,9 @@ if __name__ == "__main__":
 
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
-    model_name = "adamw_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse5_v1"
+    model_name = (
+        "adamw_resnet_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse5_v1"
+    )
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -292,7 +293,7 @@ if __name__ == "__main__":
     initialize_flow(inj_model)
     initialize_flow(bij_model)
 
-    debug = False
+    debug = True
     fast_dev = False
     max_epochs = 500
     if debug:
