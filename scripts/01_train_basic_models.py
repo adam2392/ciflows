@@ -258,7 +258,7 @@ if __name__ == "__main__":
     check_samples_every_n_epoch = 5
     monitor = "val_loss"
 
-    n_steps_mse = 20
+    n_steps_mse = 5
     mse_chkpoint_name = f"mse_chkpoint_{n_steps_mse}"
 
     lr = 3e-4
@@ -273,7 +273,7 @@ if __name__ == "__main__":
 
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
-    model_name = "adamw_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse20_v1"
+    model_name = "adamw_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse5_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
