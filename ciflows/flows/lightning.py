@@ -139,10 +139,10 @@ class plInjFlowModel(pl.LightningModule):
 
         Note: This is opposite of the normalizing flow API convention.
         """
-        # first pass through injective layer
-        x = self.inj_model.forward(x)
         # second pass through bijection layer
         x = self.bij_model.forward(x)
+        # first pass through injective layer
+        x = self.inj_model.forward(x)
         return x
 
     def inverse(self, v, target=None):
