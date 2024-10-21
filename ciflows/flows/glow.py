@@ -140,7 +140,7 @@ class Injective1x1Conv(Flow):
         svals = torch.linalg.svdvals(self.W)
 
         # compute log of its regularized singular values and sum them
-        log_det = torch.log(svals + self.gamma**2 / (svals + 1e-8))
+        log_det = torch.log(svals + self.gamma**2 / (svals + 1e-6))
         log_det = torch.sum(log_det) * (height * width)
 
         # Volume is now going from v to X
@@ -200,7 +200,7 @@ class Injective1x1Conv(Flow):
 
         # compute log of its regularized singular values and sum them
         log_det = torch.log(
-            svals + self.gamma**2 / (svals + torch.Tensor([1e-8]).to(x.device))
+            svals + self.gamma**2 / (svals + torch.Tensor([1e-6]).to(x.device))
         )
         log_det = torch.sum(log_det) * (height * width)
 
@@ -307,7 +307,14 @@ class InjectiveGlowBlock(Flow):
         # channels = channels * 2  # after injective 1x1 conv
         # Invertible 1x1 convolution
         channels = channels * 2  # after injective 1x1 conv
-        self.flows += [Injective1x1Conv(num_channels_in=channels, num_channels_v=channels//2, activation=activation, gamma=gamma)]
+        self.flows += [
+            Injective1x1Conv(
+                num_channels_in=channels,
+                num_channels_v=channels // 2,
+                activation=activation,
+                gamma=gamma,
+            )
+        ]
 
         # Activation normalization
         self.flows += [ActNorm((channels,) + (1, 1))]

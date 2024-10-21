@@ -13,17 +13,17 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.datasets import MNIST
 
-from ciflows.flows import TwoStageTraining, plFlowModel
+from ciflows.flows import TwoStageTraining, plInjFlowModel
 from ciflows.flows.glow import InjectiveGlowBlock, Squeeze
 
 
-def get_model():
+def get_inj_model():
     use_lu = True
     gamma = 1e-6
     activation = "linear"
 
     n_hidden = 512
-    n_glow_blocks = 4
+    n_glow_blocks = 3
     n_mixing_layers = 2
     n_injective_layers = 4
     n_layers = n_mixing_layers + n_injective_layers
@@ -40,7 +40,11 @@ def get_model():
     n_chs = int(n_channels * 4**n_mixing_layers * (1 / 2) ** n_injective_layers)
     print("Starting at latent representation: ", n_chs)
     latent_size = int(img_size / (2**n_mixing_layers))
-    q0 = nf.distributions.DiagGaussian((n_chs, latent_size, latent_size))
+    q0 = nf.distributions.DiagGaussian(
+        (n_chs, latent_size, latent_size), trainable=False
+    )
+
+    split_mode = "channel"
 
     for i in range(n_injective_layers):
         if i == 0:
@@ -83,6 +87,7 @@ def get_model():
                     hidden_channels=n_hidden,
                     use_lu=use_lu,
                     scale=True,
+                    split_mode=split_mode,
                 )
             ]
         flows += [Squeeze()]
@@ -91,10 +96,45 @@ def get_model():
             print(f"On layer {n_mixing_layers - i}, n_chs = {n_chs}")
 
     model = nf.NormalizingFlow(q0=q0, flows=flows)
-
+    model.output_n_chs = n_chs
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(pytorch_total_params)
 
+    return model
+
+
+def get_bij_model(n_chs, latent_size):
+    use_lu = True
+    n_hidden = 256
+    n_glow_blocks = 6
+
+    flows = []
+
+    debug = False
+
+    print("Starting at latent representation: ", n_chs, latent_size, latent_size)
+    q0 = nf.distributions.DiagGaussian((n_chs, latent_size, latent_size))
+
+    split_mode = "checkerboard"
+
+    for i in range(n_glow_blocks):
+        flows += [
+            GlowBlock(
+                channels=n_chs,
+                hidden_channels=n_hidden,
+                use_lu=use_lu,
+                scale=True,
+                split_mode=split_mode,
+            )
+        ]
+
+        if debug:
+            print(f"On layer {n_glow_blocks - i}, n_chs = {n_chs//2} -> {n_chs}")
+
+    model = nf.NormalizingFlow(q0=q0, flows=flows)
+
+    pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(pytorch_total_params)
     return model
 
 
@@ -131,8 +171,8 @@ class MNISTDataModule(pl.LightningDataModule):
         self.transform = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.Normalize((0.5,), (0.5,)),
                 transforms.Resize((32, 32)),
+                transforms.Normalize((0.5,), (0.5,)),
             ]
         )
         self.fast_dev_run = fast_dev_run
@@ -232,17 +272,14 @@ if __name__ == "__main__":
     # model = plFlowModel.load_from_checkpoint(model_fname)
 
     # define the model
-    flow_model = get_model()
-    initialize_flow(flow_model)
-    model = plFlowModel(
-        flow_model,
-        lr=lr,
-        lr_min=lr_min,
-        lr_scheduler=lr_scheduler,
-        n_steps_mse=n_steps_mse,
-        checkpoint_dir=checkpoint_dir,
-        checkpoint_name=mse_chkpoint_name,
-    )
+    inj_model = get_inj_model()
+    samples = inj_model.q0.sample(2)
+    _, n_chs, latent_size, _ = samples.shape
+    print(samples.shape)
+    bij_model = get_bij_model(n_chs=n_chs, latent_size=latent_size)
+
+    initialize_flow(inj_model)
+    initialize_flow(bij_model)
 
     debug = False
     fast_dev = False
@@ -251,9 +288,22 @@ if __name__ == "__main__":
         accelerator = "cpu"
         fast_dev = True
         max_epochs = 1
+        batch_size = 2
     else:
         torch.set_float32_matmul_precision("high")
         # model = torch.compile(model)
+
+    model = plInjFlowModel(
+        inj_model=inj_model,
+        bij_model=bij_model,
+        lr=lr,
+        lr_min=lr_min,
+        lr_scheduler=lr_scheduler,
+        n_steps_mse=n_steps_mse,
+        checkpoint_dir=checkpoint_dir,
+        checkpoint_name=mse_chkpoint_name,
+        debug=debug,
+    )
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=checkpoint_dir,

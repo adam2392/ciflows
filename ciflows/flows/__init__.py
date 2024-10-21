@@ -1,2 +1,2 @@
 from .glow import Injective1x1Conv, InjectiveGlowBlock
-from .lightning import TwoStageTraining, plFlowModel
+from .lightning import TwoStageTraining, plInjFlowModel
