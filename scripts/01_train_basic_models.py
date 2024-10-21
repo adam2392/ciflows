@@ -113,7 +113,7 @@ def get_bij_model(n_chs, latent_size):
     debug = False
 
     print("Starting at latent representation: ", n_chs, latent_size, latent_size)
-    q0 = nf.distributions.DiagGaussian((n_chs, latent_size, latent_size), trainable=False)
+    q0 = nf.distributions.DiagGaussian((n_chs, latent_size, latent_size), trainable=True)
 
     split_mode = "checkerboard"
 
@@ -262,7 +262,7 @@ if __name__ == "__main__":
 
     # output filename for the results
     root = "./data/"
-    model_name = "injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse20_v1"
+    model_name = "injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse20_v2"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -283,7 +283,7 @@ if __name__ == "__main__":
 
     debug = False
     fast_dev = False
-    max_epochs = 300
+    max_epochs = 500
     if debug:
         accelerator = "cpu"
         fast_dev = True

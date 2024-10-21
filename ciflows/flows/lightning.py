@@ -136,6 +136,7 @@ class plInjFlowModel(pl.LightningModule):
         Sample a batch of images from the flow.
         """
         samples, ldj = self.bij_model.sample(num_samples=num_samples, **params)
+        print(samples.shape)
         return self.inj_model.forward(samples), ldj
 
     def forward(self, x, target=None):
