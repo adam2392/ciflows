@@ -206,7 +206,7 @@ class plInjFlowModel(pl.LightningModule):
         # assert trainable_params == num_mse_params + num_nll_params
 
         optimizer_mse = optim.AdamW(mse_params, lr=self.lr)
-        optimizer_nll = optim.AdamW(nll_params, lr=self.lr // 2)
+        optimizer_nll = optim.AdamW(nll_params, lr=self.lr)
 
         self.optimizer_mse = optimizer_mse
         self.optimizer_nll = optimizer_nll
@@ -217,7 +217,8 @@ class plInjFlowModel(pl.LightningModule):
                 # cosine learning rate annealing
                 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                     optimizer,
-                    T_max=self.trainer.max_epochs,
+                    # T_max=self.trainer.max_epochs,
+                    T_max=self.n_steps_mse,
                     eta_min=self.lr_min,
                     verbose=True,
                 )
@@ -230,7 +231,7 @@ class plInjFlowModel(pl.LightningModule):
 
         scheduler_nll = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer,
-            T_max=self.trainer.max_epochs,
+            T_max=self.trainer.max_epochs - self.n_steps_mse,
             eta_min=self.lr_min,
             verbose=True,
         )
