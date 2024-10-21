@@ -247,10 +247,10 @@ if __name__ == "__main__":
     strategy = "auto"  # or ddp if distributed
     num_workers = 6
     gradient_clip_val = None  # 1.0
-    check_val_every_n_epoch = 5
+    check_val_every_n_epoch = 1
     monitor = "val_loss"
 
-    n_steps_mse = 50
+    n_steps_mse = 10
     mse_chkpoint_name = f"mse_chkpoint_{n_steps_mse}"
 
     lr = 3e-4
