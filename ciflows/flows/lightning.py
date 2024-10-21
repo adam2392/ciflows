@@ -1,10 +1,13 @@
 import os
-
+from pathlib import Path
 import lightning as pl
 import normflows as nf
 import torch
 import torch.optim as optim
 from lightning.pytorch.callbacks import Callback
+
+import matplotlib.pyplot as plt
+
 
 from ..loss import volume_change_surrogate, volume_change_surrogate_transformer
 from .glow import Injective1x1Conv, InjectiveGlowBlock
@@ -159,7 +162,26 @@ class plInjFlowModel(pl.LightningModule):
         v = self.bij_model.inverse(v)
         return v
 
+    def sample_and_save_images(self, batch_idx):
+        # Generate random samples
+        with torch.no_grad():
+            samples = self.bij_model.sample(16)  # Assuming flow_model has a sample method
+
+
+        # Plot the samples
+        fig, axes = plt.subplots(4, 4, figsize=(8, 8))
+        for i, ax in enumerate(axes.flatten()):
+            ax.imshow(samples[i].cpu().numpy().squeeze(), cmap="gray")
+            ax.axis('off')
+        
+        # Save the figure
+        save_path = Path(self.checkpoint_dir) / 'log_images'
+        plt.savefig(save_path / f'sample_{batch_idx}.png')
+        plt.close()
+
     def configure_optimizers(self):
+        self.automatic_optimization = False
+
         # mse_params, nll_params = self.get_injective_and_other_params()
         mse_params = list(self.inj_model.parameters())
         nll_params = list(self.bij_model.parameters())
@@ -199,18 +221,35 @@ class plInjFlowModel(pl.LightningModule):
                 scheduler = None
             scheduler_list.append(scheduler)
 
-        self.scheduler_nll = torch.optim.lr_scheduler.CosineAnnealingLR(
+        scheduler_nll = torch.optim.lr_scheduler.CosineAnnealingLR(
                     optimizer,
                     T_max=self.trainer.max_epochs,
                     eta_min=self.lr_min,
                     verbose=True,
                 )
         # return optimizer_list, scheduler_list
-        return [optimizer_nll], [scheduler]
+        return [optimizer_mse, optimizer_nll], [scheduler, scheduler_nll]
+
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure):
+        print()
+        # Only step optimizer 1 during the first phase
+        if epoch < self.n_steps_mse and optimizer_idx == 0:
+            if self.debug:
+                print(f"Optimizer {optimizer_idx} step: ", optimizer)
+            optimizer.step(closure=optimizer_closure)
+        # Only step optimizer 2 after n_steps_mse
+        elif epoch >= self.n_steps_mse and optimizer_idx == 1:
+            if self.debug:
+                print(f"Optimizer {optimizer_idx} step: ", optimizer)
+            optimizer.step(closure=optimizer_closure)
 
     def training_step(self, batch, batch_idx):
         x, _ = batch
 
+        optimizer_mse, optimizer_nll = self.optimizers()
+        # multiple schedulers
+        sch1, sch2 = self.lr_schedulers()
+        
         if self.n_steps_mse is not None and self.current_epoch < self.n_steps_mse:
             v_latent = self.inj_model.inverse(x)
             x_reconstructed = self.inj_model.forward(v_latent)
@@ -229,9 +268,25 @@ class plInjFlowModel(pl.LightningModule):
             loss = torch.nn.functional.mse_loss(
                 x_reconstructed, x
             ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
+
+            optimizer_mse.zero_grad()
+            self.manual_backward(loss)
+
+            # clip gradients
+            self.clip_gradients(optimizer_mse, gradient_clip_val=1.0, gradient_clip_algorithm='norm')
+            optimizer_mse.step()
+            sch1.step()
         else:
             inj_v = self.inj_model.inverse(x)
             loss = self.bij_model.forward_kld(inj_v)
+
+            optimizer_nll.zero_grad()
+            self.manual_backward(loss)
+
+            # clip gradients
+            self.clip_gradients(optimizer_nll, gradient_clip_val=1.0, gradient_clip_algorithm='norm')
+            optimizer_nll.step()
+            sch2.step()
 
         # logging the loss
         self.log("train_loss", loss)

@@ -113,7 +113,9 @@ def get_bij_model(n_chs, latent_size):
     debug = False
 
     print("Starting at latent representation: ", n_chs, latent_size, latent_size)
-    q0 = nf.distributions.DiagGaussian((n_chs, latent_size, latent_size), trainable=True)
+    q0 = nf.distributions.DiagGaussian(
+        (n_chs, latent_size, latent_size), trainable=True
+    )
 
     split_mode = "checkerboard"
 
@@ -185,9 +187,9 @@ class MNISTDataModule(pl.LightningDataModule):
             self.data_dir, download=True, train=True, transform=self.transform
         )
         if self.fast_dev_run:
-            self.mnist_train, self.mnist_val = random_split(
+            self.mnist_train, self.mnist_val, _ = random_split(
                 mnist_full,
-                [100, 60_000 - 100],
+                [100, 100, 60_000 - 200],
                 generator=torch.Generator().manual_seed(42),
             )
         else:
@@ -265,7 +267,7 @@ if __name__ == "__main__":
 
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
-    model_name = "injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse20_v3"
+    model_name = "injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse20_v4"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -293,8 +295,8 @@ if __name__ == "__main__":
         max_epochs = 1
         batch_size = 2
     # else:
-        # torch.set_float32_matmul_precision("high")
-        # model = torch.compile(model)
+    # torch.set_float32_matmul_precision("high")
+    # model = torch.compile(model)
 
     model = plInjFlowModel(
         inj_model=inj_model,
@@ -306,7 +308,7 @@ if __name__ == "__main__":
         checkpoint_dir=checkpoint_dir,
         checkpoint_name=mse_chkpoint_name,
         debug=debug,
-        check_val_every_n_epoch=check_val_every_n_epoch
+        check_val_every_n_epoch=check_val_every_n_epoch,
     )
 
     checkpoint_callback = ModelCheckpoint(
@@ -339,7 +341,10 @@ if __name__ == "__main__":
         max_epochs=max_epochs,
         devices=devices,
         strategy=strategy,
-        callbacks=[checkpoint_callback, TwoStageTraining()],
+        callbacks=[
+            checkpoint_callback,
+            #    TwoStageTraining()
+        ],
         check_val_every_n_epoch=check_val_every_n_epoch,
         accelerator=accelerator,
         gradient_clip_val=gradient_clip_val,
@@ -356,7 +361,7 @@ if __name__ == "__main__":
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
-        # fast_dev_run=fast_dev,
+        fast_dev_run=fast_dev,
     )
 
     trainer.fit(
