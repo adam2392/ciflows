@@ -51,6 +51,7 @@ class plInjFlowModel(pl.LightningModule):
         checkpoint_dir=None,
         checkpoint_name=None,
         debug=False,
+        check_val_every_n_epoch=1,
     ):
         """Injective flow model lightning module.
 
@@ -87,6 +88,7 @@ class plInjFlowModel(pl.LightningModule):
         self.checkpoint_dir = checkpoint_dir
         self.checkpoint_name = checkpoint_name
         self.debug = debug
+        self.check_val_every_n_epoch = check_val_every_n_epoch
 
     # def get_injective_and_other_params(self):
     #     # injective_params = []
@@ -221,7 +223,7 @@ class plInjFlowModel(pl.LightningModule):
 
         # logging the loss
         self.log("train_loss", loss)
-        if self.current_epoch % 5 == 0 and batch_idx == 0 or self.debug:
+        if self.current_epoch % self.check_val_every_n_epoch == 0 and batch_idx == 0 or self.debug:
             print()
             print(f"train_loss: {loss} | epoch_counter: {self.current_epoch}")
         return loss
@@ -245,7 +247,7 @@ class plInjFlowModel(pl.LightningModule):
         self.log("val_loss", loss)
 
         # Print the loss to the console
-        if self.current_epoch % 5 == 0 and batch_idx == 0 or self.debug:
+        if self.current_epoch % self.check_val_every_n_epoch == 0 and batch_idx == 0 or self.debug:
             print()
             print(
                 f"Nsteps_mse {self.n_steps_mse}, epoch_counter: {self.current_epoch}, val_loss: {loss}"

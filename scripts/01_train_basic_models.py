@@ -303,6 +303,7 @@ if __name__ == "__main__":
         checkpoint_dir=checkpoint_dir,
         checkpoint_name=mse_chkpoint_name,
         debug=debug,
+        check_val_every_n_epoch=check_val_every_n_epoch
     )
 
     checkpoint_callback = ModelCheckpoint(
