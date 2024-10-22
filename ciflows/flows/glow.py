@@ -67,13 +67,13 @@ class GlowBlock(Flow):
         # print(channels_)
         # assert len(channels_) == 3, len(channels_)
         in_chs, hidden_chs, _, out_chs = channels_
-        param_map = nf.nets.ConvResidualNet(
-            in_channels=in_chs,
-            out_channels=out_chs,
-            hidden_channels=hidden_chs,
-            # context_channels=hidden_chs,
-            # activation="relu",
-        )
+        # param_map = nf.nets.ConvResidualNet(
+        #     in_channels=in_chs,
+        #     out_channels=out_chs,
+        #     hidden_channels=hidden_chs,
+        #     # context_channels=hidden_chs,
+        #     # activation="relu",
+        # )
         self.flows += [AffineCouplingBlock(param_map, scale, scale_map, split_mode)]
         # Invertible 1x1 convolution
         self.flows += [nf.flows.Invertible1x1Conv(channels, use_lu)]

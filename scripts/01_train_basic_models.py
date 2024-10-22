@@ -21,9 +21,9 @@ def get_inj_model():
     gamma = 1e-3
     activation = "linear"
 
-    net_actnorm = False
-    n_hidden = 64
-    n_glow_blocks = 3
+    net_actnorm = True
+    n_hidden = 128
+    n_glow_blocks = 4
     n_mixing_layers = 2
     n_injective_layers = 4
     n_layers = n_mixing_layers + n_injective_layers
@@ -98,16 +98,16 @@ def get_inj_model():
             print(f"On layer {n_mixing_layers - i}, n_chs = {n_chs}")
 
     # add variational dequantizations
-    print("Before variational dequant: ", n_chs)
-    vardeq_layers = [
-        nf.flows.AffineCouplingBlock(
-            GatedConvNet(c_in=n_chs, c_out=2 * n_chs, c_hidden=32),
-            scale=True,
-            split_mode="checkerboard",
-        )
-        for i in range(4)
-    ]
-    flows += [VariationalDequantization(vardeq_layers)]
+    # print("Before variational dequant: ", n_chs)
+    # vardeq_layers = [
+    #     nf.flows.AffineCouplingBlock(
+    #         GatedConvNet(c_in=n_chs, c_out=2 * n_chs, c_hidden=32),
+    #         scale=True,
+    #         split_mode="checkerboard",
+    #     )
+    #     for i in range(4)
+    # ]
+    # flows += [VariationalDequantization(vardeq_layers)]
 
     model = nf.NormalizingFlow(q0=q0, flows=flows)
     model.output_n_chs = n_chs
@@ -120,7 +120,7 @@ def get_inj_model():
 def get_bij_model(n_chs, latent_size):
     use_lu = True
     net_actnorm = False
-    n_hidden = 64
+    n_hidden = 128
     n_glow_blocks = 8
 
     flows = []
@@ -194,8 +194,8 @@ class MNISTDataModule(pl.LightningDataModule):
             [
                 transforms.ToTensor(),
                 transforms.Resize((32, 32)),
-                discretize,
-                # transforms.Normalize((0.5,), (0.5,)),
+                # discretize,
+                transforms.Normalize((0.5,), (0.5,)),
             ]
         )
         self.fast_dev_run = fast_dev_run
@@ -293,7 +293,7 @@ if __name__ == "__main__":
 
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
-    model_name = "adamw_vardeq_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse5_v1"
+    model_name = "adamw_convnet_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse10_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
