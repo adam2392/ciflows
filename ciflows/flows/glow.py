@@ -61,9 +61,9 @@ class GlowBlock(Flow):
             channels_ += (num_param * channels,)
         else:
             raise NotImplementedError("Mode " + split_mode + " is not implemented.")
-        # param_map = nf.nets.ConvNet2d(
-        #     channels_, kernel_size, leaky, init_zeros, actnorm=net_actnorm
-        # )
+        param_map = nf.nets.ConvNet2d(
+            channels_, kernel_size, leaky, init_zeros, actnorm=net_actnorm
+        )
         # print(channels_)
         # assert len(channels_) == 3, len(channels_)
         in_chs, hidden_chs, _, out_chs = channels_

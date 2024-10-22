@@ -12,18 +12,18 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.datasets import MNIST
 
-from ciflows.flows import plInjFlowModel
+from ciflows.flows import plInjFlowModel, VariationalDequantization, GatedConvNet
 from ciflows.flows.glow import InjectiveGlowBlock, Squeeze, GlowBlock
 
 
 def get_inj_model():
     use_lu = True
-    gamma = 1e-6
+    gamma = 1e-3
     activation = "linear"
 
     net_actnorm = False
-    n_hidden = 256
-    n_glow_blocks = 2
+    n_hidden = 64
+    n_glow_blocks = 3
     n_mixing_layers = 2
     n_injective_layers = 4
     n_layers = n_mixing_layers + n_injective_layers
@@ -97,6 +97,18 @@ def get_inj_model():
         if debug:
             print(f"On layer {n_mixing_layers - i}, n_chs = {n_chs}")
 
+    # add variational dequantizations
+    print("Before variational dequant: ", n_chs)
+    vardeq_layers = [
+        nf.flows.AffineCouplingBlock(
+            GatedConvNet(c_in=n_chs, c_out=2 * n_chs, c_hidden=32),
+            scale=True,
+            split_mode="checkerboard",
+        )
+        for i in range(4)
+    ]
+    flows += [VariationalDequantization(vardeq_layers)]
+
     model = nf.NormalizingFlow(q0=q0, flows=flows)
     model.output_n_chs = n_chs
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -108,8 +120,8 @@ def get_inj_model():
 def get_bij_model(n_chs, latent_size):
     use_lu = True
     net_actnorm = False
-    n_hidden = 256
-    n_glow_blocks = 10
+    n_hidden = 64
+    n_glow_blocks = 8
 
     flows = []
 
@@ -159,6 +171,10 @@ def initialize_flow(model):
             nn.init.constant_(param, 0.0)
 
 
+def discretize(sample):
+    return (sample * 255).to(torch.int32).to(torch.float32)
+
+
 class MNISTDataModule(pl.LightningDataModule):
     def __init__(
         self,
@@ -178,7 +194,8 @@ class MNISTDataModule(pl.LightningDataModule):
             [
                 transforms.ToTensor(),
                 transforms.Resize((32, 32)),
-                transforms.Normalize((0.5,), (0.5,)),
+                discretize,
+                # transforms.Normalize((0.5,), (0.5,)),
             ]
         )
         self.fast_dev_run = fast_dev_run
@@ -196,6 +213,10 @@ class MNISTDataModule(pl.LightningDataModule):
                 [100, 100, 60_000 - 200],
                 generator=torch.Generator().manual_seed(42),
             )
+            # Get a sample image
+            images, labels = next(iter(self.train_dataloader()))
+
+            print("Dataset range: ", images.max(), images.min())
         else:
             self.mnist_train, self.mnist_val = random_split(
                 mnist_full, [55000, 5000], generator=torch.Generator().manual_seed(42)
@@ -257,7 +278,7 @@ if __name__ == "__main__":
     check_samples_every_n_epoch = 5
     monitor = "val_loss"
 
-    n_steps_mse = 5
+    n_steps_mse = 10
     mse_chkpoint_name = f"mse_chkpoint_{n_steps_mse}"
 
     lr = 3e-4
@@ -272,9 +293,7 @@ if __name__ == "__main__":
 
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
-    model_name = (
-        "adamw_resnet_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse5_v1"
-    )
+    model_name = "adamw_vardeq_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse5_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
