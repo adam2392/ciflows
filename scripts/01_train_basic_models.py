@@ -21,7 +21,7 @@ def get_inj_model():
     gamma = 1e-3
     activation = "linear"
 
-    net_actnorm = True
+    net_actnorm = False
     n_hidden = 128
     n_glow_blocks = 4
     n_mixing_layers = 2
@@ -47,7 +47,7 @@ def get_inj_model():
     split_mode = "channel"
 
     for i in range(n_injective_layers):
-        if i == 0:
+        if i % 2 == 0:
             split_mode = "checkerboard"
         else:
             split_mode = "channel"
