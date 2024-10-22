@@ -293,52 +293,59 @@ if __name__ == "__main__":
 
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
-    model_name = "adamw_convnet_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse10_v1"
+    # convnet restart = v2, whcih was good
+    model_name = "adamw_convnet_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse10_v2"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
+    train_from_checkpoint = True
 
-    # epoch=99
-    # step=43000
-    # model_fname = checkpoint_dir / f'epoch={epoch}-step={step}.ckpt'
-    # model = plFlowModel.load_from_checkpoint(model_fname)
+    if train_from_checkpoint:
+        epoch=499
+        step=27000
+        model_fname = checkpoint_dir / f'epoch={epoch}-step={step}.ckpt'
+        model = plInjFlowModel.load_from_checkpoint(model_fname)
 
-    # define the model
-    inj_model = get_inj_model()
-    samples = inj_model.q0.sample(2)
-    _, n_chs, latent_size, _ = samples.shape
-    print(samples.shape)
-    bij_model = get_bij_model(n_chs=n_chs, latent_size=latent_size)
+        model.current_epoch = epoch
+        max_epochs = model.current_epoch + 1000
+    else:
+        model_fname = None
+        # define the model
+        inj_model = get_inj_model()
+        samples = inj_model.q0.sample(2)
+        _, n_chs, latent_size, _ = samples.shape
+        print(samples.shape)
+        bij_model = get_bij_model(n_chs=n_chs, latent_size=latent_size)
 
-    initialize_flow(inj_model)
-    initialize_flow(bij_model)
+        initialize_flow(inj_model)
+        initialize_flow(bij_model)
 
-    debug = False
-    fast_dev = False
-    max_epochs = 500
-    if debug:
-        accelerator = "cpu"
-        fast_dev = True
-        max_epochs = 5
-        n_steps_mse = 2
-        batch_size = 16
-        check_samples_every_n_epoch = 1
-    # else:
-    # torch.set_float32_matmul_precision("high")
-    # model = torch.compile(model)
+        debug = False
+        fast_dev = False
+        max_epochs = 500
+        if debug:
+            accelerator = "cpu"
+            fast_dev = True
+            max_epochs = 5
+            n_steps_mse = 2
+            batch_size = 16
+            check_samples_every_n_epoch = 1
+        # else:
+        # torch.set_float32_matmul_precision("high")
+        # model = torch.compile(model)
 
-    model = plInjFlowModel(
-        inj_model=inj_model,
-        bij_model=bij_model,
-        lr=lr,
-        lr_min=lr_min,
-        lr_scheduler=lr_scheduler,
-        n_steps_mse=n_steps_mse,
-        checkpoint_dir=checkpoint_dir,
-        checkpoint_name=mse_chkpoint_name,
-        debug=debug,
-        check_val_every_n_epoch=check_val_every_n_epoch,
-        check_samples_every_n_epoch=check_samples_every_n_epoch,
-    )
+        model = plInjFlowModel(
+            inj_model=inj_model,
+            bij_model=bij_model,
+            lr=lr,
+            lr_min=lr_min,
+            lr_scheduler=lr_scheduler,
+            n_steps_mse=n_steps_mse,
+            checkpoint_dir=checkpoint_dir,
+            checkpoint_name=mse_chkpoint_name,
+            debug=debug,
+            check_val_every_n_epoch=check_val_every_n_epoch,
+            check_samples_every_n_epoch=check_samples_every_n_epoch,
+        )
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=checkpoint_dir,
@@ -396,6 +403,7 @@ if __name__ == "__main__":
     trainer.fit(
         model,
         datamodule=data_module,
+        ckpt_path=model_fname
     )
 
     # save the final model
