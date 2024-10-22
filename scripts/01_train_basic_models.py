@@ -311,6 +311,8 @@ if __name__ == "__main__":
 
         # model.current_epoch = epoch
         max_epochs = model.current_epoch + 1000
+        fast_dev = False
+        debug = False
     else:
         model_fname = None
         # define the model
