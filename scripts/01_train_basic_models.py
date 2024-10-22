@@ -308,8 +308,8 @@ if __name__ == "__main__":
         model_name = "adamw_convnet_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse10_v2"
         checkpoint_dir = Path("./results") / model_name
         checkpoint_dir.mkdir(exist_ok=True, parents=True)
-        
-        model.current_epoch = epoch
+
+        # model.current_epoch = epoch
         max_epochs = model.current_epoch + 1000
     else:
         model_fname = None
