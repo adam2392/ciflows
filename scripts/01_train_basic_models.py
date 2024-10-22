@@ -12,8 +12,9 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.datasets import MNIST
 
-from ciflows.flows import plInjFlowModel, VariationalDequantization, GatedConvNet
-from ciflows.flows.glow import InjectiveGlowBlock, Squeeze, GlowBlock
+from ciflows.flows import (GatedConvNet, VariationalDequantization,
+                           plInjFlowModel)
+from ciflows.flows.glow import GlowBlock, InjectiveGlowBlock, Squeeze
 
 
 def get_inj_model():
@@ -169,7 +170,7 @@ def initialize_flow(model):
             # Layer-dependent initialization
             if "coupling" in name:
                 nn.init.normal_(param, mean=0.0, std=1.0)
-            elif 'batch' in name:
+            elif "batch" in name:
                 continue
             else:
                 nn.init.xavier_uniform_(param)
@@ -306,9 +307,9 @@ if __name__ == "__main__":
     train_from_checkpoint = False
 
     if train_from_checkpoint:
-        epoch=499
-        step=27000
-        model_fname = checkpoint_dir / f'epoch={epoch}-step={step}.ckpt'
+        epoch = 499
+        step = 27000
+        model_fname = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
         model = plInjFlowModel.load_from_checkpoint(model_fname)
 
         model_name = "adamw_convnet_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse10_v2"
@@ -331,7 +332,7 @@ if __name__ == "__main__":
         initialize_flow(inj_model)
         initialize_flow(bij_model)
 
-        debug = False
+        debug = True
         fast_dev = False
         max_epochs = 1000
         if debug:

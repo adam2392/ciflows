@@ -43,7 +43,7 @@ class Dequantization(nn.Module):
             z = (
                 z * (1 - self.alpha) + 0.5 * self.alpha
             )  # Scale to prevent boundaries 0 and 1
-            ldj += np.log(1. - self.alpha) * np.prod(z.shape[1:])
+            ldj += np.log(1.0 - self.alpha) * np.prod(z.shape[1:])
             ldj += (-torch.log(z) - torch.log(1 - z)).sum(dim=[1, 2, 3])
             z = torch.log(z) - torch.log(1 - z)
         return z, ldj
@@ -133,9 +133,9 @@ class GatedConv(nn.Module):
         super().__init__()
         self.net = nn.Sequential(
             ConcatELU(),
-            nn.Conv2d(2*c_in, c_hidden, kernel_size=3, padding=1),
+            nn.Conv2d(2 * c_in, c_hidden, kernel_size=3, padding=1),
             ConcatELU(),
-            nn.Conv2d(2*c_hidden, 2*c_in, kernel_size=1)
+            nn.Conv2d(2 * c_hidden, 2 * c_in, kernel_size=1),
         )
 
     def forward(self, x):
@@ -160,10 +160,11 @@ class GatedConvNet(nn.Module):
         layers = []
         layers += [nn.Conv2d(c_in, c_hidden, kernel_size=3, padding=1)]
         for layer_index in range(num_layers):
-            layers += [GatedConv(c_hidden, c_hidden),
-                       LayerNormChannels(c_hidden)]
-        layers += [ConcatELU(),
-                   nn.Conv2d(2*c_hidden, c_out, kernel_size=3, padding=1)]
+            layers += [GatedConv(c_hidden, c_hidden), LayerNormChannels(c_hidden)]
+        layers += [
+            ConcatELU(),
+            nn.Conv2d(2 * c_hidden, c_out, kernel_size=3, padding=1),
+        ]
         self.nn = nn.Sequential(*layers)
 
         self.nn[-1].weight.data.zero_()
@@ -171,7 +172,8 @@ class GatedConvNet(nn.Module):
 
     def forward(self, x):
         return self.nn(x)
-    
+
+
 if __name__ == "__main__":
     import normflows as nf
 
@@ -180,7 +182,7 @@ if __name__ == "__main__":
 
     vardeq_layers = [
         nf.flows.AffineCouplingBlock(
-            GatedConvNet(c_in=n_chs, c_out=2*n_chs, c_hidden=256),
+            GatedConvNet(c_in=n_chs, c_out=2 * n_chs, c_hidden=256),
             scale=True,
             split_mode="checkerboard",
         )
@@ -189,7 +191,7 @@ if __name__ == "__main__":
     flows += [VariationalDequantization(vardeq_layers)]
 
     z = torch.randn(2, 1, 32, 32)
-    print('Now Var DEQs')
+    print("Now Var DEQs")
     for flow in flows:
         z, log_det = flow.inverse(z)
         print(z.shape, log_det.shape)

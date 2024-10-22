@@ -4,10 +4,12 @@ import normflows as nf
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.functional import F
 from normflows.flows.affine import AffineCouplingBlock
 from normflows.flows.base import Flow
 from normflows.flows.normalization import ActNorm
+from torch.functional import F
+
+from .unet import Unet
 
 
 class GlowBlock(Flow):
@@ -31,7 +33,7 @@ class GlowBlock(Flow):
         init_zeros=True,
         use_lu=True,
         net_actnorm=False,
-        dropout_probability=0.0
+        dropout_probability=0.0,
     ):
         """Constructor
 
@@ -68,16 +70,20 @@ class GlowBlock(Flow):
         # print(channels_)
         # assert len(channels_) == 3, len(channels_)
         in_chs, hidden_chs, _, out_chs = channels_
-        param_map = nf.nets.ConvResidualNet(
-            in_channels=in_chs,
-            out_channels=out_chs,
-            hidden_channels=hidden_chs,
-            use_batch_norm=False,
-            num_blocks=2,
-            dropout_probability=dropout_probability,
-            # context_channels=hidden_chs,
-            # activation="relu",
+        param_map = Unet(
+            input_channels=in_chs,
+            output_channels=out_chs,
         )
+        # param_map = nf.nets.ConvResidualNet(
+        #     in_channels=in_chs,
+        #     out_channels=out_chs,
+        #     hidden_channels=hidden_chs,
+        #     use_batch_norm=False,
+        #     num_blocks=2,
+        #     dropout_probability=dropout_probability,
+        #     # context_channels=hidden_chs,
+        #     # activation="relu",
+        # )
         self.flows += [AffineCouplingBlock(param_map, scale, scale_map, split_mode)]
         # Invertible 1x1 convolution
         self.flows += [nf.flows.Invertible1x1Conv(channels, use_lu)]
@@ -389,10 +395,14 @@ class InjectiveGlowBlock(Flow):
         else:
             raise NotImplementedError("Mode " + split_mode + " is not implemented.")
 
-        param_map = nf.nets.ConvNet2d(
-            channels_, kernel_size, leaky, init_zeros, actnorm=net_actnorm
-        )
+        # param_map = nf.nets.ConvNet2d(
+        #     channels_, kernel_size, leaky, init_zeros, actnorm=net_actnorm
+        # )
         in_chs, hidden_chs, _, out_chs = channels_
+        param_map = Unet(
+            input_channels=in_chs,
+            output_channels=out_chs,
+        )
         # param_map = nf.nets.ConvResidualNet(
         #     in_channels=in_chs,
         #     out_channels=out_chs,
@@ -565,7 +575,8 @@ def test_convnet():
     channels_ = (input_channels,) + 2 * (hidden_chs,)
     channels_ += (2 * input_channels,)
     model = nf.nets.ConvNet2d(
-        channels_, kernel_size,
+        channels_,
+        kernel_size,
     )
 
     # Forward pass through the model
@@ -575,9 +586,9 @@ def test_convnet():
     print("Input shape:", x.shape)
     print("Output shape:", output.shape)
 
+
 # Run the test
 if __name__ == "__main__":
     test_unet()
-
 
     test_convnet()
