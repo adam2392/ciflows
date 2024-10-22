@@ -31,6 +31,7 @@ class GlowBlock(Flow):
         init_zeros=True,
         use_lu=True,
         net_actnorm=False,
+        dropout_probability=0.0
     ):
         """Constructor
 
@@ -67,13 +68,16 @@ class GlowBlock(Flow):
         # print(channels_)
         # assert len(channels_) == 3, len(channels_)
         in_chs, hidden_chs, _, out_chs = channels_
-        # param_map = nf.nets.ConvResidualNet(
-        #     in_channels=in_chs,
-        #     out_channels=out_chs,
-        #     hidden_channels=hidden_chs,
-        #     # context_channels=hidden_chs,
-        #     # activation="relu",
-        # )
+        param_map = nf.nets.ConvResidualNet(
+            in_channels=in_chs,
+            out_channels=out_chs,
+            hidden_channels=hidden_chs,
+            use_batch_norm=False,
+            num_blocks=2,
+            dropout_probability=dropout_probability,
+            # context_channels=hidden_chs,
+            # activation="relu",
+        )
         self.flows += [AffineCouplingBlock(param_map, scale, scale_map, split_mode)]
         # Invertible 1x1 convolution
         self.flows += [nf.flows.Invertible1x1Conv(channels, use_lu)]
@@ -389,13 +393,13 @@ class InjectiveGlowBlock(Flow):
             channels_, kernel_size, leaky, init_zeros, actnorm=net_actnorm
         )
         in_chs, hidden_chs, _, out_chs = channels_
-        param_map = nf.nets.ConvResidualNet(
-            in_channels=in_chs,
-            out_channels=out_chs,
-            hidden_channels=hidden_chs,
-            # context_channels=hidden_chs,
-            # activation="relu",
-        )
+        # param_map = nf.nets.ConvResidualNet(
+        #     in_channels=in_chs,
+        #     out_channels=out_chs,
+        #     hidden_channels=hidden_chs,
+        #     # context_channels=hidden_chs,
+        #     # activation="relu",
+        # )
         self.flows += [AffineCouplingBlock(param_map, scale, scale_map, split_mode)]
 
         # channels = channels * 2  # after injective 1x1 conv
@@ -544,6 +548,36 @@ def test_unet():
     print("Output shape:", output.shape)
 
 
+def test_convnet():
+    # Define input parameters
+    input_channels = 1  # For example, RGB images
+    output_channels = 16  # For binary segmentation
+    input_height = 32  # Height of the input image
+    input_width = 32  # Width of the input image
+
+    # Create a random input tensor
+    x = torch.randn(1, input_channels, input_height, input_width)  # Batch size of 1
+
+    # Instantiate the UNet model
+    output_channels = input_channels * 2
+    hidden_chs = 32
+    kernel_size = (3, 1, 3)
+    channels_ = (input_channels,) + 2 * (hidden_chs,)
+    channels_ += (2 * input_channels,)
+    model = nf.nets.ConvNet2d(
+        channels_, kernel_size,
+    )
+
+    # Forward pass through the model
+    output = model(x)
+
+    # Print the output shape
+    print("Input shape:", x.shape)
+    print("Output shape:", output.shape)
+
 # Run the test
 if __name__ == "__main__":
     test_unet()
+
+
+    test_convnet()

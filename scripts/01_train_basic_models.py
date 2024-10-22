@@ -20,10 +20,11 @@ def get_inj_model():
     use_lu = True
     gamma = 1e-3
     activation = "linear"
+    dropout_probability = 0.2
 
     net_actnorm = False
     n_hidden = 128
-    n_glow_blocks = 4
+    n_glow_blocks = 3
     n_mixing_layers = 2
     n_injective_layers = 4
     n_layers = n_mixing_layers + n_injective_layers
@@ -47,7 +48,7 @@ def get_inj_model():
     split_mode = "channel"
 
     for i in range(n_injective_layers):
-        if i % 2 == 0:
+        if i <= 1:
             split_mode = "checkerboard"
         else:
             split_mode = "channel"
@@ -61,6 +62,7 @@ def get_inj_model():
                     scale=True,
                     split_mode=split_mode,
                     net_actnorm=net_actnorm,
+                    dropout_probability=dropout_probability,
                 )
             ]
 
@@ -90,6 +92,7 @@ def get_inj_model():
                     use_lu=use_lu,
                     scale=True,
                     split_mode=split_mode,
+                    dropout_probability=dropout_probability,
                 )
             ]
         flows += [Squeeze()]
@@ -143,6 +146,7 @@ def get_bij_model(n_chs, latent_size):
                 scale=True,
                 split_mode=split_mode,
                 net_actnorm=net_actnorm,
+                dropout_probability=0.2,
             )
         ]
 
@@ -165,6 +169,8 @@ def initialize_flow(model):
             # Layer-dependent initialization
             if "coupling" in name:
                 nn.init.normal_(param, mean=0.0, std=1.0)
+            elif 'batch' in name:
+                continue
             else:
                 nn.init.xavier_uniform_(param)
         elif "bias" in name:
@@ -278,7 +284,7 @@ if __name__ == "__main__":
     check_samples_every_n_epoch = 5
     monitor = "val_loss"
 
-    n_steps_mse = 10
+    n_steps_mse = 20
     mse_chkpoint_name = f"mse_chkpoint_{n_steps_mse}"
 
     lr = 3e-4
@@ -294,7 +300,7 @@ if __name__ == "__main__":
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
     # convnet restart = v2, whcih was good
-    model_name = "adamw_convnet_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse10_v1"
+    model_name = "adamw_resnet_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse20_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
     train_from_checkpoint = False
@@ -327,7 +333,7 @@ if __name__ == "__main__":
 
         debug = False
         fast_dev = False
-        max_epochs = 500
+        max_epochs = 1000
         if debug:
             accelerator = "cpu"
             fast_dev = True
