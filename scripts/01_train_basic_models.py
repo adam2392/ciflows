@@ -297,7 +297,7 @@ if __name__ == "__main__":
     model_name = "adamw_convnet_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse10_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
-    train_from_checkpoint = True
+    train_from_checkpoint = False
 
     if train_from_checkpoint:
         epoch=499
@@ -409,7 +409,7 @@ if __name__ == "__main__":
     trainer.fit(
         model,
         datamodule=data_module,
-        ckpt_path=model_fname
+        # ckpt_path=model_fname
     )
 
     # save the final model
