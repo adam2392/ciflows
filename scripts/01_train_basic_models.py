@@ -143,7 +143,7 @@ def get_bij_model(n_chs, latent_size):
     for i in range(n_glow_blocks):
         flows += [
             nf.flows.AutoregressiveRationalQuadraticSpline(
-                n_channels=n_chs, num_blocks=net_hidden_layers, num_hidden_channels=net_hidden_dim
+                num_input_channels=n_chs, num_blocks=net_hidden_layers, num_hidden_channels=net_hidden_dim
             )
         ]
         # flows += [
