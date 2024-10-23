@@ -23,8 +23,8 @@ def get_inj_model():
     dropout_probability = 0.2
 
     net_actnorm = False
-    n_hidden = 64
-    n_glow_blocks = 2
+    n_hidden = 128
+    n_glow_blocks = 3
     n_mixing_layers = 2
     n_injective_layers = 4
     n_layers = n_mixing_layers + n_injective_layers
@@ -299,12 +299,12 @@ if __name__ == "__main__":
     devices = 1
     strategy = "auto"  # or ddp if distributed
     num_workers = 6
-    gradient_clip_val = 1.0
+    gradient_clip_val = 2.0
     check_val_every_n_epoch = 1
     check_samples_every_n_epoch = 5
     monitor = "val_loss"
 
-    n_steps_mse = 20
+    n_steps_mse = 50
     mse_chkpoint_name = f"mse_chkpoint_{n_steps_mse}"
 
     lr = 3e-4
@@ -320,7 +320,7 @@ if __name__ == "__main__":
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
     # convnet restart = v2, whcih was good
-    model_name = "adamw_unet_injflow_twostage_batch1024_gradclip1_mnist_nottrainableq0_nstepsmse20_v1"
+    model_name = "adamw_unet_injflow_twostage_batch1024_gradclip2_mnist_nottrainableq0_nstepsmse50_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
     train_from_checkpoint = False
@@ -331,7 +331,7 @@ if __name__ == "__main__":
         model_fname = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
         model = plInjFlowModel.load_from_checkpoint(model_fname)
 
-        model_name = "adamw_unet_injflow_twostage_batch1024_gradclip1_mnist_nottrainableq0_nstepsmse20_v1"
+        model_name = "adamw_unet_injflow_twostage_batch1024_gradclip2_mnist_nottrainableq0_nstepsmse50_v2"
         checkpoint_dir = Path("./results") / model_name
         checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -353,7 +353,7 @@ if __name__ == "__main__":
 
         debug = False
         fast_dev = False
-        max_epochs = 1000
+        max_epochs = 2000
         if debug:
             accelerator = "cpu"
             fast_dev = True
