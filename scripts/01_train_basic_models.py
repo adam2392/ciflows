@@ -353,7 +353,7 @@ if __name__ == "__main__":
 
         debug = False
         fast_dev = False
-        max_epochs = 2000
+        max_epochs = 5000
         if debug:
             accelerator = "cpu"
             fast_dev = True
