@@ -12,6 +12,21 @@ from torch.functional import F
 from .unet import Unet
 
 
+class ReshapeFlow(nn.Module):
+    def __init__(self, shape_in, shape_out):
+        super(ReshapeFlow, self).__init__()
+        self.shape_in = shape_in
+        self.shape_out = shape_out
+
+    def forward(self, x):
+        # Reshape the input from shape_in to shape_out
+        return x.view(x.size(0), *self.shape_out), 0.0
+
+    def inverse(self, x):
+        # Reshape the input from shape_out to shape_in
+        return x.view(x.size(0), *self.shape_in), 0.0
+
+
 class GlowBlock(Flow):
     """Glow: Generative Flow with Invertible 1×1 Convolutions, [arXiv: 1807.03039](https://arxiv.org/abs/1807.03039)
 
@@ -591,6 +606,17 @@ def test_convnet():
 
 # Run the test
 if __name__ == "__main__":
-    test_unet()
+    # test_unet()
 
-    test_convnet()
+    # test_convnet()
+
+    # Example usage:
+    flow_layer = ReshapeFlow(shape_in=(3, 32, 32), shape_out=(3 * 32 * 32,))
+
+    x = torch.randn(64, 3, 32, 32)  # Batch of images
+    y, _ = flow_layer.forward(x)  # Reshape to (64, 3*32*32)
+    x_inv, _ = flow_layer.inverse(y)  # Reshape back to (64, 3, 32, 32)
+
+    print(x.shape)  # torch.Size([64, 3, 32, 32])
+    print(y.shape)  # torch.Size([64, 3072])
+    print(x_inv.shape)  # torch.Size([64, 3, 32, 32])
