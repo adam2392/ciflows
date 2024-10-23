@@ -349,7 +349,7 @@ if __name__ == "__main__":
         initialize_flow(inj_model)
         initialize_flow(bij_model)
 
-        debug = True
+        debug = False
         fast_dev = False
         max_epochs = 1000
         if debug:
