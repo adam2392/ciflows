@@ -133,23 +133,30 @@ def get_bij_model(n_chs, latent_size):
 
     print("Starting at latent representation: ", n_chs, latent_size, latent_size)
     q0 = nf.distributions.DiagGaussian(
-        (n_chs, latent_size, latent_size), trainable=True
+        (n_chs, latent_size, latent_size), trainable=False
     )
 
     split_mode = "checkerboard"
 
+    net_hidden_layers = 3
+    net_hidden_dim = 64
     for i in range(n_glow_blocks):
         flows += [
-            GlowBlock(
-                channels=n_chs,
-                hidden_channels=n_hidden,
-                use_lu=use_lu,
-                scale=True,
-                split_mode=split_mode,
-                net_actnorm=net_actnorm,
-                dropout_probability=0.2,
+            nf.flows.AutoregressiveRationalQuadraticSpline(
+                n_channels=n_chs, num_blocks=net_hidden_layers, num_hidden_channels=net_hidden_dim
             )
         ]
+        # flows += [
+        #     GlowBlock(
+        #         channels=n_chs,
+        #         hidden_channels=n_hidden,
+        #         use_lu=use_lu,
+        #         scale=True,
+        #         split_mode=split_mode,
+        #         net_actnorm=net_actnorm,
+        #         dropout_probability=0.2,
+        #     )
+        # ]
 
         if debug:
             print(f"On layer {n_glow_blocks - i}, n_chs = {n_chs//2} -> {n_chs}")
@@ -312,7 +319,7 @@ if __name__ == "__main__":
         model_fname = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
         model = plInjFlowModel.load_from_checkpoint(model_fname)
 
-        model_name = "adamw_convnet_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse10_v2"
+        model_name = "adamw_convnet_injflow_twostage_batch1024_gradclip1_mnist_nottrainableq0_nstepsmse10_v1"
         checkpoint_dir = Path("./results") / model_name
         checkpoint_dir.mkdir(exist_ok=True, parents=True)
 

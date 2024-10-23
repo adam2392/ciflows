@@ -73,6 +73,7 @@ class GlowBlock(Flow):
         param_map = Unet(
             input_channels=in_chs,
             output_channels=out_chs,
+            latent_dim=hidden_channels,
         )
         # param_map = nf.nets.ConvResidualNet(
         #     in_channels=in_chs,
@@ -402,6 +403,7 @@ class InjectiveGlowBlock(Flow):
         param_map = Unet(
             input_channels=in_chs,
             output_channels=out_chs,
+            latent_dim=hidden_channels,
         )
         # param_map = nf.nets.ConvResidualNet(
         #     in_channels=in_chs,
