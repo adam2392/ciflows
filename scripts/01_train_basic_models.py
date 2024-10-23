@@ -132,8 +132,8 @@ def get_bij_model(n_chs, latent_size):
 
     print("Starting at latent representation: ", n_chs, latent_size, latent_size)
     q0 = nf.distributions.DiagGaussian(
-        (n_chs * latent_size * latent_size,), trainable=False
-        # (n_chs, latent_size, latent_size), trainable=False
+        # (n_chs * latent_size * latent_size,), trainable=False
+        (n_chs, latent_size, latent_size), trainable=False
     )
 
     split_mode = "checkerboard"
