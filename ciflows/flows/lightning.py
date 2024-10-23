@@ -84,8 +84,9 @@ class plInjFlowModel(pl.LightningModule):
         self.save_hyperparameters()
 
         # XXX: This should change depending on the dataset
-        self.example_input_array = [torch.randn(2, 1, 8, 8), torch.randn(2, 1)]
-
+        # self.example_input_array = [torch.randn(2, 1, 8, 8), torch.randn(2, 1)]
+        self.example_input_array = [torch.randn(2, 1 * 8 * 8), torch.randn(2, 1)]
+        
         self.inj_model = inj_model
         self.bij_model = bij_model
 

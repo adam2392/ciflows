@@ -18,13 +18,13 @@ from ciflows.flows.glow import GlowBlock, InjectiveGlowBlock, Squeeze, ReshapeFl
 
 def get_inj_model():
     use_lu = True
-    gamma = 1e-3
+    gamma = 1e-6
     activation = "linear"
     dropout_probability = 0.2
 
     net_actnorm = False
-    n_hidden = 128
-    n_glow_blocks = 3
+    n_hidden = 64
+    n_glow_blocks = 2
     n_mixing_layers = 2
     n_injective_layers = 4
     n_layers = n_mixing_layers + n_injective_layers
@@ -131,46 +131,48 @@ def get_bij_model(n_chs, latent_size):
     debug = False
 
     print("Starting at latent representation: ", n_chs, latent_size, latent_size)
+    # q0 = nf.distributions.DiagGaussian(
+    #     (n_chs, latent_size, latent_size), trainable=False
+    # )
     q0 = nf.distributions.DiagGaussian(
-        # (n_chs * latent_size * latent_size,), trainable=False
-        (n_chs, latent_size, latent_size), trainable=False
+        (n_chs * latent_size * latent_size,), trainable=False
     )
 
     split_mode = "checkerboard"
 
-    net_hidden_layers = 3
+    net_hidden_layers = 4
     net_hidden_dim = 64
 
-    # flows += [
-    #     ReshapeFlow(
-    #         shape_out=(n_chs, latent_size, latent_size),
-    #         shape_in=(n_chs * latent_size * latent_size,),
-    #     )
-    # ]
 
     for i in range(n_glow_blocks):
-        # flows += [
-        #     nf.flows.AutoregressiveRationalQuadraticSpline(
-        #         num_input_channels=n_chs * latent_size * latent_size,
-        #         num_blocks=net_hidden_layers,
-        #         num_hidden_channels=net_hidden_dim,
-        #     )
-        # ]
         flows += [
-            GlowBlock(
-                channels=n_chs,
-                hidden_channels=n_hidden,
-                use_lu=use_lu,
-                scale=True,
-                split_mode=split_mode,
-                net_actnorm=net_actnorm,
-                dropout_probability=0.2,
+            nf.flows.AutoregressiveRationalQuadraticSpline(
+                num_input_channels=n_chs * latent_size * latent_size,
+                num_blocks=net_hidden_layers,
+                num_hidden_channels=net_hidden_dim,
             )
         ]
+        # flows += [
+        #     GlowBlock(
+        #         channels=n_chs,
+        #         hidden_channels=n_hidden,
+        #         use_lu=use_lu,
+        #         scale=True,
+        #         split_mode=split_mode,
+        #         net_actnorm=net_actnorm,
+        #         dropout_probability=0.2,
+        #     )
+        # ]
 
         if debug:
             print(f"On layer {n_glow_blocks - i}, n_chs = {n_chs//2} -> {n_chs}")
 
+    flows += [
+        ReshapeFlow(
+            shape_in=(n_chs * latent_size * latent_size,),
+            shape_out=(n_chs, latent_size, latent_size),
+        )
+    ]
     model = nf.NormalizingFlow(q0=q0, flows=flows)
 
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -318,7 +320,7 @@ if __name__ == "__main__":
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
     # convnet restart = v2, whcih was good
-    model_name = "adamw_resnet_injflow_twostage_batch1024_gradclip1_mnist_trainableq0_nstepsmse20_v2"
+    model_name = "adamw_unet_injflow_twostage_batch1024_gradclip1_mnist_nottrainableq0_nstepsmse20_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
     train_from_checkpoint = False
@@ -329,7 +331,7 @@ if __name__ == "__main__":
         model_fname = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
         model = plInjFlowModel.load_from_checkpoint(model_fname)
 
-        model_name = "adamw_convnet_injflow_twostage_batch1024_gradclip1_mnist_nottrainableq0_nstepsmse10_v1"
+        model_name = "adamw_unet_injflow_twostage_batch1024_gradclip1_mnist_nottrainableq0_nstepsmse20_v1"
         checkpoint_dir = Path("./results") / model_name
         checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
