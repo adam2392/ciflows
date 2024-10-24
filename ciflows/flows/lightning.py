@@ -300,7 +300,7 @@ class plInjFlowModel(pl.LightningModule):
 
             # clip gradients
             self.clip_gradients(
-                optimizer_nll, gradient_clip_val=1.0, gradient_clip_algorithm="norm"
+                optimizer_nll, gradient_clip_val=2.0, gradient_clip_algorithm="norm"
             )
             optimizer_nll.step()
             sch2.step()
