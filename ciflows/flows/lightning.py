@@ -86,7 +86,7 @@ class plInjFlowModel(pl.LightningModule):
         # XXX: This should change depending on the dataset
         # self.example_input_array = [torch.randn(2, 1, 8, 8), torch.randn(2, 1)]
         self.example_input_array = [torch.randn(2, 1 * 8 * 8), torch.randn(2, 1)]
-        
+
         self.inj_model = inj_model
         self.bij_model = bij_model
 
@@ -285,7 +285,7 @@ class plInjFlowModel(pl.LightningModule):
 
             # clip gradients
             self.clip_gradients(
-                optimizer_mse, gradient_clip_val=1.0, gradient_clip_algorithm="norm"
+                optimizer_mse, gradient_clip_val=2.0, gradient_clip_algorithm="norm"
             )
             optimizer_mse.step()
             sch1.step()
