@@ -61,6 +61,7 @@ class plInjFlowModel(pl.LightningModule):
         debug=False,
         check_val_every_n_epoch=1,
         gradient_clip_val=None,
+        beta = 1.0,
     ):
         """Injective flow model lightning module.
 
@@ -84,9 +85,9 @@ class plInjFlowModel(pl.LightningModule):
         # ensure that the model is saved and can be loaded later as a checkpoint
         self.save_hyperparameters()
 
-        # XXX: This should change depending on the dataset
-        # self.example_input_array = [torch.randn(2, 1, 8, 8), torch.randn(2, 1)]
-        self.example_input_array = [torch.randn(2, 1 * 8 * 8), torch.randn(2, 1)]
+        # XXX: This should change depending on the dataset and is the vlatent size
+        self.example_input_array = [torch.randn(2, 1, 8, 8), torch.randn(2, 1)]
+        # self.example_input_array = [torch.randn(2, 1 * 8 * 8), torch.randn(2, 1)]
 
         self.inj_model = inj_model
         self.bij_model = bij_model
@@ -102,6 +103,7 @@ class plInjFlowModel(pl.LightningModule):
         self.check_samples_every_n_epoch = check_samples_every_n_epoch
         self.gradient_clip_val = gradient_clip_val
 
+        self.beta = torch.Tensor([beta])
     # def get_injective_and_other_params(self):
     #     # injective_params = []
     #     # other_params = []
@@ -144,7 +146,6 @@ class plInjFlowModel(pl.LightningModule):
         Sample a batch of images from the flow.
         """
         samples, ldj = self.bij_model.sample(num_samples=num_samples, **params)
-        print(samples.shape)
         return self.inj_model.forward(samples), ldj
 
     def forward(self, x, target=None):
@@ -153,7 +154,7 @@ class plInjFlowModel(pl.LightningModule):
         Note: This is opposite of the normalizing flow API convention.
         """
         # second pass through bijection layer
-        x = self.bij_model.forward(x)
+        # x = self.bij_model.forward(x)
         # first pass through injective layer
         x = self.inj_model.forward(x)
         return x
@@ -164,18 +165,21 @@ class plInjFlowModel(pl.LightningModule):
         Note: This is opposite of the normalizing flow API convention.
         """
         v = self.inj_model.inverse(v)
-        v = self.bij_model.inverse(v)
+        # v = self.bij_model.inverse(v)
         return v
 
     def sample_and_save_images(self, epoch_idx):
         # Generate random samples
         with torch.no_grad():
-            samples, _ = self.bij_model.sample(
-                16
-            )  # Assuming flow_model has a sample method
-
+            # samples, _ = self.bij_model.sample(
+            #     16
+            # )  # Assuming flow_model has a sample method
             # pass through the injective layer
-            samples = self.inj_model.forward(samples)
+            # samples = self.inj_model.forward(samples)
+
+            samples, _ = self.inj_model.sample(
+                16
+            )
 
         # Plot the samples
         fig, axes = plt.subplots(4, 4, figsize=(8, 8))
@@ -194,14 +198,14 @@ class plInjFlowModel(pl.LightningModule):
 
         # mse_params, nll_params = self.get_injective_and_other_params()
         mse_params = list(self.inj_model.parameters())
-        nll_params = list(self.bij_model.parameters())
+        # nll_params = list(self.bij_model.parameters())
         # Check the number of parameters in each optimizer
         num_mse_params = sum(p.numel() for p in mse_params)
-        num_nll_params = sum(p.numel() for p in nll_params)
+        # num_nll_params = sum(p.numel() for p in nll_params)
 
         print(f"Number of parameters in optimizer_mse: {num_mse_params}")
-        print(f"Number of parameters in optimizer_nll: {num_nll_params}")
-        print(f"Total number of parameters: {num_mse_params + num_nll_params}")
+        # print(f"Number of parameters in optimizer_nll: {num_nll_params}")
+        # print(f"Total number of parameters: {num_mse_params + num_nll_params}")
         # trainable_params = sum(
         #     p.numel() for p in self.inj_model.parameters() if p.requires_grad
         # )
@@ -209,7 +213,7 @@ class plInjFlowModel(pl.LightningModule):
         # assert trainable_params == num_mse_params + num_nll_params
 
         optimizer_mse = optim.AdamW(mse_params, lr=self.lr)
-        optimizer_nll = optim.AdamW(nll_params, lr=self.lr)
+        optimizer_nll = optim.AdamW(mse_params, lr=self.lr)
 
         self.optimizer_mse = optimizer_mse
         self.optimizer_nll = optimizer_nll
@@ -303,9 +307,22 @@ class plInjFlowModel(pl.LightningModule):
 
             lr = optimizer_mse.param_groups[0]["lr"]
         else:
-            inj_v = self.inj_model.inverse(x)
-            loss = self.bij_model.forward_kld(inj_v)
+            nll_loss = self.inj_model.forward_kld(x)
 
+            v_latent = self.inj_model.inverse(x)
+            x_reconstructed = self.inj_model.forward(v_latent)
+
+            # reconstruct the latents
+            v_latent_recon = self.inj_model.inverse(x_reconstructed)
+            
+            # inj_v = self.inj_model.inverse(x)
+            # loss = self.bij_model.forward_kld(inj_v)
+            
+            loss = torch.nn.functional.mse_loss(
+                x_reconstructed, x
+            ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
+
+            loss = nll_loss + self.beta * loss
             optimizer_nll.zero_grad()
             self.manual_backward(loss)
 

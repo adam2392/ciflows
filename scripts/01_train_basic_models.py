@@ -23,8 +23,8 @@ def get_inj_model():
     dropout_probability = 0.2
 
     net_actnorm = False
-    n_hidden = 128
-    n_glow_blocks = 3
+    n_hidden = 256
+    n_glow_blocks = 6
     n_mixing_layers = 2
     n_injective_layers = 4
     n_layers = n_mixing_layers + n_injective_layers
@@ -124,7 +124,7 @@ def get_bij_model(n_chs, latent_size):
     use_lu = True
     net_actnorm = False
     n_hidden = 128
-    n_glow_blocks = 8
+    n_glow_blocks = 3
 
     flows = []
 
@@ -141,18 +141,39 @@ def get_bij_model(n_chs, latent_size):
     split_mode = "checkerboard"
 
     net_hidden_layers = 4
-    net_hidden_dim = 64
+    net_hidden_dim = 128
 
+    # flows += [
+    #     ReshapeFlow(
+    #         shape_in=(n_chs * latent_size * latent_size,),
+    #         shape_out=(n_chs, latent_size, latent_size),
+    #     )
+    # ]
 
+    n_chs = int(n_chs * 4**n_glow_blocks)
+    # n_chs = n_chs * latent_size * latent_size
     for i in range(n_glow_blocks):
-        flows += [
-            nf.flows.AutoregressiveRationalQuadraticSpline(
-                num_input_channels=n_chs * latent_size * latent_size,
-                num_blocks=net_hidden_layers,
-                num_hidden_channels=net_hidden_dim,
-                permute_mask=True,
-            )
-        ]
+        # Neural network with two hidden layers having 64 units each
+        # Last layer is initialized by zeros making training more stable
+        # n_chs *= 4
+        # param_map = nf.nets.MLP([n_chs, net_hidden_dim, n_chs*2], init_zeros=True)
+        # # # Add flow layer
+        # flows.append(nf.flows.AffineCouplingBlock(param_map, split_mode='channel'))
+        # flows.append(nf.flows.Permute(n_chs, mode='swap'))
+
+        # Swap dimensions
+        # flows += [
+        #     nf.flows.AutoregressiveRationalQuadraticSpline(
+        #         num_input_channels=n_chs * latent_size * latent_size,
+        #         num_blocks=net_hidden_layers,
+        #         num_hidden_channels=net_hidden_dim,
+        #         permute_mask=True,
+        #     )
+        # ]
+        # if i  1:
+        #     split_mode = "checkerboard"
+        # else:
+        #     split_mode = "channel"
         # flows += [
         #     GlowBlock(
         #         channels=n_chs,
@@ -164,10 +185,13 @@ def get_bij_model(n_chs, latent_size):
         #         dropout_probability=0.2,
         #     )
         # ]
-
+        # flows += [Squeeze()]
+        # n_chs = n_chs // 4
+        # print(n_chs)
         if debug:
             print(f"On layer {n_glow_blocks - i}, n_chs = {n_chs//2} -> {n_chs}")
 
+    # maps x to (n_chs * latent_size * latent_size), while v is mapped to (n_chs, latent_size, latent_size)
     flows += [
         ReshapeFlow(
             shape_in=(n_chs * latent_size * latent_size,),
@@ -321,7 +345,7 @@ if __name__ == "__main__":
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
     # convnet restart = v2, whcih was good
-    model_name = "adamw_unet_injflow_twostage_batch1024_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
+    model_name = "adamw_unet_onlyinjflow_twostage_batch1024_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
     train_from_checkpoint = False
@@ -332,7 +356,7 @@ if __name__ == "__main__":
         model_fname = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
         model = plInjFlowModel.load_from_checkpoint(model_fname)
 
-        model_name = "adamw_unet_injflow_twostage_batch1024_gradclip1_mnist_nottrainableq0_nstepsmse50_v2"
+        model_name = "adamw_unet_onlyinjflow_twostage_batch1024_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
         checkpoint_dir = Path("./results") / model_name
         checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -347,10 +371,11 @@ if __name__ == "__main__":
         samples = inj_model.q0.sample(2)
         _, n_chs, latent_size, _ = samples.shape
         print(samples.shape)
-        bij_model = get_bij_model(n_chs=n_chs, latent_size=latent_size)
 
         initialize_flow(inj_model)
-        initialize_flow(bij_model)
+
+        bij_model = get_bij_model(n_chs=n_chs, latent_size=latent_size)
+        # initialize_flow(bij_model)
 
         debug = False
         fast_dev = False

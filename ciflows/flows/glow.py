@@ -109,6 +109,7 @@ class GlowBlock(Flow):
     def forward(self, z):
         log_det_tot = torch.zeros(z.shape[0], dtype=z.dtype, device=z.device)
         for flow in self.flows:
+            print(z.shape, flow._get_name())
             z, log_det = flow(z)
             log_det_tot += log_det
         return z, log_det_tot
