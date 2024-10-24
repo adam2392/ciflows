@@ -104,6 +104,7 @@ class plInjFlowModel(pl.LightningModule):
         self.gradient_clip_val = gradient_clip_val
 
         self.beta = torch.Tensor([beta])
+        self.beta.requires_grad = False
     # def get_injective_and_other_params(self):
     #     # injective_params = []
     #     # other_params = []
@@ -265,6 +266,7 @@ class plInjFlowModel(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, _ = batch
 
+        self.beta = self.beta.to(x.device)
         optimizer_mse, optimizer_nll = self.optimizers()
         # multiple schedulers
         sch1, sch2 = self.lr_schedulers()

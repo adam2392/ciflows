@@ -377,7 +377,7 @@ if __name__ == "__main__":
         bij_model = get_bij_model(n_chs=n_chs, latent_size=latent_size)
         # initialize_flow(bij_model)
 
-        debug = False
+        debug = True
         fast_dev = False
         max_epochs = 2000
         if debug:
