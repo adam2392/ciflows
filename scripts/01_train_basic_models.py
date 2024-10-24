@@ -12,8 +12,8 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.datasets import MNIST
 
-from ciflows.flows import GatedConvNet, VariationalDequantization, plInjFlowModel
-from ciflows.flows.glow import GlowBlock, InjectiveGlowBlock, Squeeze, ReshapeFlow
+from ciflows.flows import GatedConvNet, VariationalDequantization, plInjFlowModel, TwoStageTraining
+from ciflows.flows.glow import GlowBlock, InjectiveGlowBlock, Squeeze, ReshapeFlow, 
 
 
 def get_inj_model():
@@ -150,6 +150,7 @@ def get_bij_model(n_chs, latent_size):
                 num_input_channels=n_chs * latent_size * latent_size,
                 num_blocks=net_hidden_layers,
                 num_hidden_channels=net_hidden_dim,
+                permute_mask=True,
             )
         ]
         # flows += [
@@ -299,7 +300,7 @@ if __name__ == "__main__":
     devices = 1
     strategy = "auto"  # or ddp if distributed
     num_workers = 6
-    gradient_clip_val = 2.0
+    gradient_clip_val = 1.0
     check_val_every_n_epoch = 1
     check_samples_every_n_epoch = 5
     monitor = "val_loss"
@@ -320,7 +321,7 @@ if __name__ == "__main__":
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
     # convnet restart = v2, whcih was good
-    model_name = "adamw_unet_injflow_twostage_batch1024_gradclip2_mnist_nottrainableq0_nstepsmse50_v1"
+    model_name = "adamw_unet_injflow_twostage_batch1024_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
     train_from_checkpoint = False
@@ -331,7 +332,7 @@ if __name__ == "__main__":
         model_fname = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
         model = plInjFlowModel.load_from_checkpoint(model_fname)
 
-        model_name = "adamw_unet_injflow_twostage_batch1024_gradclip2_mnist_nottrainableq0_nstepsmse50_v2"
+        model_name = "adamw_unet_injflow_twostage_batch1024_gradclip1_mnist_nottrainableq0_nstepsmse50_v2"
         checkpoint_dir = Path("./results") / model_name
         checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -353,7 +354,7 @@ if __name__ == "__main__":
 
         debug = False
         fast_dev = False
-        max_epochs = 5000
+        max_epochs = 2000
         if debug:
             accelerator = "cpu"
             fast_dev = True
@@ -361,8 +362,8 @@ if __name__ == "__main__":
             n_steps_mse = 2
             batch_size = 16
             check_samples_every_n_epoch = 1
-        # else:
-        # torch.set_float32_matmul_precision("high")
+        else:
+            torch.set_float32_matmul_precision("high")
         # model = torch.compile(model)
 
         model = plInjFlowModel(
@@ -377,6 +378,7 @@ if __name__ == "__main__":
             debug=debug,
             check_val_every_n_epoch=check_val_every_n_epoch,
             check_samples_every_n_epoch=check_samples_every_n_epoch,
+            gradient_clip_val=gradient_clip_val
         )
 
     checkpoint_callback = ModelCheckpoint(
@@ -399,10 +401,6 @@ if __name__ == "__main__":
     print(f"Model name: {model_name}")
     print()
 
-    # configure logging at the root level of Lightning
-    # logging.getLogger("lightning.pytorch").setLevel(level=logging.INFO)
-    # logging.basicConfig(level=logging.INFO)
-
     # Define the trainer
     trainer = pl.Trainer(
         logger=False,
@@ -411,7 +409,7 @@ if __name__ == "__main__":
         strategy=strategy,
         callbacks=[
             checkpoint_callback,
-            #    TwoStageTraining()
+               TwoStageTraining()
         ],
         check_val_every_n_epoch=check_val_every_n_epoch,
         accelerator=accelerator,

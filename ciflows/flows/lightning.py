@@ -22,7 +22,7 @@ class TwoStageTraining(Callback):
             if trainer.current_epoch == 0:
                 print()
                 print("Training with MSE loss")
-            trainer.optimizers = [pl_module.optimizer_mse]
+            # trainer.optimizers = [pl_module.optimizer_mse]
             # trainer.lr_schedulers = trainer.configure_schedulers([pl_module.optimizer_mse])
             # trainer.optimizer_frequencies = [] # or optimizers frequencies if you have any
         else:
@@ -41,7 +41,7 @@ class TwoStageTraining(Callback):
                 print(f"Checkpoint saved at {checkpoint_path}")
 
             self.switched = True
-            trainer.optimizers = [pl_module.optimizer_nll]
+            # trainer.optimizers = [pl_module.optimizer_nll]
             # trainer.lr_schedulers = trainer.configure_schedulers([pl_module.])
             # trainer.optimizer_frequencies = [] # or optimizers frequencies if you have any
 
@@ -60,6 +60,7 @@ class plInjFlowModel(pl.LightningModule):
         check_samples_every_n_epoch=None,
         debug=False,
         check_val_every_n_epoch=1,
+        gradient_clip_val=None,
     ):
         """Injective flow model lightning module.
 
@@ -99,6 +100,7 @@ class plInjFlowModel(pl.LightningModule):
         self.debug = debug
         self.check_val_every_n_epoch = check_val_every_n_epoch
         self.check_samples_every_n_epoch = check_samples_every_n_epoch
+        self.gradient_clip_val = gradient_clip_val
 
     # def get_injective_and_other_params(self):
     #     # injective_params = []
@@ -236,13 +238,15 @@ class plInjFlowModel(pl.LightningModule):
             eta_min=self.lr_min,
             verbose=True,
         )
+
         # return optimizer_list, scheduler_list
         return [optimizer_mse, optimizer_nll], [scheduler, scheduler_nll]
 
     def optimizer_step(
         self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure
     ):
-        print()
+        if self.debug:
+            print()
         # Only step optimizer 1 during the first phase
         if epoch < self.n_steps_mse and optimizer_idx == 0:
             if self.debug:
@@ -269,12 +273,17 @@ class plInjFlowModel(pl.LightningModule):
             v_latent_recon = self.inj_model.inverse(x_reconstructed)
 
             # check if any nans
-            if torch.isnan(x_reconstructed).any():
-                print(
-                    "x_reconstructed has nans", x_reconstructed, x_reconstructed.shape
-                )
-            if torch.isnan(v_latent_recon).any():
-                print("v_latent_recon has nans", v_latent_recon, v_latent_recon.shape)
+            if self.debug:
+                if torch.isnan(x_reconstructed).any():
+                    print(
+                        "x_reconstructed has nans",
+                        x_reconstructed,
+                        x_reconstructed.shape,
+                    )
+                if torch.isnan(v_latent_recon).any():
+                    print(
+                        "v_latent_recon has nans", v_latent_recon, v_latent_recon.shape
+                    )
 
             loss = torch.nn.functional.mse_loss(
                 x_reconstructed, x
@@ -285,7 +294,9 @@ class plInjFlowModel(pl.LightningModule):
 
             # clip gradients
             self.clip_gradients(
-                optimizer_mse, gradient_clip_val=2.0, gradient_clip_algorithm="norm"
+                optimizer_mse,
+                gradient_clip_val=self.gradient_clip_val,
+                gradient_clip_algorithm="norm",
             )
             optimizer_mse.step()
             sch1.step()
@@ -300,7 +311,7 @@ class plInjFlowModel(pl.LightningModule):
 
             # clip gradients
             self.clip_gradients(
-                optimizer_nll, gradient_clip_val=2.0, gradient_clip_algorithm="norm"
+                optimizer_nll, gradient_clip_val=self.gradient_clip_val, gradient_clip_algorithm="norm"
             )
             optimizer_nll.step()
             sch2.step()
