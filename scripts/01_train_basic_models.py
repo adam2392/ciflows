@@ -340,6 +340,9 @@ if __name__ == "__main__":
     np.random.seed(seed)
     pl.seed_everything(seed, workers=True)
 
+    import os
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
     if torch.cuda.is_available():
         device = torch.device("cuda")
         accelerator = "cuda"
@@ -353,7 +356,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    batch_size = 512
+    batch_size = 256
     devices = 1
     strategy = "auto"  # or ddp if distributed
     num_workers = 6
