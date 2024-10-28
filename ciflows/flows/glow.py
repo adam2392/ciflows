@@ -14,6 +14,15 @@ from .unet import Unet
 
 class ReshapeFlow(nn.Module):
     def __init__(self, shape_in, shape_out):
+        """Reshape flow.
+
+        Parameters
+        ----------
+        shape_in : tuple of ints
+            Input shape of the data at latent space.
+        shape_out : tuple of ints
+            Output shape of the data at image space.
+        """
         super(ReshapeFlow, self).__init__()
         self.shape_in = shape_in
         self.shape_out = shape_out
