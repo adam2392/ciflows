@@ -171,7 +171,7 @@ def get_bij_model(n_chs, latent_size):
 
     split_mode = "checkerboard"
 
-    net_hidden_layers = 4
+    net_hidden_layers = 2
     net_hidden_dim = 128
 
     # flows += [
@@ -353,7 +353,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    batch_size = 1024
+    batch_size = 512
     devices = 1
     strategy = "auto"  # or ddp if distributed
     num_workers = 6
@@ -378,7 +378,7 @@ if __name__ == "__main__":
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
     # convnet restart = v2, whcih was good
-    model_name = "adamw_unet_injflow_neuralspline_twostage_batch1024_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
+    model_name = "adamw_unet_injflow_neuralspline_twostage_batch512_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
     train_from_checkpoint = False
@@ -389,7 +389,7 @@ if __name__ == "__main__":
         model_fname = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
         model = plInjFlowModel.load_from_checkpoint(model_fname)
 
-        model_name = "adamw_unet_injflow_neuralspline_twostage_batch1024_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
+        model_name = "adamw_unet_injflow_neuralspline_twostage_batch512_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
         checkpoint_dir = Path("./results") / model_name
         checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
