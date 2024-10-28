@@ -29,7 +29,7 @@ def get_inj_model():
 
     net_actnorm = False
     n_hidden = 128
-    n_glow_blocks = 3
+    n_glow_blocks = 2
     n_mixing_layers = 2
     n_injective_layers = 4
     n_layers = n_mixing_layers + n_injective_layers

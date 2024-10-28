@@ -199,14 +199,14 @@ class plInjFlowModel(pl.LightningModule):
 
         # mse_params, nll_params = self.get_injective_and_other_params()
         mse_params = list(self.inj_model.parameters())
-        # nll_params = list(self.bij_model.parameters())
+        nll_params = list(self.bij_model.parameters())
         # Check the number of parameters in each optimizer
         num_mse_params = sum(p.numel() for p in mse_params)
-        # num_nll_params = sum(p.numel() for p in nll_params)
+        num_nll_params = sum(p.numel() for p in nll_params)
 
         print(f"Number of parameters in optimizer_mse: {num_mse_params}")
-        # print(f"Number of parameters in optimizer_nll: {num_nll_params}")
-        # print(f"Total number of parameters: {num_mse_params + num_nll_params}")
+        print(f"Number of parameters in optimizer_nll: {num_nll_params}")
+        print(f"Total number of parameters: {num_mse_params + num_nll_params}")
         # trainable_params = sum(
         #     p.numel() for p in self.inj_model.parameters() if p.requires_grad
         # )
@@ -214,7 +214,7 @@ class plInjFlowModel(pl.LightningModule):
         # assert trainable_params == num_mse_params + num_nll_params
 
         optimizer_mse = optim.AdamW(mse_params, lr=self.lr)
-        optimizer_nll = optim.AdamW(mse_params, lr=self.lr)
+        optimizer_nll = optim.AdamW(nll_params, lr=self.lr)
 
         self.optimizer_mse = optimizer_mse
         self.optimizer_nll = optimizer_nll
@@ -309,22 +309,21 @@ class plInjFlowModel(pl.LightningModule):
 
             lr = optimizer_mse.param_groups[0]["lr"]
         else:
-            nll_loss = self.inj_model.forward_kld(x)
+            # nll_loss = self.inj_model.forward_kld(x)
 
-            v_latent = self.inj_model.inverse(x)
-            x_reconstructed = self.inj_model.forward(v_latent)
+            # v_latent = self.inj_model.inverse(x)
+            # x_reconstructed = self.inj_model.forward(v_latent)
 
-            # reconstruct the latents
-            v_latent_recon = self.inj_model.inverse(x_reconstructed)
+            # # reconstruct the latents
+            # v_latent_recon = self.inj_model.inverse(x_reconstructed)
             
-            # inj_v = self.inj_model.inverse(x)
-            # loss = self.bij_model.forward_kld(inj_v)
-            
-            loss = torch.nn.functional.mse_loss(
-                x_reconstructed, x
-            ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
+            # loss = torch.nn.functional.mse_loss(
+            #     x_reconstructed, x
+            # ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
+            # loss = nll_loss + self.beta * loss
 
-            loss = nll_loss + self.beta * loss
+            inj_v = self.inj_model.inverse(x)
+            loss = self.bij_model.forward_kld(inj_v)
             optimizer_nll.zero_grad()
             self.manual_backward(loss)
 
@@ -384,21 +383,21 @@ class plInjFlowModel(pl.LightningModule):
                 x_reconstructed, x
             ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
         else:
-            nll_loss = self.inj_model.forward_kld(x)
+            # nll_loss = self.inj_model.forward_kld(x)
 
-            v_latent = self.inj_model.inverse(x)
-            x_reconstructed = self.inj_model.forward(v_latent)
+            # v_latent = self.inj_model.inverse(x)
+            # x_reconstructed = self.inj_model.forward(v_latent)
 
-            # reconstruct the latents
-            v_latent_recon = self.inj_model.inverse(x_reconstructed)
-            loss = torch.nn.functional.mse_loss(
-                x_reconstructed, x
-            ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
-            loss = nll_loss + self.beta * loss
+            # # reconstruct the latents
+            # v_latent_recon = self.inj_model.inverse(x_reconstructed)
+            # loss = torch.nn.functional.mse_loss(
+            #     x_reconstructed, x
+            # ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
+            # loss = nll_loss + self.beta * loss
 
             # 
-            # inj_v = self.inj_model.inverse(x)
-            # loss = self.bij_model.forward_kld(inj_v)
+            inj_v = self.inj_model.inverse(x)
+            loss = self.bij_model.forward_kld(inj_v)
 
         self.log("Nsteps_mse", self.n_steps_mse)
         self.log("val_loss", loss)
