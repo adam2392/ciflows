@@ -50,7 +50,7 @@ class plInjFlowModel(pl.LightningModule):
     def __init__(
         self,
         inj_model: InjectiveFlow,
-        bij_model: nf.NormalizingFlow,
+        bij_model: nf.NormalizingFlow=None,
         lr: float = 1e-3,
         lr_min: float = 1e-8,
         lr_scheduler=None,
@@ -146,8 +146,12 @@ class plInjFlowModel(pl.LightningModule):
         """
         Sample a batch of images from the flow.
         """
-        samples, ldj = self.bij_model.sample(num_samples=num_samples, **params)
-        return self.inj_model.forward(samples), ldj
+        if self.bij_model is not None:
+            samples, ldj = self.bij_model.sample(num_samples=num_samples, **params)
+            return self.inj_model.forward(samples), ldj
+        else:
+            samples, ldj = self.inj_model.sample(num_samples=num_samples, **params)
+            return samples, ldj
 
     def forward(self, x, target=None):
         """Foward pass from vlatent to input images.
@@ -155,7 +159,8 @@ class plInjFlowModel(pl.LightningModule):
         Note: This is opposite of the normalizing flow API convention.
         """
         # second pass through bijection layer
-        # x = self.bij_model.forward(x)
+        if self.bij_model is not None:
+            x = self.bij_model.forward(x)
         # first pass through injective layer
         x = self.inj_model.forward(x)
         return x
@@ -166,19 +171,14 @@ class plInjFlowModel(pl.LightningModule):
         Note: This is opposite of the normalizing flow API convention.
         """
         v = self.inj_model.inverse(v)
-        # v = self.bij_model.inverse(v)
+        if self.bij_model is not None:
+            v = self.bij_model.inverse(v)
         return v
 
     def sample_and_save_images(self, epoch_idx):
         # Generate random samples
         with torch.no_grad():
-            # samples, _ = self.bij_model.sample(
-            #     16
-            # )  # Assuming flow_model has a sample method
-            # pass through the injective layer
-            # samples = self.inj_model.forward(samples)
-
-            samples, _ = self.inj_model.sample(
+            samples, _ = self.sample(
                 16
             )
 
@@ -384,8 +384,21 @@ class plInjFlowModel(pl.LightningModule):
                 x_reconstructed, x
             ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
         else:
-            inj_v = self.inj_model.inverse(x)
-            loss = self.bij_model.forward_kld(inj_v)
+            nll_loss = self.inj_model.forward_kld(x)
+
+            v_latent = self.inj_model.inverse(x)
+            x_reconstructed = self.inj_model.forward(v_latent)
+
+            # reconstruct the latents
+            v_latent_recon = self.inj_model.inverse(x_reconstructed)
+            loss = torch.nn.functional.mse_loss(
+                x_reconstructed, x
+            ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
+            loss = nll_loss + self.beta * loss
+
+            # 
+            # inj_v = self.inj_model.inverse(x)
+            # loss = self.bij_model.forward_kld(inj_v)
 
         self.log("Nsteps_mse", self.n_steps_mse)
         self.log("val_loss", loss)

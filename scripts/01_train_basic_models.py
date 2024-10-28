@@ -12,8 +12,13 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.datasets import MNIST
 
-from ciflows.flows import GatedConvNet, VariationalDequantization, plInjFlowModel, TwoStageTraining
-from ciflows.flows.glow import GlowBlock, InjectiveGlowBlock, Squeeze, ReshapeFlow 
+from ciflows.flows import (
+    GatedConvNet,
+    VariationalDequantization,
+    plInjFlowModel,
+    TwoStageTraining,
+)
+from ciflows.flows.glow import GlowBlock, InjectiveGlowBlock, Squeeze, ReshapeFlow
 
 
 def get_inj_model():
@@ -162,14 +167,14 @@ def get_bij_model(n_chs, latent_size):
         # flows.append(nf.flows.Permute(n_chs, mode='swap'))
 
         # Swap dimensions
-        # flows += [
-        #     nf.flows.AutoregressiveRationalQuadraticSpline(
-        #         num_input_channels=n_chs * latent_size * latent_size,
-        #         num_blocks=net_hidden_layers,
-        #         num_hidden_channels=net_hidden_dim,
-        #         permute_mask=True,
-        #     )
-        # ]
+        flows += [
+            nf.flows.AutoregressiveRationalQuadraticSpline(
+                num_input_channels=n_chs * latent_size * latent_size,
+                num_blocks=net_hidden_layers,
+                num_hidden_channels=net_hidden_dim,
+                permute_mask=True,
+            )
+        ]
         # if i  1:
         #     split_mode = "checkerboard"
         # else:
@@ -374,7 +379,8 @@ if __name__ == "__main__":
 
         initialize_flow(inj_model)
 
-        bij_model = get_bij_model(n_chs=n_chs, latent_size=latent_size)
+        bij_model = None
+        # bij_model = get_bij_model(n_chs=n_chs, latent_size=latent_size)
         # initialize_flow(bij_model)
 
         debug = False
@@ -384,7 +390,7 @@ if __name__ == "__main__":
             accelerator = "cpu"
             fast_dev = True
             max_epochs = 5
-            n_steps_mse = 2
+            n_steps_mse = 1
             batch_size = 16
             check_samples_every_n_epoch = 1
         else:
@@ -403,7 +409,7 @@ if __name__ == "__main__":
             debug=debug,
             check_val_every_n_epoch=check_val_every_n_epoch,
             check_samples_every_n_epoch=check_samples_every_n_epoch,
-            gradient_clip_val=gradient_clip_val
+            gradient_clip_val=gradient_clip_val,
         )
 
     checkpoint_callback = ModelCheckpoint(
@@ -432,10 +438,7 @@ if __name__ == "__main__":
         max_epochs=max_epochs,
         devices=devices,
         strategy=strategy,
-        callbacks=[
-            checkpoint_callback,
-               TwoStageTraining()
-        ],
+        callbacks=[checkpoint_callback, TwoStageTraining()],
         check_val_every_n_epoch=check_val_every_n_epoch,
         accelerator=accelerator,
         gradient_clip_val=gradient_clip_val,
