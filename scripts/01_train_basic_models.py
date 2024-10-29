@@ -28,7 +28,7 @@ def get_inj_model():
     dropout_probability = 0.2
 
     net_actnorm = False
-    n_hidden = 128
+    n_hidden = 64
     n_glow_blocks = 2
     n_mixing_layers = 2
     n_injective_layers = 4
@@ -36,7 +36,7 @@ def get_inj_model():
 
     # hidden layers for the AutoregressiveRationalQuadraticSpline
     net_hidden_layers = 2
-    net_hidden_dim = 128
+    net_hidden_dim = 64
 
     input_shape = (1, 32, 32)
     n_channels = input_shape[0]
@@ -93,37 +93,39 @@ def get_inj_model():
             print(f"On layer {n_layers - i}, n_chs = {n_chs//2} -> {n_chs}")
 
     for i in range(n_mixing_layers):
-        # for j in range(n_glow_blocks):
-        #     flows += [
-        #         GlowBlock(
-        #             channels=n_chs,
-        #             hidden_channels=n_hidden,
-        #             use_lu=use_lu,
-        #             scale=True,
-        #             split_mode=split_mode,
-        #             dropout_probability=dropout_probability,
-        #         )
-        #     ]
-        flows += [
-            ReshapeFlow(
-                shape_in=(n_chs, latent_size, latent_size),
-                shape_out=(n_chs * latent_size * latent_size,),
-            )
-        ]
-        flows += [
-            nf.flows.AutoregressiveRationalQuadraticSpline(
-                num_input_channels=n_chs * latent_size * latent_size,
-                num_blocks=net_hidden_layers,
-                num_hidden_channels=net_hidden_dim,
-                permute_mask=True,
-            )
-        ]
-        flows += [
-            ReshapeFlow(
-                shape_in=(n_chs * latent_size * latent_size,),
-                shape_out=(n_chs, latent_size, latent_size),
-            )
-        ]
+        if i == n_mixing_layers - 1:
+            for j in range(n_glow_blocks):
+                flows += [
+                    GlowBlock(
+                        channels=n_chs,
+                        hidden_channels=n_hidden,
+                        use_lu=use_lu,
+                        scale=True,
+                        split_mode=split_mode,
+                        dropout_probability=dropout_probability,
+                    )
+                ]
+        else:
+            flows += [
+                ReshapeFlow(
+                    shape_in=(n_chs, latent_size, latent_size),
+                    shape_out=(n_chs * latent_size * latent_size,),
+                )
+            ]
+            flows += [
+                nf.flows.AutoregressiveRationalQuadraticSpline(
+                    num_input_channels=n_chs * latent_size * latent_size,
+                    num_blocks=net_hidden_layers,
+                    num_hidden_channels=net_hidden_dim,
+                    permute_mask=True,
+                )
+            ]
+            flows += [
+                ReshapeFlow(
+                    shape_in=(n_chs * latent_size * latent_size,),
+                    shape_out=(n_chs, latent_size, latent_size),
+                )
+            ]
 
         flows += [Squeeze()]
         n_chs = n_chs // 4
