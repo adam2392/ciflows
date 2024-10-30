@@ -272,10 +272,10 @@ class plInjFlowModel(pl.LightningModule):
         sch1, sch2 = self.lr_schedulers()
 
         if self.n_steps_mse is not None and self.current_epoch < self.n_steps_mse:
-            v_latent = self.inj_model.inverse(x)
-            x_reconstructed = self.inj_model.forward(v_latent)
+            x_reconstructed = self.inj_model.forward(self.inj_model.inverse(x))
 
             # reconstruct the latents
+            v_latent = self.inj_model.inverse(x)
             v_latent_recon = self.inj_model.inverse(x_reconstructed)
 
             # check if any nans
