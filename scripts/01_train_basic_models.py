@@ -447,7 +447,7 @@ if __name__ == "__main__":
             check_samples_every_n_epoch = 1
         else:
             torch.set_float32_matmul_precision("high")
-        # model = torch.compile(model)
+            
 
         model = plInjFlowModel(
             inj_model=inj_model,
@@ -463,6 +463,9 @@ if __name__ == "__main__":
             check_samples_every_n_epoch=check_samples_every_n_epoch,
             gradient_clip_val=gradient_clip_val,
         )
+
+        if not debug:
+            model = torch.compile(model)
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=checkpoint_dir,
