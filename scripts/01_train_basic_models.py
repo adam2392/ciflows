@@ -62,38 +62,40 @@ def get_inj_model():
         else:
             split_mode = "channel"
 
-        # for j in range(n_glow_blocks):
-        #     flows += [
-        #         GlowBlock(
-        #             channels=n_chs,
-        #             hidden_channels=n_hidden,
-        #             use_lu=use_lu,
-        #             scale=True,
-        #             split_mode=split_mode,
-        #             net_actnorm=net_actnorm,
-        #             dropout_probability=dropout_probability,
-        #         )
-        #     ]
-        flows += [
-            ReshapeFlow(
-                shape_in=(n_chs, latent_size, latent_size),
-                shape_out=(n_chs * latent_size * latent_size,),
-            )
-        ]
-        flows += [
-            nf.flows.AutoregressiveRationalQuadraticSpline(
-                num_input_channels=n_chs * latent_size * latent_size,
-                num_blocks=net_hidden_layers,
-                num_hidden_channels=net_hidden_dim,
-                permute_mask=True,
-            )
-        ]
-        flows += [
-            ReshapeFlow(
-                shape_in=(n_chs * latent_size * latent_size,),
-                shape_out=(n_chs, latent_size, latent_size),
-            )
-        ]
+        if i % 2 == 0:
+            for j in range(n_glow_blocks):
+                flows += [
+                    GlowBlock(
+                        channels=n_chs,
+                        hidden_channels=n_hidden,
+                        use_lu=use_lu,
+                        scale=True,
+                        split_mode=split_mode,
+                        net_actnorm=net_actnorm,
+                        dropout_probability=dropout_probability,
+                    )
+                ]
+        else:
+            flows += [
+                ReshapeFlow(
+                    shape_in=(n_chs, latent_size, latent_size),
+                    shape_out=(n_chs * latent_size * latent_size,),
+                )
+            ]
+            flows += [
+                nf.flows.AutoregressiveRationalQuadraticSpline(
+                    num_input_channels=n_chs * latent_size * latent_size,
+                    num_blocks=net_hidden_layers,
+                    num_hidden_channels=net_hidden_dim,
+                    permute_mask=True,
+                )
+            ]
+            flows += [
+                ReshapeFlow(
+                    shape_in=(n_chs * latent_size * latent_size,),
+                    shape_out=(n_chs, latent_size, latent_size),
+                )
+            ]
 
         # input to inj flow is what is at the X -> V layer
         flows += [
@@ -177,7 +179,7 @@ def get_bij_model(n_chs, latent_size):
     use_lu = True
     net_actnorm = False
     n_hidden = 128
-    n_glow_blocks = 3
+    n_glow_blocks = 6
 
     flows = []
 
@@ -403,7 +405,7 @@ if __name__ == "__main__":
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
     # convnet restart = v2, whcih was good
-    model_name = "compiled_adamw_unet_injflow_neuralspline_twostage_batch512_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
+    model_name = "adamw_unet_injflow_6layerneuralspline_twostage_batch512_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
     train_from_checkpoint = False
@@ -414,7 +416,7 @@ if __name__ == "__main__":
         model_fname = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
         model = plInjFlowModel.load_from_checkpoint(model_fname)
 
-        model_name = "compiled_adamw_unet_injflow_neuralspline_twostage_batch512_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
+        model_name = "adamw_unet_injflow_6layerneuralspline_twostage_batch512_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
         checkpoint_dir = Path("./results") / model_name
         checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
