@@ -494,7 +494,7 @@ if __name__ == "__main__":
         check_val_every_n_epoch=check_val_every_n_epoch,
         accelerator=accelerator,
         gradient_clip_val=gradient_clip_val,
-        precision="bf16",
+        # precision="bf16",
         # fast_dev_run=fast_dev,
         # log_every_n_steps=1,
         # max_epochs=1,

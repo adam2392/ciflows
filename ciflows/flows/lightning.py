@@ -272,11 +272,17 @@ class plInjFlowModel(pl.LightningModule):
         sch1, sch2 = self.lr_schedulers()
 
         if self.n_steps_mse is not None and self.current_epoch < self.n_steps_mse:
+            # Enable autocasting for the forward pass
+            # with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
             x_reconstructed = self.inj_model.forward(self.inj_model.inverse(x))
 
             # reconstruct the latents
             v_latent = self.inj_model.inverse(x)
             v_latent_recon = self.inj_model.inverse(x_reconstructed)
+
+            loss = torch.nn.functional.mse_loss(
+                x_reconstructed, x
+            ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
 
             # check if any nans
             if self.debug:
@@ -290,10 +296,6 @@ class plInjFlowModel(pl.LightningModule):
                     print(
                         "v_latent_recon has nans", v_latent_recon, v_latent_recon.shape
                     )
-
-            loss = torch.nn.functional.mse_loss(
-                x_reconstructed, x
-            ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
 
             optimizer_mse.zero_grad()
             self.manual_backward(loss)
