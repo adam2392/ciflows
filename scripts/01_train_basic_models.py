@@ -466,8 +466,8 @@ if __name__ == "__main__":
             gradient_clip_val=gradient_clip_val,
         )
 
-        if not debug:
-            model = torch.compile(model)
+        # if not debug:
+        #     model = torch.compile(model)
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=checkpoint_dir,
