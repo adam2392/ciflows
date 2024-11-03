@@ -179,7 +179,7 @@ def get_bij_model(n_chs, latent_size):
     use_lu = True
     net_actnorm = False
     n_hidden = 128
-    n_glow_blocks = 8
+    n_glow_blocks = 10
 
     flows = []
 
@@ -276,7 +276,7 @@ def initialize_flow(model):
             else:
                 nn.init.xavier_uniform_(param)
         elif "bias" in name:
-            nn.init.constant_(param, 0.0)
+            nn.init.constant_(param, 1e-5)
 
 
 def discretize(sample):
@@ -389,7 +389,7 @@ if __name__ == "__main__":
     check_samples_every_n_epoch = 5
     monitor = "val_loss"
 
-    n_steps_mse = 50
+    n_steps_mse = 20
     mse_chkpoint_name = f"mse_chkpoint_{n_steps_mse}"
 
     lr = 3e-4
@@ -405,7 +405,7 @@ if __name__ == "__main__":
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
     # convnet restart = v2, whcih was good
-    model_name = "adamw_unet_injflow_8layerneuralspline_twostage_batch512_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
+    model_name = "adamw_unet_injflow_10layerneuralspline_twostage_batch512_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
     train_from_checkpoint = False
@@ -416,7 +416,7 @@ if __name__ == "__main__":
         model_fname = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
         model = plInjFlowModel.load_from_checkpoint(model_fname)
 
-        model_name = "adamw_unet_injflow_8layerneuralspline_twostage_batch512_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
+        model_name = "adamw_unet_injflow_10layerneuralspline_twostage_batch512_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
         checkpoint_dir = Path("./results") / model_name
         checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
