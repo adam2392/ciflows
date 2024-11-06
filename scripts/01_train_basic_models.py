@@ -28,10 +28,11 @@ def get_inj_model():
     dropout_probability = 0.2
 
     net_actnorm = False
-    n_hidden = 128
+    n_hidden_list = [32, 64, 128, 256, 256, 256]
+    n_hidden = 64
     n_glow_blocks = 3
-    n_mixing_layers = 2
-    n_injective_layers = 4
+    n_mixing_layers = 3
+    n_injective_layers = 6
     n_layers = n_mixing_layers + n_injective_layers
 
     # hidden layers for the AutoregressiveRationalQuadraticSpline
@@ -48,8 +49,8 @@ def get_inj_model():
     debug = False
 
     n_chs = int(n_channels * 4**n_mixing_layers * (1 / 2) ** n_injective_layers)
-    print("Starting at latent representation: ", n_chs)
     latent_size = int(img_size / (2**n_mixing_layers))
+    print("Starting at latent representation: ", n_chs, "with latent size: ", latent_size)
     q0 = nf.distributions.DiagGaussian(
         (n_chs, latent_size, latent_size), trainable=False
     )
@@ -57,6 +58,7 @@ def get_inj_model():
     split_mode = "channel"
 
     for i in range(n_injective_layers):
+        # n_hidden = n_hidden_list[-i]
         if i <= 1:
             split_mode = "checkerboard"
         else:
@@ -196,7 +198,7 @@ def get_bij_model(n_chs, latent_size):
     split_mode = "checkerboard"
 
     net_hidden_layers = 2
-    net_hidden_dim = 128
+    net_hidden_dim = 64
 
     # flows += [
     #     ReshapeFlow(
@@ -380,7 +382,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    batch_size = 512
+    batch_size = 256
     devices = 1
     strategy = "auto"  # or ddp if distributed
     num_workers = 6
@@ -389,7 +391,7 @@ if __name__ == "__main__":
     check_samples_every_n_epoch = 5
     monitor = "val_loss"
 
-    n_steps_mse = 20
+    n_steps_mse = 10
     mse_chkpoint_name = f"mse_chkpoint_{n_steps_mse}"
 
     lr = 3e-4
@@ -405,7 +407,7 @@ if __name__ == "__main__":
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
     # convnet restart = v2, whcih was good
-    model_name = "adamw_unet_injflow_10layerneuralspline_twostage_batch512_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
+    model_name = "16dimlatent_adamw_unet_injflow_10layerneuralspline_twostage_batch256_gradclip1_mnist_nottrainableq0_nstepsmse10_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
     train_from_checkpoint = False
@@ -416,7 +418,7 @@ if __name__ == "__main__":
         model_fname = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
         model = plInjFlowModel.load_from_checkpoint(model_fname)
 
-        model_name = "adamw_unet_injflow_10layerneuralspline_twostage_batch512_gradclip1_mnist_nottrainableq0_nstepsmse50_v1"
+        model_name = "16dimlatent_adamw_unet_injflow_10layerneuralspline_twostage_batch256_gradclip1_mnist_nottrainableq0_nstepsmse10_v1"
         checkpoint_dir = Path("./results") / model_name
         checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
@@ -450,7 +452,7 @@ if __name__ == "__main__":
         else:
             torch.set_float32_matmul_precision("high")
             
-
+        example_input_array = [torch.randn(2, n_chs * latent_size * latent_size), torch.randn(2, 1)]
         model = plInjFlowModel(
             inj_model=inj_model,
             bij_model=bij_model,
@@ -464,6 +466,7 @@ if __name__ == "__main__":
             check_val_every_n_epoch=check_val_every_n_epoch,
             check_samples_every_n_epoch=check_samples_every_n_epoch,
             gradient_clip_val=gradient_clip_val,
+            example_input_array=example_input_array,
         )
 
         # if not debug:

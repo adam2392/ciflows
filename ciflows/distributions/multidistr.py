@@ -291,6 +291,23 @@ class ClusteredCausalDistribution(MultidistrCausalFlow):
         self.noise_means_requires_grad = noise_means_requires_grad
         self.noise_stds_requires_grad = noise_stds_requires_grad
 
+    def set_noise_means(self, noise_means, node, distr_idx):
+        pass
+
+    def sample_noise(self, distr_idx, n_samples=1):
+        noise_means = self.noise_means[distr_idx]
+        noise_stds = self.noise_stds[distr_idx]
+        result = torch.zeros((n_samples, len(noise_means), len(noise_means[0])))
+
+        # Sample according to specified means
+        for idx in range(len(noise_means)):
+            mean = noise_means[idx]
+            stddev = noise_stds[idx]
+            cov = torch.diag(stddev ** 2)
+            dist = torch.distributions.MultivariateNormal(mean, cov)
+            result[:, idx, :] = dist.sample(sample_shape=((n_samples,))).squeeze()
+        return result
+
     def forward(
         self, num_samples=1, intervention_targets: Tensor = None, hard_interventions: Tensor = None
     ):

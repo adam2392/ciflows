@@ -61,6 +61,7 @@ class plInjFlowModel(pl.LightningModule):
         debug=False,
         check_val_every_n_epoch=1,
         gradient_clip_val=None,
+        example_input_array=None,
         beta = 1.0,
     ):
         """Injective flow model lightning module.
@@ -87,7 +88,10 @@ class plInjFlowModel(pl.LightningModule):
 
         # XXX: This should change depending on the dataset and is the vlatent size
         # self.example_input_array = [torch.randn(2, 1, 8, 8), torch.randn(2, 1)]
-        self.example_input_array = [torch.randn(2, 1 * 8 * 8), torch.randn(2, 1)]
+        if example_input_array is not None:
+            self.example_input_array = example_input_array
+        else:
+            self.example_input_array = [torch.randn(2, 1 * 8 * 8), torch.randn(2, 1)]
 
         self.inj_model = inj_model
         self.bij_model = bij_model
