@@ -15,7 +15,7 @@ from sklearn.model_selection import train_test_split
 
 path_to_repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import ciflows.data
-import ciflows.model
+import ciflows.flows.model
 
 
 def fit_model(model, X_train, y_train, feature_names, r):
