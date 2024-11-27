@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from ciflows.distributions.sampling import sample_well_conditioned_matrix, sample_cov_matrix
+from ciflows.distributions.sampling import sample_well_conditioned_matrix, sample_random_covariance_matrix
 
 
 @pytest.mark.parametrize("d1, d2, cond_num", [(5, 3, 10), (10, 5, 5), (10, 20, 10)])
@@ -39,34 +39,6 @@ def compute_correlation_matrix(samples):
     :return: The correlation matrix.
     """
     return np.corrcoef(samples, rowvar=False)
-
-# Test to compare "farther" and "closer" covariance matrices in higher dimensions
-def test_covariance_sampling():
-    # Covariance matrix with high base correlation (closer)
-    cov_matrix_closer = sample_cov_matrix(5, base_correlation=0.9)
-    
-    # Covariance matrix with low base correlation (farther)
-    cov_matrix_farther = sample_cov_matrix(5, base_correlation=0.1)
-    
-    # Sample points from both covariance matrices
-    samples_closer = sample_from_cov(cov_matrix_closer)
-    samples_farther = sample_from_cov(cov_matrix_farther)
-    
-    # Compute correlation matrices from the samples
-    correlation_closer = compute_correlation_matrix(samples_closer)
-    correlation_farther = compute_correlation_matrix(samples_farther)
-    
-    # Compute mean off-diagonal correlation to compare the overall distance
-    mean_corr_closer = np.mean(correlation_closer[np.triu_indices(5, k=1)])
-    mean_corr_farther = np.mean(correlation_farther[np.triu_indices(5, k=1)])
-    
-    # Assert that the closer correlation is indeed higher than the farther correlation
-    assert mean_corr_closer > mean_corr_farther, "Closer variables should have higher correlation!"
-    
-    # Print for demonstration purposes
-    print(f"Mean correlation for closer variables: {mean_corr_closer:.4f}")
-    print(f"Mean correlation for farther variables: {mean_corr_farther:.4f}")
-
 
 # from scipy.linalg import logm, sqrtm
 # import pytest

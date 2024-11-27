@@ -290,7 +290,7 @@ def set_initial_noise_parameters(
 
     Returns
     -------
-    noise_params : list[ParameterList]
+    noise_params : list[ParameterList] or torch.Tensor of shape (num_distributions, num_nodes)
         The noise means/stds for each variable in each distribution.
     noise_params_requires_grad : list[list[bool]]]
         Whether each noise mean/std requires a gradient to update it or not.
@@ -302,6 +302,8 @@ def set_initial_noise_parameters(
 
     noise_params = []
     noise_params_requires_grad = []
+
+    # noise_params = torch.zeros((intervention_targets.shape[0], dag.number_of_nodes()))
     num_distributions = intervention_targets.shape[0]
 
     for idx in range(num_distributions):

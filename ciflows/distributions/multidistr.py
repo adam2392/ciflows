@@ -292,7 +292,8 @@ class ClusteredCausalDistribution(MultidistrCausalFlow):
         self.noise_stds_requires_grad = noise_stds_requires_grad
 
     def set_noise_means(self, noise_means, node, distr_idx):
-        pass
+        assert len(noise_means) == len(self.noise_means[distr_idx][node])
+        self.noise_means[distr_idx][node] = noise_means
 
     def sample_noise(self, distr_idx, n_samples=1):
         noise_means = self.noise_means[distr_idx]
