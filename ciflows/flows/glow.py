@@ -7,7 +7,6 @@ import torch.nn as nn
 from normflows.flows.affine import AffineCouplingBlock
 from normflows.flows.base import Flow
 from normflows.flows.normalization import ActNorm
-from torch.functional import F
 
 from .unet import Unet
 
@@ -88,9 +87,9 @@ class GlowBlock(Flow):
             channels_ += (num_param * channels,)
         else:
             raise NotImplementedError("Mode " + split_mode + " is not implemented.")
-        param_map = nf.nets.ConvNet2d(
-            channels_, kernel_size, leaky, init_zeros, actnorm=net_actnorm
-        )
+        # param_map = nf.nets.ConvNet2d(
+        #     channels_, kernel_size, leaky, init_zeros, actnorm=net_actnorm
+        # )
         # print(channels_)
         # assert len(channels_) == 3, len(channels_)
         in_chs, hidden_chs, _, out_chs = channels_
@@ -495,7 +494,7 @@ class InjectiveGlowBlock(Flow):
         log_det_tot = torch.zeros(x.shape[0], dtype=x.dtype, device=x.device)
         for i in range(len(self.flows) - 1, -1, -1):
             if self.debug:
-                print(self.flows[i], x.shape)
+                print(i, self.flows[i].__class__.__name__, len(self.flows), x.shape)
             x, log_det = self.flows[i].inverse(x)
             log_det_tot += log_det
         return x, log_det_tot

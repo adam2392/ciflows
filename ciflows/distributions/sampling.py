@@ -79,6 +79,7 @@ def sample_random_vector(d, min_val=None, max_val=None, seed=None):
         max_val = 1
     return rng.uniform(min_val, max_val, size=(d,))
 
+
 # Example usage
 # d = 5  # Dimensionality
 # k = 4  # Number of vectors
@@ -90,13 +91,14 @@ def sample_random_vector(d, min_val=None, max_val=None, seed=None):
 # cosine_distances = 1 - np.dot(vectors, vectors.T)
 # print(cosine_distances.round(3))
 
+
 def regular_simplex_points(d, k):
     """Generate k equidistant points on the surface of a d-dimensional unit sphere."""
     assert k <= d + 1, "k must be less than or equal to d + 1"
-    
+
     # Initialize a matrix to hold the points
     points = np.zeros((k, d))
-    
+
     # Calculate the points
     for i in range(k):
         # Generate the points of the simplex
@@ -104,10 +106,11 @@ def regular_simplex_points(d, k):
             if j < k - 1:
                 points[i, j] = np.random.normal(size=(1,))
             else:
-                points[i, j] = -np.sum(points[i, :k-1])  # Ensure that they sum to 0
+                points[i, j] = -np.sum(points[i, : k - 1])  # Ensure that they sum to 0
         points[i] /= np.linalg.norm(points[i])  # Normalize to unit length
 
     return points
+
 
 # Example usage
 d = 5  # Dimensionality

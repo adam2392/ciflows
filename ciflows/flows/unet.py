@@ -1,7 +1,3 @@
-from typing import List
-
-import normflows as nf
-import numpy as np
 import torch
 import torch.nn as nn
 
@@ -41,10 +37,12 @@ class Unet(nn.Module):
         super(Unet, self).__init__()
 
         # Define the number of filters for each level
-        self.encoder_filters = [32, 64]
-        self.decoder_filters = [x * 2 for x in [64, 32]]
+        self.encoder_filters = [16, 32]
+        self.decoder_filters = [x * 2 for x in [32, 16]]
 
-        self.initial_conv = ConvBlock(input_channels, self.encoder_filters[0], latent_dim=latent_dim)
+        self.initial_conv = ConvBlock(
+            input_channels, self.encoder_filters[0], latent_dim=latent_dim
+        )
 
         # Encoder conv blocks
         self.conv_blocks1 = nn.ModuleList()
@@ -63,6 +61,7 @@ class Unet(nn.Module):
 
         # Pooling and upsampling layers
         self.maxpool = nn.MaxPool2d(kernel_size=2)
+
         self.upsample = nn.Upsample(scale_factor=2, mode="nearest")
 
         # Final convolution
@@ -82,7 +81,11 @@ class Unet(nn.Module):
         for conv_block in self.conv_blocks1:
             x = conv_block(x)
             skip_x.append(x)
+
+            # XXX: Note this will not work if we downsample too much
             x = self.maxpool(x)
+            # else:
+            # x = self.maxpool(x)
 
         ## Bridge
         x = self.conv_block_bridge(x)
@@ -115,7 +118,8 @@ if __name__ == "__main__":
     output = model2(output)
     print(output.shape)  # Expected output shape: (1, 32, 128, 128)
 
-    x = torch.randn(10, 2, 32, 32)  # Batch size 1, 32 channels, 128x128 image
-    model = Unet(input_channels=2, output_channels=4)
+    # x = torch.randn(10, 2, 32, 32)  # Batch size 1, 32 channels, 128x128 image
+    x = torch.randn(10, 24, 2, 2)  # Batch size 1, 32 channels, 128x128 image
+    model = Unet(input_channels=24, output_channels=48)
     output = model(x)
     print(output.shape)  # Expected output shape: (1, 3, 128, 128

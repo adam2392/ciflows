@@ -5,12 +5,11 @@ from pathlib import Path
 import lightning as pl
 import matplotlib.pyplot as plt
 import normflows as nf
+import numpy as np
 import torch
 import torch.optim as optim
 from lightning.pytorch.callbacks import Callback
 
-from ..loss import volume_change_surrogate, volume_change_surrogate_transformer
-from .glow import Injective1x1Conv, InjectiveGlowBlock
 from .model import InjectiveFlow
 
 
@@ -50,7 +49,7 @@ class plInjFlowModel(pl.LightningModule):
     def __init__(
         self,
         inj_model: InjectiveFlow,
-        bij_model: nf.NormalizingFlow=None,
+        bij_model: nf.NormalizingFlow = None,
         lr: float = 1e-3,
         lr_min: float = 1e-8,
         lr_scheduler=None,
@@ -62,7 +61,7 @@ class plInjFlowModel(pl.LightningModule):
         check_val_every_n_epoch=1,
         gradient_clip_val=None,
         example_input_array=None,
-        beta = 1.0,
+        beta=1.0,
     ):
         """Injective flow model lightning module.
 
@@ -109,41 +108,6 @@ class plInjFlowModel(pl.LightningModule):
 
         self.beta = torch.Tensor([beta])
         self.beta.requires_grad = False
-    # def get_injective_and_other_params(self):
-    #     # injective_params = []
-    #     # other_params = []
-
-    #     # for flow in self.model.flows:
-    #     #     # Check if the flow is an injective Glow block
-    #     #     # print(flow._get_name())
-
-    #     #     if isinstance(flow, InjectiveGlowBlock):
-    #     #         for block in flow.flows:
-    #     #             if isinstance(block, Injective1x1Conv):
-    #     #                 injective_params += list(block.parameters())
-    #     #             else:
-    #     #                 other_params += list(block.parameters())
-    #     #     else:
-    #     #         other_params += list(flow.parameters())
-    #     # Get all trainable parameters in the model
-    #     all_params = list(self.model.parameters())
-
-    #     # Collect injective parameters
-    #     injective_params = []
-    #     for flow in self.model.flows:
-    #         if isinstance(flow, InjectiveGlowBlock):
-    #             injective_params += list(flow.parameters())
-    #             # for block in flow.flows:
-    #             #     if isinstance(block, Injective1x1Conv):
-    #             #         injective_params += list(block.parameters())
-
-    #     # Convert injective_params to a set for set operations
-    #     injective_params_set = set(injective_params)
-
-    #     # Use set difference to get non-injective (other) parameters
-    #     other_params = [p for p in all_params if p not in injective_params_set]
-
-    #     return injective_params, other_params
 
     @torch.no_grad()
     def sample(self, num_samples=1, **params):
@@ -182,9 +146,7 @@ class plInjFlowModel(pl.LightningModule):
     def sample_and_save_images(self, epoch_idx):
         # Generate random samples
         with torch.no_grad():
-            samples, _ = self.sample(
-                16
-            )
+            samples, _ = self.sample(16)
 
         # Plot the samples
         fig, axes = plt.subplots(4, 4, figsize=(8, 8))
@@ -322,7 +284,7 @@ class plInjFlowModel(pl.LightningModule):
 
             # # reconstruct the latents
             # v_latent_recon = self.inj_model.inverse(x_reconstructed)
-            
+
             # loss = torch.nn.functional.mse_loss(
             #     x_reconstructed, x
             # ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
@@ -335,7 +297,9 @@ class plInjFlowModel(pl.LightningModule):
 
             # clip gradients
             self.clip_gradients(
-                optimizer_nll, gradient_clip_val=self.gradient_clip_val, gradient_clip_algorithm="norm"
+                optimizer_nll,
+                gradient_clip_val=self.gradient_clip_val,
+                gradient_clip_algorithm="norm",
             )
             optimizer_nll.step()
             sch2.step()
@@ -401,7 +365,7 @@ class plInjFlowModel(pl.LightningModule):
             # ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
             # loss = nll_loss + self.beta * loss
 
-            # 
+            #
             inj_v = self.inj_model.inverse(x)
             loss = self.bij_model.forward_kld(inj_v)
 
@@ -419,3 +383,308 @@ class plInjFlowModel(pl.LightningModule):
                 f"Nsteps_mse {self.n_steps_mse}, epoch_counter: {self.current_epoch}, val_loss: {loss}"
             )
         return loss
+
+
+class plCausalInjFlowModel(pl.LightningModule):
+    def __init__(
+        self,
+        inj_model: InjectiveFlow,
+        bij_model: nf.NormalizingFlow = None,
+        lr: float = 0.001,
+        lr_min: float = 1e-8,
+        lr_scheduler=None,
+        n_steps_mse=None,
+        checkpoint_dir=None,
+        checkpoint_name=None,
+        check_samples_every_n_epoch=None,
+        debug=False,
+        check_val_every_n_epoch=1,
+        gradient_clip_val=None,
+        example_input_array=None,
+        beta=1,
+    ):
+        super().__init__()
+
+        # ensure that the model is saved and can be loaded later as a checkpoint
+        self.save_hyperparameters()
+
+        # XXX: This should change depending on the dataset and is the vlatent size
+        # self.example_input_array = [torch.randn(2, 1, 8, 8), torch.randn(2, 1)]
+        if example_input_array is not None:
+            self.example_input_array = example_input_array
+        else:
+            self.example_input_array = [torch.randn(2, 1 * 8 * 8), torch.randn(2, 1)]
+
+        self.inj_model = inj_model
+        self.bij_model = bij_model
+
+        self.lr = lr
+        self.lr_scheduler = lr_scheduler
+        self.lr_min = lr_min
+        self.n_steps_mse = n_steps_mse
+        self.checkpoint_dir = checkpoint_dir
+        self.checkpoint_name = checkpoint_name
+        self.debug = debug
+        self.check_val_every_n_epoch = check_val_every_n_epoch
+        self.check_samples_every_n_epoch = check_samples_every_n_epoch
+        self.gradient_clip_val = gradient_clip_val
+
+        self.beta = torch.Tensor([beta])
+        self.beta.requires_grad = False
+
+    def training_step(self, batch, batch_idx):
+        x, meta_labels, targets = batch
+        distr_idx = meta_labels[-2]
+
+        if self.debug:
+            print(x.shape)
+            print(distr_idx)
+            print(targets)
+
+        self.beta = self.beta.to(x.device)
+        optimizer_mse, optimizer_nll = self.optimizers()
+        # multiple schedulers
+        sch1, sch2 = self.lr_schedulers()
+
+        if not self.debug and self.n_steps_mse is not None and self.current_epoch < self.n_steps_mse:
+            # Enable autocasting for the forward pass
+            # with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+            x_reconstructed = self.inj_model.forward(self.inj_model.inverse(x))
+
+            # reconstruct the latents
+            v_latent = self.inj_model.inverse(x)
+            v_latent_recon = self.inj_model.inverse(x_reconstructed)
+
+            loss = torch.nn.functional.mse_loss(
+                x_reconstructed, x
+            ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
+
+            # check if any nans
+            if self.debug:
+                if torch.isnan(x_reconstructed).any():
+                    print(
+                        "x_reconstructed has nans",
+                        x_reconstructed,
+                        x_reconstructed.shape,
+                    )
+                if torch.isnan(v_latent_recon).any():
+                    print(
+                        "v_latent_recon has nans", v_latent_recon, v_latent_recon.shape
+                    )
+
+            optimizer_mse.zero_grad()
+            self.manual_backward(loss)
+
+            # clip gradients
+            self.clip_gradients(
+                optimizer_mse,
+                gradient_clip_val=self.gradient_clip_val,
+                gradient_clip_algorithm="norm",
+            )
+            optimizer_mse.step()
+            sch1.step()
+
+            lr = optimizer_mse.param_groups[0]["lr"]
+        else:
+            inj_v = self.inj_model.inverse(x)
+            vhat, log_q = self.bij_model.inverse_and_log_det(inj_v)
+            log_q += self.bij_model.q0.log_prob(vhat, distr_idx, targets)
+            loss  = -torch.mean(log_q)
+
+            if self.debug:
+                print('Training step: ', x.shape, inj_v.shape, loss.shape)
+            optimizer_nll.zero_grad()
+            self.manual_backward(loss)
+
+            # clip gradients
+            self.clip_gradients(
+                optimizer_nll,
+                gradient_clip_val=self.gradient_clip_val,
+                gradient_clip_algorithm="norm",
+            )
+            optimizer_nll.step()
+            sch2.step()
+
+            lr = optimizer_nll.param_groups[0]["lr"]
+
+        # logging the loss
+        self.log("train_loss", loss)
+        if (
+            self.current_epoch % self.check_val_every_n_epoch == 0
+            and batch_idx == 0
+            or self.debug
+        ):
+
+            print()
+            print(
+                f"train_loss: {loss} | lr: {lr} | epoch_counter: {self.current_epoch}"
+            )
+
+        if (
+            self.check_samples_every_n_epoch is not None
+            and self.current_epoch % self.check_samples_every_n_epoch == 0
+            and batch_idx == 0
+        ):
+            self.sample_and_save_images(self.current_epoch)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, meta_labels, targets = batch
+        if self.n_steps_mse is not None and self.current_epoch < self.n_steps_mse:
+            v_latent = self.inj_model.inverse(x)
+            x_reconstructed = self.inj_model.forward(v_latent)
+            # reconstruct the latents
+            v_latent_recon = self.inj_model.inverse(x_reconstructed)
+
+            loss = torch.nn.functional.mse_loss(
+                x_reconstructed, x
+            ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
+        else:
+            inj_v = self.inj_model.inverse(x)
+            loss = self.bij_model.forward_kld(inj_v)
+
+        self.log("Nsteps_mse", self.n_steps_mse)
+        self.log("val_loss", loss)
+
+        # Print the loss to the console
+        if (
+            self.current_epoch % self.check_val_every_n_epoch == 0
+            and batch_idx == 0
+            or self.debug
+        ):
+            print()
+            print(
+                f"Nsteps_mse {self.n_steps_mse}, epoch_counter: {self.current_epoch}, val_loss: {loss}"
+            )
+        return loss
+
+    @torch.no_grad()
+    def sample(self, num_samples=1, **params):
+        """
+        Sample a batch of images from the flow.
+        """
+        if self.bij_model is not None:
+            samples, ldj = self.bij_model.sample(num_samples=num_samples, **params)
+            return self.inj_model.forward(samples), ldj
+        else:
+            samples, ldj = self.inj_model.sample(num_samples=num_samples, **params)
+            return samples, ldj
+
+    def forward(self, x, target=None):
+        """Foward pass from vlatent to input images.
+
+        Note: This is opposite of the normalizing flow API convention.
+        """
+        # second pass through bijection layer
+        if self.bij_model is not None:
+            x = self.bij_model.forward(x)
+        # first pass through injective layer
+        x = self.inj_model.forward(x)
+        return x
+
+    def inverse(self, v, target=None):
+        """Inverse pass from input images to latent space.
+
+        Note: This is opposite of the normalizing flow API convention.
+        """
+        v = self.inj_model.inverse(v)
+        if self.bij_model is not None:
+            v = self.bij_model.inverse(v)
+        return v
+
+    def sample_and_save_images(self, epoch_idx):
+        # Generate random samples
+        with torch.no_grad():
+            samples, _ = self.sample(16)
+
+        #  Normalize: Ensure values are in [0, 1]
+        min_val = torch.min(samples)
+        max_val = torch.max(samples)
+        samples = (samples - min_val) / (max_val - min_val)
+
+        # Convert to NumPy and transpose to (H, W, C)
+        samples = samples.permute(0, 2, 3, 1).numpy()
+
+        # Convert to [0, 255] for visualization
+        samples = (samples * 255).astype(np.uint8)
+
+        # Plot the samples
+        fig, axes = plt.subplots(4, 4, figsize=(8, 8))
+        for i, ax in enumerate(axes.flatten()):
+            ax.imshow(samples[i], cmap="gray")
+            ax.axis("off")
+
+        # Save the figure
+        save_path = Path(self.checkpoint_dir) / "log_images"
+        save_path.mkdir(exist_ok=True, parents=True)
+        plt.savefig(save_path / f"sample_{epoch_idx}.png")
+        plt.close()
+
+    def configure_optimizers(self):
+        self.automatic_optimization = False
+
+        # mse_params, nll_params = self.get_injective_and_other_params()
+        mse_params = list(self.inj_model.parameters())
+        nll_params = list(self.bij_model.parameters())
+        # Check the number of parameters in each optimizer
+        num_mse_params = sum(p.numel() for p in mse_params)
+        num_nll_params = sum(p.numel() for p in nll_params)
+
+        print(f"Number of parameters in optimizer_mse: {num_mse_params}")
+        print(f"Number of parameters in optimizer_nll: {num_nll_params}")
+        print(f"Total number of parameters: {num_mse_params + num_nll_params}")
+        # trainable_params = sum(
+        #     p.numel() for p in self.inj_model.parameters() if p.requires_grad
+        # )
+        # print(f"Total number of trainable parameters: {trainable_params}")
+        # assert trainable_params == num_mse_params + num_nll_params
+
+        optimizer_mse = optim.AdamW(mse_params, lr=self.lr)
+        optimizer_nll = optim.AdamW(nll_params, lr=self.lr)
+
+        self.optimizer_mse = optimizer_mse
+        self.optimizer_nll = optimizer_nll
+        scheduler_list = []
+        optimizer_list = [optimizer_mse, optimizer_nll]
+        for optimizer in optimizer_list:
+            if self.lr_scheduler == "cosine":
+                # cosine learning rate annealing
+                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                    optimizer,
+                    # T_max=self.trainer.max_epochs,
+                    T_max=self.n_steps_mse,
+                    eta_min=self.lr_min,
+                    verbose=True,
+                )
+            elif self.lr_scheduler == "step":
+                # An scheduler is optional, but can help in flows to get the last bpd improvement
+                scheduler = optim.lr_scheduler.StepLR(optimizer, 1, gamma=0.99)
+            else:
+                scheduler = None
+            scheduler_list.append(scheduler)
+
+        scheduler_nll = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=self.trainer.max_epochs - self.n_steps_mse,
+            eta_min=self.lr_min,
+            verbose=True,
+        )
+
+        # return optimizer_list, scheduler_list
+        return [optimizer_mse, optimizer_nll], [scheduler, scheduler_nll]
+
+    def optimizer_step(
+        self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure
+    ):
+        if self.debug:
+            print()
+        # Only step optimizer 1 during the first phase
+        if epoch < self.n_steps_mse and optimizer_idx == 0:
+            if self.debug:
+                print(f"Optimizer {optimizer_idx} step: ", optimizer)
+            optimizer.step(closure=optimizer_closure)
+        # Only step optimizer 2 after n_steps_mse
+        elif epoch >= self.n_steps_mse and optimizer_idx == 1:
+            if self.debug:
+                print(f"Optimizer {optimizer_idx} step: ", optimizer)
+            optimizer.step(closure=optimizer_closure)

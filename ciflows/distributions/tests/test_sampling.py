@@ -1,24 +1,25 @@
-import pytest
 import numpy as np
+import pytest
 
-from ciflows.distributions.sampling import sample_well_conditioned_matrix, sample_random_covariance_matrix
+from ciflows.distributions.sampling import sample_well_conditioned_matrix
 
 
 @pytest.mark.parametrize("d1, d2, cond_num", [(5, 3, 10), (10, 5, 5), (10, 20, 10)])
 def test_well_conditioned_matrix(d1, d2, cond_num):
     tolerance = 1e-6
-    
+
     # Generate the matrix
     A = sample_well_conditioned_matrix(d1, d2, cond_num)
-    
+
     # Check dimensions
     assert A.shape == (d2, d1), f"Expected shape {(d2, d1)}, but got {A.shape}"
-    
+
     # Check condition number with tolerance
     U, S, Vt = np.linalg.svd(A, full_matrices=False)
     computed_cond_num = S[0] / S[-1]  # largest singular value / smallest singular value
-    assert computed_cond_num <= cond_num + tolerance, \
-        f"Condition number {computed_cond_num} exceeds the limit {cond_num} (with tolerance {tolerance})"
+    assert (
+        computed_cond_num <= cond_num + tolerance
+    ), f"Condition number {computed_cond_num} exceeds the limit {cond_num} (with tolerance {tolerance})"
 
 
 def sample_from_cov(cov_matrix, n_samples=1000):
@@ -32,6 +33,7 @@ def sample_from_cov(cov_matrix, n_samples=1000):
     samples = np.random.multivariate_normal(mean, cov_matrix, n_samples)
     return samples
 
+
 def compute_correlation_matrix(samples):
     """
     Computes the correlation matrix from the samples.
@@ -39,6 +41,7 @@ def compute_correlation_matrix(samples):
     :return: The correlation matrix.
     """
     return np.corrcoef(samples, rowvar=False)
+
 
 # from scipy.linalg import logm, sqrtm
 # import pytest
@@ -55,7 +58,7 @@ def compute_correlation_matrix(samples):
 #     perturbation = alpha * (np.random.rand(d, d) - 0.5)  # Random perturbation centered around 0
 #     perturbation = (perturbation + perturbation.T) / 2  # Ensure it's symmetric
 #     perturbed_matrix = base_matrix + perturbation
-    
+
 #     # Ensure positive definiteness
 #     return (perturbed_matrix + perturbed_matrix.T) / 2 + np.eye(d) * 1e-5  # Small identity for stability
 

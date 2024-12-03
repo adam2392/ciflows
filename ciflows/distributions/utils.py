@@ -1,4 +1,3 @@
-
 import networkx as nx
 import normflows as nf
 import torch
@@ -39,7 +38,9 @@ def make_spline_flows(
     flows = []
     for i in range(n_flows):
         flows += [
-            nf.flows.AutoregressiveRationalQuadraticSpline(latent_dim, n_layers, n_hidden_dim)
+            nf.flows.AutoregressiveRationalQuadraticSpline(
+                latent_dim, n_layers, n_hidden_dim
+            )
         ]
         if permutation:
             flows += [nf.flows.LULinearPermute(latent_dim)]
@@ -57,7 +58,9 @@ def sample_invertible_matrix(size, min_val, max_val, max_samples=1000):
         # Check if the matrix is invertible by computing its determinant
         if torch.det(matrix) != 0:
             return matrix
-    raise ValueError(f"Could not find an invertible matrix after {max_samples} samples.")
+    raise ValueError(
+        f"Could not find an invertible matrix after {max_samples} samples."
+    )
 
 
 def set_initial_confounder_edge_coeffs(
@@ -140,8 +143,12 @@ def set_initial_confounder_edge_coeffs(
         else:
             random_val = Uniform(min_val, max_val).sample((1,))
             val = random_val
-            param_node1 = nn.Parameter(val * torch.ones(1), requires_grad=False)  # .to(device)
-            param_node2 = nn.Parameter(val * torch.ones(1), requires_grad=False)  # .to(device)
+            param_node1 = nn.Parameter(
+                val * torch.ones(1), requires_grad=False
+            )  # .to(device)
+            param_node2 = nn.Parameter(
+                val * torch.ones(1), requires_grad=False
+            )  # .to(device)
 
         node1_params = param_node1
         coeff_values_i[str(node1)] = node1_params
@@ -217,7 +224,9 @@ def set_initial_edge_coeffs(
             if cluster_mapping is None:
                 random_val = Uniform(min_val, max_val).sample((1,))
                 val = random_val
-                param = nn.Parameter(val * torch.ones(1), requires_grad=True)  # .to(device)
+                param = nn.Parameter(
+                    val * torch.ones(1), requires_grad=True
+                )  # .to(device)
             elif cluster_mapping is not None and use_matrix:
                 if len(cluster_mapping[idx]) != len(cluster_mapping[pa_idx]):
                     raise ValueError(
@@ -239,7 +248,9 @@ def set_initial_edge_coeffs(
         if cluster_mapping is None:
             const = torch.ones(1, requires_grad=False)  # .to(device)  # variance param
         else:
-            const = nn.Parameter(torch.ones(cluster_size, requires_grad=False))  # .to(device)
+            const = nn.Parameter(
+                torch.ones(cluster_size, requires_grad=False)
+            )  # .to(device)
 
         coeff_values_i.append(const)
         coeff_values_requires_grad_i.append(False)

@@ -7,11 +7,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 from lightning.pytorch.callbacks import ModelCheckpoint
-from torch.utils.data import DataLoader, random_split
-from torchvision import transforms
-from torchvision.datasets import MNIST
 
-from ciflows.flows import TwoStageTraining, plInjFlowModel
+from ciflows.datasets.causalmnist import MultiDistrDataModule
+from ciflows.distributions.linear import ClusteredLinearGaussianDistribution
+from ciflows.flows import TwoStageTraining, plCausalInjFlowModel
 from ciflows.flows.glow import (GlowBlock, InjectiveGlowBlock, ReshapeFlow,
                                 Squeeze)
 
@@ -24,7 +23,7 @@ def get_inj_model():
 
     net_actnorm = False
     n_hidden_list = [32, 64, 128, 256, 256, 256]
-    n_hidden = 64
+    n_hidden = 32
     n_glow_blocks = 3
     n_mixing_layers = 3
     n_injective_layers = 6
@@ -32,9 +31,9 @@ def get_inj_model():
 
     # hidden layers for the AutoregressiveRationalQuadraticSpline
     net_hidden_layers = 2
-    net_hidden_dim = 64
+    net_hidden_dim = 32
 
-    input_shape = (1, 32, 32)
+    input_shape = (3, 32, 32)
     n_channels = input_shape[0]
     img_size = input_shape[1]
 
@@ -61,7 +60,7 @@ def get_inj_model():
         else:
             split_mode = "channel"
 
-        if i % 2 == 0:
+        if i % 1 == 0:
             for j in range(n_glow_blocks):
                 flows += [
                     GlowBlock(
@@ -154,18 +153,6 @@ def get_inj_model():
         if debug:
             print(f"On layer {n_mixing_layers - i}, n_chs = {n_chs}")
 
-    # add variational dequantizations
-    # print("Before variational dequant: ", n_chs)
-    # vardeq_layers = [
-    #     nf.flows.AffineCouplingBlock(
-    #         GatedConvNet(c_in=n_chs, c_out=2 * n_chs, c_hidden=32),
-    #         scale=True,
-    #         split_mode="checkerboard",
-    #     )
-    #     for i in range(4)
-    # ]
-    # flows += [VariationalDequantization(vardeq_layers)]
-
     model = nf.NormalizingFlow(q0=q0, flows=flows)
     model.output_n_chs = n_chs
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -174,11 +161,18 @@ def get_inj_model():
     return model
 
 
-def get_bij_model(n_chs, latent_size):
+def get_bij_model(
+    n_chs,
+    latent_size,
+    adj_mat,
+    cluster_sizes,
+    intervention_targets,
+    confounded_variables,
+):
     use_lu = True
     net_actnorm = False
     n_hidden = 128
-    n_glow_blocks = 10
+    n_glow_blocks = 8
 
     flows = []
 
@@ -192,10 +186,18 @@ def get_bij_model(n_chs, latent_size):
         (n_chs * latent_size * latent_size,), trainable=False
     )
 
+    q0 = ClusteredLinearGaussianDistribution(
+        adjacency_matrix=adj_mat,
+        cluster_sizes=cluster_sizes,
+        intervention_targets_per_distr=intervention_targets,
+        hard_interventions_per_distr=None,
+        confounded_variables=confounded_variables,
+    )
+
     split_mode = "checkerboard"
 
     net_hidden_layers = 2
-    net_hidden_dim = 64
+    net_hidden_dim = 32
 
     # flows += [
     #     ReshapeFlow(
@@ -278,80 +280,6 @@ def initialize_flow(model):
             nn.init.constant_(param, 1e-5)
 
 
-def discretize(sample):
-    return (sample * 255).to(torch.int32).to(torch.float32)
-
-
-class MNISTDataModule(pl.LightningDataModule):
-    def __init__(
-        self,
-        data_dir: str = "path/to/dir",
-        batch_size: int = 64,
-        num_workers: int = 4,
-        shuffle=True,
-        fast_dev_run=False,
-    ):
-        super().__init__()
-        self.data_dir = data_dir
-        self.batch_size = batch_size
-        self.num_workers = num_workers
-        self.shuffle = shuffle
-
-        self.transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Resize((32, 32)),
-                # discretize,
-                transforms.Normalize((0.5,), (0.5,)),
-            ]
-        )
-        self.fast_dev_run = fast_dev_run
-
-    def setup(self, stage: str):
-        self.mnist_test = MNIST(
-            self.data_dir, download=True, train=False, transform=self.transform
-        )
-        mnist_full = MNIST(
-            self.data_dir, download=True, train=True, transform=self.transform
-        )
-        if self.fast_dev_run:
-            self.mnist_train, self.mnist_val, _ = random_split(
-                mnist_full,
-                [100, 100, 60_000 - 200],
-                generator=torch.Generator().manual_seed(42),
-            )
-            # Get a sample image
-            images, labels = next(iter(self.train_dataloader()))
-
-            print("Dataset range: ", images.max(), images.min())
-        else:
-            self.mnist_train, self.mnist_val = random_split(
-                mnist_full, [55000, 5000], generator=torch.Generator().manual_seed(42)
-            )
-
-    def train_dataloader(self):
-        return DataLoader(
-            self.mnist_train,
-            batch_size=self.batch_size,
-            num_workers=self.num_workers,
-            shuffle=self.shuffle,
-            persistent_workers=True,
-        )
-
-    def val_dataloader(self):
-        return DataLoader(
-            self.mnist_val,
-            batch_size=self.batch_size,
-            num_workers=self.num_workers,
-            persistent_workers=True,
-        )
-
-    def test_dataloader(self):
-        return DataLoader(
-            self.mnist_test, batch_size=self.batch_size, num_workers=self.num_workers
-        )
-
-
 if __name__ == "__main__":
     # parser = argparse.ArgumentParser()
     # args = parser.parse_args()
@@ -380,6 +308,9 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
+    debug = True
+    fast_dev = False
+
     batch_size = 256
     devices = 1
     strategy = "auto"  # or ddp if distributed
@@ -399,79 +330,24 @@ if __name__ == "__main__":
     # whether or not to shuffle dataset
     shuffle = True
 
+    graph_type = "collider"
+    adj_mat = np.array([[0, 0, 1], [0, 0, 1], [0, 0, 0]])
+    confounded_variables = None
+    cluster_sizes = [16, 16, 16]
+
     # output filename for the results
-    root = "./data/"
+    root = "/Users/adam2392/pytorch_data/"
 
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
     # convnet restart = v2, whcih was good
-    model_name = "16dimlatent_adamw_unet_injflow_10layerneuralspline_twostage_batch256_gradclip1_mnist_nottrainableq0_nstepsmse10_v1"
+    model_name = "16dimlatent_10layerneuralspline_twostage_batch256_gradclip1_causalmnist_nottrainableq0_nstepsmse10_v1"
     checkpoint_dir = Path("./results") / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
     train_from_checkpoint = False
 
-    if train_from_checkpoint:
-        epoch = 499
-        step = 27000
-        model_fname = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
-        model = plInjFlowModel.load_from_checkpoint(model_fname)
-
-        model_name = "16dimlatent_adamw_unet_injflow_10layerneuralspline_twostage_batch256_gradclip1_mnist_nottrainableq0_nstepsmse10_v1"
-        checkpoint_dir = Path("./results") / model_name
-        checkpoint_dir.mkdir(exist_ok=True, parents=True)
-
-        # model.current_epoch = epoch
-        max_epochs = model.current_epoch + 1000
-        fast_dev = False
-        debug = False
-    else:
-        model_fname = None
-        # define the model
-        inj_model = get_inj_model()
-        samples = inj_model.q0.sample(2)
-        _, n_chs, latent_size, _ = samples.shape
-        print(samples.shape)
-        initialize_flow(inj_model)
-
-        # bij_model = None
-        bij_model = get_bij_model(n_chs=n_chs, latent_size=latent_size)
-        initialize_flow(bij_model)
-
-        debug = False
-        fast_dev = False
-        max_epochs = 2000
-        if debug:
-            accelerator = "cpu"
-            fast_dev = True
-            max_epochs = 5
-            n_steps_mse = 1
-            batch_size = 16
-            check_samples_every_n_epoch = 1
-        else:
-            torch.set_float32_matmul_precision("high")
-
-        example_input_array = [
-            torch.randn(2, n_chs * latent_size * latent_size),
-            torch.randn(2, 1),
-        ]
-        model = plInjFlowModel(
-            inj_model=inj_model,
-            bij_model=bij_model,
-            lr=lr,
-            lr_min=lr_min,
-            lr_scheduler=lr_scheduler,
-            n_steps_mse=n_steps_mse,
-            checkpoint_dir=checkpoint_dir,
-            checkpoint_name=mse_chkpoint_name,
-            debug=debug,
-            check_val_every_n_epoch=check_val_every_n_epoch,
-            check_samples_every_n_epoch=check_samples_every_n_epoch,
-            gradient_clip_val=gradient_clip_val,
-            example_input_array=example_input_array,
-        )
-
-        # if not debug:
-        #     model = torch.compile(model)
+    # if not debug:
+    #     model = torch.compile(model)
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=checkpoint_dir,
@@ -492,6 +368,97 @@ if __name__ == "__main__":
     print()
     print(f"Model name: {model_name}")
     print()
+    # demo to load dataloader. please make sure transform is None. d
+    data_module = MultiDistrDataModule(
+        root=root,
+        graph_type=graph_type,
+        batch_size=batch_size,
+        stratify_distrs=True,
+        num_workers=num_workers,
+        fast_dev_run=fast_dev,
+    )
+    data_module.setup()
+
+    intervention_targets_per_distr = []
+    print(data_module.dataset.intervention_targets.shape)
+    print(data_module.dataset.labels.shape)
+    for distr_idx in data_module.dataset.distribution_idx.unique():
+        idx = np.argwhere(data_module.dataset.distribution_idx == distr_idx)[0][0]
+        intervention_targets_per_distr.append(
+            data_module.dataset.intervention_targets[idx]
+        )
+    print(idx)
+
+    print(intervention_targets_per_distr)
+    intervention_targets_per_distr = np.array(intervention_targets_per_distr)
+    unique_rows = np.unique(data_module.dataset.intervention_targets, axis=0)
+    print("Unique intervention targets: ", unique_rows)
+
+    if train_from_checkpoint:
+        epoch = 499
+        step = 27000
+        model_fname = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
+        model = plCausalInjFlowModel.load_from_checkpoint(model_fname)
+
+        model_name = "16dimlatent_10layerneuralspline_twostage_batch256_gradclip1_causalmnist_nottrainableq0_nstepsmse10_v1"
+        checkpoint_dir = Path("./results") / model_name
+        checkpoint_dir.mkdir(exist_ok=True, parents=True)
+
+        # model.current_epoch = epoch
+        max_epochs = model.current_epoch + 1000
+        fast_dev = False
+        debug = False
+    else:
+        model_fname = None
+        # define the model
+        inj_model = get_inj_model()
+        samples = inj_model.q0.sample(2)
+        _, n_chs, latent_size, _ = samples.shape
+        print("Output shape of injective flow model: ", samples.shape)
+        initialize_flow(inj_model)
+
+        # bij_model = None
+        bij_model = get_bij_model(
+            n_chs=n_chs,
+            latent_size=latent_size,
+            adj_mat=adj_mat,
+            cluster_sizes=cluster_sizes,
+            intervention_targets=intervention_targets_per_distr,
+            confounded_variables=confounded_variables,
+        )
+        initialize_flow(bij_model)
+
+        max_epochs = 2000
+        if debug:
+            accelerator = "cpu"
+            fast_dev = True
+            max_epochs = 5
+            n_steps_mse = 1
+            batch_size = 16
+            check_samples_every_n_epoch = 1
+            num_workers = 2
+        else:
+            torch.set_float32_matmul_precision("high")
+
+        example_input_array = [
+            torch.randn(2, n_chs * latent_size * latent_size),
+            torch.randn(2, 1),
+        ]
+        model = plCausalInjFlowModel(
+            inj_model=inj_model,
+            bij_model=bij_model,
+            lr=lr,
+            lr_min=lr_min,
+            lr_scheduler=lr_scheduler,
+            n_steps_mse=n_steps_mse,
+            checkpoint_dir=checkpoint_dir,
+            checkpoint_name=mse_chkpoint_name,
+            debug=debug,
+            check_val_every_n_epoch=check_val_every_n_epoch,
+            check_samples_every_n_epoch=check_samples_every_n_epoch,
+            gradient_clip_val=gradient_clip_val,
+            example_input_array=example_input_array,
+        )
 
     # Define the trainer
     trainer = pl.Trainer(
@@ -504,20 +471,11 @@ if __name__ == "__main__":
         accelerator=accelerator,
         gradient_clip_val=gradient_clip_val,
         # precision="bf16",
-        # fast_dev_run=fast_dev,
+        fast_dev_run=fast_dev,
         # log_every_n_steps=1,
         # max_epochs=1,
         # limit_train_batches=1,
         # limit_val_batches=1,
-    )
-
-    # define the data loader
-    data_module = MNISTDataModule(
-        data_dir=root,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=num_workers,
-        fast_dev_run=fast_dev,
     )
 
     trainer.fit(
@@ -529,3 +487,53 @@ if __name__ == "__main__":
     # save the final model
     print(f"Saving model to {checkpoint_dir / '{model_name}_final.pt'}")
     torch.save(model, checkpoint_dir / f"{model_name}_final.pt")
+
+
+# import logging
+# import math
+# from pathlib import Path
+# from pprint import pprint
+
+# import cv2
+# import lightning as pl
+# import matplotlib.pyplot as plt
+# import networkx as nx
+# import normflows as nf
+# import numpy as np
+# import seaborn as sns
+# import torch
+# import torch.nn as nn
+# from albumentations import (
+#     CoarseDropout,
+#     Compose,
+#     ElasticTransform,
+#     GaussianBlur,
+#     GridDistortion,
+#     HorizontalFlip,
+#     HueSaturationValue,
+#     OneOf,
+#     Perspective,
+#     RandomBrightnessContrast,
+#     RandomCrop,
+# )
+# from albumentations.pytorch import ToTensorV2
+# from PIL import Image
+# from torchvision import transforms
+# from torchvision.datasets import CelebA
+# from torchvision.utils import make_grid, save_image
+# # Root directory for the dataset
+# data_root = "/Users/adam2392/pytorch_data/"
+# # Spatial size of training images, images are resized to this size.
+# image_size = 64
+# celeba_data = CelebA(
+#     data_root,
+#     download=True,
+#     transform=transforms.Compose(
+#         [
+#             transforms.Resize(image_size),
+#             transforms.CenterCrop(image_size),
+#             transforms.ToTensor(),
+#             transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+#         ]
+#     ),
+# )

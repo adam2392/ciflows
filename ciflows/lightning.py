@@ -1,10 +1,7 @@
 import lightning as pl
 import torch
 import torch.optim as optim
-from lightning.pytorch.callbacks import Callback
 
-from .flows.glow import InjectiveGlowBlock
-from .flows.model import InjectiveFlow
 from .loss import volume_change_surrogate, volume_change_surrogate_transformer
 
 

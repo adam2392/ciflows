@@ -1,4 +1,6 @@
 import logging
+from collections import OrderedDict
+from math import prod
 from pathlib import Path
 
 import lightning as pl
@@ -6,6 +8,7 @@ import normflows as nf
 import numpy as np
 import torch
 import torch.nn as nn
+from fff.model.utils import wrap_batch_norm2d
 from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
@@ -13,13 +16,6 @@ from torchvision.datasets import MNIST
 
 from ciflows.lightning import plApproximateFlowModel
 from ciflows.vit import VisionTransformerDecoder, VisionTransformerEncoder
-
-from collections import OrderedDict
-from math import prod
-import torch
-import torch.nn as nn
-
-from fff.model.utils import guess_image_shape, wrap_batch_norm2d
 
 
 class SkipConnection(nn.Module):
@@ -117,7 +113,7 @@ class ConvolutionalNeuralNetwork(nn.Module):
                 encoder.append(nn.InstanceNorm2d(out_channels))
             encoder.append(nn.ReLU())
             n_channels = out_channels
-        
+
         # flattens (batch, channels, height, width) to (batch, channels * height * width)
         encoder.append(nn.Flatten(-3, -1))
         # project to latent space

@@ -1,8 +1,7 @@
+import networkx as nx
 import numpy as np
 import torch
 from torch import Tensor
-import networkx as nx
-import normflows as nf
 
 from ciflows.distributions.multidistr import MultidistrCausalFlow
 
@@ -45,7 +44,9 @@ def sample_linear_gaussian_dag(
         node_dim = cluster_sizes[i]
 
         for distr_idx in range(intervention_targets_per_distr.shape[0]):
-            intervention_targets = np.argwhere(intervention_targets_per_distr[distr_idx] == 1)
+            intervention_targets = np.argwhere(
+                intervention_targets_per_distr[distr_idx] == 1
+            )
             # print('INtervention targets: ', intervention_targets)
 
             # add the exogenous node
@@ -195,7 +196,7 @@ def log_prob_from_dag(
     )
 
     if debug:
-        print(f"\n cluster sizes: ", cluster_sizes)
+        print("\n cluster sizes: ", cluster_sizes)
 
     unique_distrs = torch.unique(distr_idx)
     log_prob = torch.zeros(n_samples)
@@ -213,7 +214,7 @@ def log_prob_from_dag(
         for idx, node in enumerate(nodes):
             node_idx = np.arange(
                 cluster_sizes[:idx].sum(), cluster_sizes[: idx + 1].sum(), dtype=int
-            ) 
+            )
             node_dim = cluster_sizes[idx]
 
             if debug:
@@ -231,6 +232,13 @@ def log_prob_from_dag(
                 if dag.nodes[par].get("exogenous", False)
                 and dag.nodes[par].get("distr_idx", None) == distr
             ]
+            if exogenous_parents == []:
+                exogenous_parents = [
+                    par
+                    for par in dag.predecessors(node)
+                    if dag.nodes[par].get("exogenous", False)
+                    and dag.nodes[par].get("distr_idx", None) == 0
+                ]
 
             # get confounded parents for this distribution index
             confounded_parents = [
@@ -281,10 +289,16 @@ def log_prob_from_dag(
 
             # accumulate log probability for each sample using conditional normal
             for i, sample_idx in enumerate(env_mask):
-                log_prob_node = torch.distributions.Normal(
-                    mean_vec[i],
-                    std_vec[i],
-                ).log_prob(X[sample_idx, node_idx].squeeze()).sum()
+                # print(mean_vec[i], std_vec[i])
+                # print(X[sample_idx, node_idx].shape)
+                log_prob_node = (
+                    torch.distributions.Normal(
+                        mean_vec[i],
+                        std_vec[i],
+                    )
+                    .log_prob(X[sample_idx, node_idx].squeeze())
+                    .sum()
+                )
                 log_prob[sample_idx] += log_prob_node
 
     return log_prob
@@ -404,13 +418,29 @@ class ClusteredLinearGaussianDistribution(MultidistrCausalFlow):
             result[:, idx, :] = dist.sample(sample_shape=((n_samples,))).squeeze()
         return result
 
+    def sample(self, num_samples=1, **kwargs):
+        """Samples from base distribution
+
+        Args:
+          num_samples: Number of samples to draw from the distriubtion
+
+        Returns:
+          Samples drawn from the distribution
+        """
+        z, _ = self.forward(num_samples, **kwargs)
+        return z
+
     def forward(
         self,
-        num_samples=1,
-        intervention_targets: Tensor = None,
-        hard_interventions: Tensor = None,
+        n_samples=1,
+        distr_idx=0,
     ):
-        pass
+        # XXX: figure out how to sample from interventional distributions?
+        v_samples = sample_from_dag(self.dag, n_samples=n_samples, distr_idx=distr_idx)
+
+        distr_idx = torch.full((n_samples, 1), distr_idx)
+        log_prob = log_prob_from_dag(self.dag, v_samples, distr_idx)
+        return v_samples, log_prob
 
     def log_prob(
         self,

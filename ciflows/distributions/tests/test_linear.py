@@ -1,13 +1,12 @@
-import pytest
-import torch
 import networkx as nx
-from torch.distributions import Normal
-from ciflows.distributions.linear import (
-    log_prob_from_dag,
-    sample_linear_gaussian_dag,
-    sample_from_dag,
-)
 import numpy as np
+import torch
+from numpy.testing import assert_array_equal
+from torch.distributions import Normal
+
+from ciflows.distributions.linear import (ClusteredLinearGaussianDistribution,
+                                          log_prob_from_dag, sample_from_dag,
+                                          sample_linear_gaussian_dag)
 
 
 # Define a function to generate data from a known linear Gaussian DAG
@@ -150,4 +149,20 @@ def test_log_prob_from_random_dag():
     )
 
     assert log_prob_distr0.shape == (n_samples,)
-    assert log_prob_distr0.sum() > log_prob_distr1.sum()
+    assert (
+        log_prob_distr0.sum() > log_prob_distr1.sum()
+    ), f"{log_prob_distr0}, {log_prob_distr1}"
+
+    prior = ClusteredLinearGaussianDistribution(
+        cluster_sizes=cluster_sizes,
+        adjacency_matrix=adj_mat,
+        confounded_variables=confounded_variables,
+        intervention_targets_per_distr=intervention_targets_per_distr,
+        hard_interventions_per_distr=hard_interventions_per_distr,
+    )
+    prior.dag = dag
+    prior_log_p = prior.log_prob(
+        v_samples, distr_idx, intervention_targets=intervention_targets_per_distr
+    )
+    print(prior_log_p, log_prob_distr1)
+    assert_array_equal(prior_log_p, log_prob_distr1)
