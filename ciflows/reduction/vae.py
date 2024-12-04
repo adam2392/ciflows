@@ -6,7 +6,6 @@ from torchvision import transforms
 
 # CELEB_PATH = "./data/"
 IMAGE_SIZE = 64
-LATENT_DIM = 48
 image_dim = 3 * IMAGE_SIZE * IMAGE_SIZE  # 67500
 # print(
 #     # "\nCELEB_PATH",
@@ -33,7 +32,7 @@ celeb_transform1 = transforms.Compose(
 
 
 class VAE(nn.Module):
-    def __init__(self):
+    def __init__(self, LATENT_DIM=48):
         super(VAE, self).__init__()
 
         hidden_dims = [32, 64, 128, 256, 512]

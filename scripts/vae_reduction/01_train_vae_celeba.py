@@ -174,13 +174,16 @@ if __name__ == "__main__":
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
+    latent_dim = 48
+    batch_size = 256
+    model_fname = f"celeba_vaereduction_batch256_latentdim48_v1.pt"
+
     max_epochs = 10_000
     lr = 3e-4
     lr_min = 1e-8
     lr_scheduler = "cosine"
     debug = False
     num_workers = 6
-    batch_size = 256
     graph_type = "chain"
 
     torch.set_float32_matmul_precision("high")
@@ -194,7 +197,7 @@ if __name__ == "__main__":
 
         fast_dev = True
 
-    model = VAE()
+    model = VAE(LATENT_DIM=latent_dim)
     model = model.to(device)
     image_dim = 3 * 64 * 64
 
@@ -285,22 +288,14 @@ if __name__ == "__main__":
         # Track top 5 models based on validation loss
         if epoch % 5 == 0:
             # Optionally, remove worse models if there are more than k saved models
-            if top_k_saver.check(model, train_loss, epoch):
-                top_k_saver.save_model(model, epoch, train_loss)
-
-    # Save top 5 models
-    # for i, (val_loss, epoch, state_dict) in enumerate(top_models):
-    #     torch.save(
-    #         state_dict,
-    #         f"{model_dir}/top_model_{i+1}_epoch_{epoch}_val_loss_{val_loss:.4f}.pth",
-    #     )
+            top_k_saver.save_model(model, epoch, train_loss)
 
     # Save final model
-    # torch.save(model.state_dict(), checkpoint_dir / f"final_vaereduction_model.pt")
-    # print(f"Training complete. Models saved in {checkpoint_dir}.")
+    torch.save(model.state_dict(), checkpoint_dir / model_fname)
+    print(f"Training complete. Models saved in {checkpoint_dir}.")
 
-    # # Usage example:
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # vae_model = VAE().to(device)
-    # model_path = checkpoint_dir / f"final_vaereduction_model.pt"
-    # vae_model = load_model(vae_model, model_path, device)
+    # Usage example:
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    vae_model = VAE().to(device)
+    model_path = checkpoint_dir / f"final_vaereduction_model.pt"
+    vae_model = load_model(vae_model, model_path, device)
