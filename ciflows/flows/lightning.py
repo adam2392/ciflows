@@ -52,7 +52,7 @@ import matplotlib.pyplot as plt
 
 # Function to log images
 def log_images(images, epoch, checkpoint_dir, logger=None):
-    grid = make_grid(images, nrow=8, normalize=True, range=(0, 1))
+    grid = make_grid(images, nrow=8, normalize=True)
     if logger:
         # Log to your preferred logger, e.g., TensorBoard
         logger.add_image(f"Training Images - Epoch {epoch}", grid)
