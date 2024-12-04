@@ -559,6 +559,7 @@ class plCausalInjFlowModel(pl.LightningModule):
             log_images(
                 x,
                 self.current_epoch,
+                self.checkpoint_dir,
             )
         return loss
 
