@@ -45,6 +45,31 @@ class TwoStageTraining(Callback):
             # trainer.optimizer_frequencies = [] # or optimizers frequencies if you have any
 
 
+import torch
+from torchvision.utils import make_grid
+import matplotlib.pyplot as plt
+
+
+# Function to log images
+def log_images(images, epoch, checkpoint_dir, logger=None):
+    grid = make_grid(images, nrow=8, normalize=True, range=(0, 1))
+    if logger:
+        # Log to your preferred logger, e.g., TensorBoard
+        logger.add_image(f"Training Images - Epoch {epoch}", grid)
+    else:
+        # Display using matplotlib (optional)
+        plt.figure(figsize=(10, 10))
+        plt.imshow(grid.permute(1, 2, 0).detach().cpu().numpy())
+        plt.title(f"Epoch {epoch}")
+        plt.show()
+
+        # Save the figure
+        save_path = Path(checkpoint_dir) / "log_images"
+        save_path.mkdir(exist_ok=True, parents=True)
+        plt.savefig(save_path / f"training_samples_{epoch}.png")
+        plt.close()
+
+
 class plInjFlowModel(pl.LightningModule):
     def __init__(
         self,
@@ -447,8 +472,9 @@ class plCausalInjFlowModel(pl.LightningModule):
         sch1, sch2 = self.lr_schedulers()
 
         if (
-            not self.debug
-            and self.n_steps_mse is not None
+            # not self.debug
+            # and 
+            self.n_steps_mse is not None
             and self.current_epoch < self.n_steps_mse
         ):
             # Enable autocasting for the forward pass
@@ -530,10 +556,16 @@ class plCausalInjFlowModel(pl.LightningModule):
             and batch_idx == 0
         ):
             self.sample_and_save_images(self.current_epoch)
+            log_images(
+                x,
+                self.current_epoch,
+            )
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, meta_labels, targets = batch
+        distr_idx = meta_labels[-2]
+        
         if self.n_steps_mse is not None and self.current_epoch < self.n_steps_mse:
             v_latent = self.inj_model.inverse(x)
             x_reconstructed = self.inj_model.forward(v_latent)
@@ -545,7 +577,12 @@ class plCausalInjFlowModel(pl.LightningModule):
             ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
         else:
             inj_v = self.inj_model.inverse(x)
-            loss = self.bij_model.forward_kld(inj_v)
+            vhat, log_q = self.bij_model.inverse_and_log_det(inj_v)
+            log_q += self.bij_model.q0.log_prob(vhat, distr_idx, targets)
+            loss = -torch.mean(log_q)
+
+            # inj_v = self.inj_model.inverse(x)
+            # loss = self.bij_model.forward_kld(inj_v)
 
         self.log("Nsteps_mse", self.n_steps_mse)
         self.log("val_loss", loss)

@@ -358,8 +358,8 @@ if __name__ == "__main__":
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
     # convnet restart = v2, whcih was good
-    model_name = "16dimlatent_10layerneuralspline_twostage_batch256_gradclip1_causalceleba_nottrainableq0_nstepsmse10_v1"
-    checkpoint_dir = root / 'causalceleba' / "results" / model_name
+    model_name = "16dimlatent_10layerneuralspline_twostage_batch256_gradclip1_causalceleba_nottrainableq0_nstepsmse10_v2"
+    checkpoint_dir = root / 'CausalCelebA' / "results" / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
     train_from_checkpoint = False
 
@@ -380,7 +380,8 @@ if __name__ == "__main__":
     #     log_graph=True,
     # )
     # logger = logging.getLogger()
-    logging.basicConfig(level=logging.INFO)
+    # logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger(__name__)
     print()
     print(f"Model name: {model_name}")
