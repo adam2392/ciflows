@@ -186,17 +186,17 @@ def get_bij_model(
     # q0 = nf.distributions.DiagGaussian(
     #     (n_chs, latent_size, latent_size), trainable=False
     # )
-    # q0 = nf.distributions.DiagGaussian(
-    #     (n_chs * latent_size * latent_size,), trainable=False
-    # )
-
-    q0 = ClusteredLinearGaussianDistribution(
-        adjacency_matrix=adj_mat,
-        cluster_sizes=cluster_sizes,
-        intervention_targets_per_distr=intervention_targets,
-        hard_interventions_per_distr=None,
-        confounded_variables=confounded_variables,
+    q0 = nf.distributions.DiagGaussian(
+        (n_chs * latent_size * latent_size,), trainable=False
     )
+
+    # q0 = ClusteredLinearGaussianDistribution(
+    #     adjacency_matrix=adj_mat,
+    #     cluster_sizes=cluster_sizes,
+    #     intervention_targets_per_distr=intervention_targets,
+    #     hard_interventions_per_distr=None,
+    #     confounded_variables=confounded_variables,
+    # )
 
     split_mode = "checkerboard"
 

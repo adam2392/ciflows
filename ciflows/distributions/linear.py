@@ -83,7 +83,7 @@ def sample_linear_gaussian_dag(
     return dag
 
 
-def sample_from_dag(dag, n_samples=100, distr_idx=0):
+def sample_from_dag(dag, n_samples=100, distr_idx=0, device="cpu"):
     # sample in topological order
     nodes = [
         node
@@ -99,7 +99,7 @@ def sample_from_dag(dag, n_samples=100, distr_idx=0):
             if not dag.nodes[node].get("exogenous", False)
         ]
     )
-    samples = torch.zeros((n_samples, cluster_sizes.sum()))
+    samples = torch.zeros((n_samples, cluster_sizes.sum())).to(device)
 
     # confounded_samples =
     # for each variable, sample from its parents, which includes the exogenous
