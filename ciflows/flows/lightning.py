@@ -446,7 +446,11 @@ class plCausalInjFlowModel(pl.LightningModule):
         # multiple schedulers
         sch1, sch2 = self.lr_schedulers()
 
-        if not self.debug and self.n_steps_mse is not None and self.current_epoch < self.n_steps_mse:
+        if (
+            not self.debug
+            and self.n_steps_mse is not None
+            and self.current_epoch < self.n_steps_mse
+        ):
             # Enable autocasting for the forward pass
             # with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
             x_reconstructed = self.inj_model.forward(self.inj_model.inverse(x))
@@ -489,10 +493,10 @@ class plCausalInjFlowModel(pl.LightningModule):
             inj_v = self.inj_model.inverse(x)
             vhat, log_q = self.bij_model.inverse_and_log_det(inj_v)
             log_q += self.bij_model.q0.log_prob(vhat, distr_idx, targets)
-            loss  = -torch.mean(log_q)
+            loss = -torch.mean(log_q)
 
             if self.debug:
-                print('Training step: ', x.shape, inj_v.shape, loss.shape)
+                print("Training step: ", x.shape, inj_v.shape, loss.shape)
             optimizer_nll.zero_grad()
             self.manual_backward(loss)
 
@@ -603,7 +607,7 @@ class plCausalInjFlowModel(pl.LightningModule):
             samples = (samples - min_val) / (max_val - min_val)
 
             # Convert to NumPy and transpose to (H, W, C)
-            samples = samples.permute(0, 2, 3, 1).numpy()
+            samples = samples.permute(0, 2, 3, 1).detach().cpu().numpy()
 
             # Convert to [0, 255] for visualization
             samples = (samples * 255).astype(np.uint8)
