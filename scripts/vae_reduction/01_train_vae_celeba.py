@@ -169,7 +169,7 @@ if __name__ == "__main__":
     print(f"Using accelerator: {accelerator}")
 
     root = Path("/Users/adam2392/pytorch_data/celeba")
-    # root = Path("/home/adam2392/projects/data/")
+    root = Path("/home/adam2392/projects/data/")
 
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
