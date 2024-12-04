@@ -1,3 +1,4 @@
+# https://github.com/moshesipper/vae-torch-celeba/blob/main/vae.py
 # based on https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
 import torch
 from torch import nn
@@ -7,16 +8,16 @@ from torchvision import transforms
 IMAGE_SIZE = 64
 LATENT_DIM = 48
 image_dim = 3 * IMAGE_SIZE * IMAGE_SIZE  # 67500
-print(
-    # "\nCELEB_PATH",
-    # CELEB_PATH,
-    "IMAGE_SIZE",
-    IMAGE_SIZE,
-    "LATENT_DIM",
-    LATENT_DIM,
-    "image_dim",
-    image_dim,
-)
+# print(
+#     # "\nCELEB_PATH",
+#     # CELEB_PATH,
+#     "IMAGE_SIZE",
+#     IMAGE_SIZE,
+#     "LATENT_DIM",
+#     LATENT_DIM,
+#     "image_dim",
+#     image_dim,
+# )
 
 celeb_transform = transforms.Compose(
     [
