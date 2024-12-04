@@ -32,6 +32,8 @@ class StratifiedSampler(Sampler):
         return indices
 
     def __iter__(self):
+        # shuffle each time a new iterator is called
+        self._generate_indices()
         return iter(self.indices)
 
     def __len__(self):
