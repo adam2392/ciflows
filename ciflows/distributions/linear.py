@@ -199,7 +199,7 @@ def log_prob_from_dag(
         print("\n cluster sizes: ", cluster_sizes)
 
     unique_distrs = torch.unique(distr_idx)
-    log_prob = torch.zeros(n_samples)
+    log_prob = torch.zeros(n_samples).to(X.device)
 
     # for each distribution index, compute the log likelihood for those samples
     # that belong to that distribution
@@ -250,9 +250,9 @@ def log_prob_from_dag(
 
             # initialize the mean and variance contributions from the parents
             # and the exogenous variables (exogenous per distribution and the confounder)
-            exo_mean_contributions = torch.zeros((len(env_mask), node_dim))
-            exo_var_contributions = torch.zeros((len(env_mask), node_dim))
-            par_contributions = torch.zeros((len(env_mask), node_dim))
+            exo_mean_contributions = torch.zeros((len(env_mask), node_dim)).to(X.device)
+            exo_var_contributions = torch.zeros((len(env_mask), node_dim)).to(X.device)
+            par_contributions = torch.zeros((len(env_mask), node_dim)).to(X.device)
 
             # accumulate the mean and variance from the parents
             if (
@@ -261,7 +261,7 @@ def log_prob_from_dag(
             ):
                 exogenous_parents = exogenous_parents + confounded_parents
                 for par in parents:
-                    par_weight = torch.atleast_2d(dag[par][node]["weight"])
+                    par_weight = torch.atleast_2d(dag[par][node]["weight"]).to(X.device)
                     par_node_idx = (
                         np.argwhere(np.array(nodes) == par).flatten().squeeze()
                     )
@@ -272,7 +272,7 @@ def log_prob_from_dag(
                         dtype=int,
                     )
 
-                    par_sample = torch.atleast_2d(X[env_mask][:, par_idx])
+                    par_sample = torch.atleast_2d(X[env_mask][:, par_idx]).to(X.device)
                     par_contributions += par_sample @ par_weight
 
             for par in exogenous_parents:
@@ -298,7 +298,7 @@ def log_prob_from_dag(
                     )
                     .log_prob(X[sample_idx, node_idx].squeeze())
                     .sum()
-                )
+                ).to(X.device)
                 log_prob[sample_idx] += log_prob_node
 
     return log_prob

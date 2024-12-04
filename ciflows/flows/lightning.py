@@ -597,16 +597,16 @@ class plCausalInjFlowModel(pl.LightningModule):
         with torch.no_grad():
             samples, _ = self.sample(16)
 
-        #  Normalize: Ensure values are in [0, 1]
-        min_val = torch.min(samples)
-        max_val = torch.max(samples)
-        samples = (samples - min_val) / (max_val - min_val)
+            #  Normalize: Ensure values are in [0, 1]
+            min_val = torch.min(samples)
+            max_val = torch.max(samples)
+            samples = (samples - min_val) / (max_val - min_val)
 
-        # Convert to NumPy and transpose to (H, W, C)
-        samples = samples.permute(0, 2, 3, 1).numpy()
+            # Convert to NumPy and transpose to (H, W, C)
+            samples = samples.permute(0, 2, 3, 1).numpy()
 
-        # Convert to [0, 255] for visualization
-        samples = (samples * 255).astype(np.uint8)
+            # Convert to [0, 255] for visualization
+            samples = (samples * 255).astype(np.uint8)
 
         # Plot the samples
         fig, axes = plt.subplots(4, 4, figsize=(8, 8))
