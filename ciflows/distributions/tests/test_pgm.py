@@ -1,4 +1,3 @@
-
 import torch
 
 from ciflows.distributions.pgm import LinearGaussianDag

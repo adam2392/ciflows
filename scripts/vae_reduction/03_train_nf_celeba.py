@@ -233,19 +233,21 @@ if __name__ == "__main__":
     graph_type = "chain"
 
     torch.set_float32_matmul_precision("high")
-    
+
     if debug:
         root = Path("/Users/adam2392/pytorch_data/celeba")
     else:
         root = Path("/home/adam2392/projects/data/")
 
-     # v1: K=32
+    # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
     model_fname = "celeba_nfonvaereduction_batch1024_latentdim48_v2.pt"
 
     # checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
-    checkpoint_dir = root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split('.')[0]
+    checkpoint_dir = (
+        root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split(".")[0]
+    )
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     vae_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim48"
@@ -278,7 +280,7 @@ if __name__ == "__main__":
 
     # Cosine Annealing Scheduler (adjust the T_max for the number of epochs)
     scheduler = CosineAnnealingLR(
-        optimizer, T_max=max_epochs, eta_min=1e-6
+        optimizer, T_max=max_epochs, eta_min=lr_min
     )  # T_max = total epochs
 
     top_k_saver = TopKModelSaver(
