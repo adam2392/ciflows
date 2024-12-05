@@ -226,7 +226,8 @@ if __name__ == "__main__":
 
     # v1: K=32
     # v2: K=8
-    model_fname = "celeba_nfonvaereduction_batch256_latentdim48_v2.pt"
+    # v3: K=8, batch higher
+    model_fname = "celeba_nfonvaereduction_batch1024_latentdim48_v2.pt"
 
     max_epochs = 2000
     lr = 3e-4
