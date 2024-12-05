@@ -234,19 +234,19 @@ if __name__ == "__main__":
     lr_min = 1e-8
     lr_scheduler = "cosine"
     max_norm = 1.0  # Threshold for gradient norm clipping
-    debug = False
+    debug = True
     num_workers = 10
     graph_type = "chain"
 
     torch.set_float32_matmul_precision("high")
-
+    
     if debug:
         root = Path("/Users/adam2392/pytorch_data/celeba")
     else:
         root = Path("/home/adam2392/projects/data/")
 
     # checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
-    checkpoint_dir = root / "CausalCelebA" / "nf_on_vae_reduction" / "latentdim48"
+    checkpoint_dir = root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split('.')[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     vae_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim48"
@@ -267,6 +267,9 @@ if __name__ == "__main__":
     model = make_nf_model(debug=debug)
     model = model.to(device)
     image_dim = 3 * 64 * 64
+
+    # compile the model
+    torch.compile(model)
 
     # print the number of parameters in the model
     print(sum(p.numel() for p in model.parameters()) / 1e6, "M parameters")
