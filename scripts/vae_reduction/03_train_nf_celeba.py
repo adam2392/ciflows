@@ -234,7 +234,7 @@ if __name__ == "__main__":
     lr_min = 1e-8
     lr_scheduler = "cosine"
     max_norm = 1.0  # Threshold for gradient norm clipping
-    debug = True
+    debug = False
     num_workers = 10
     graph_type = "chain"
 
@@ -269,7 +269,7 @@ if __name__ == "__main__":
     image_dim = 3 * 64 * 64
 
     # compile the model
-    torch.compile(model)
+    model = torch.compile(model)
 
     # print the number of parameters in the model
     print(sum(p.numel() for p in model.parameters()) / 1e6, "M parameters")
