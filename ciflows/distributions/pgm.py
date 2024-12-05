@@ -4,7 +4,15 @@ import networkx as nx
 
 
 class LinearGaussianDAGSampler:
-    def __init__(self, node_dimensions, edge_list, noise_means, noise_variances):
+    def __init__(
+        self,
+        node_dimensions,
+        edge_list,
+        noise_means,
+        noise_variances,
+        intervened_variable_list,
+        confounded_list=None,
+    ):
         """
         Args:
             node_dimensions (dict): Dictionary mapping node names to their feature dimensions.
@@ -13,25 +21,46 @@ class LinearGaussianDAGSampler:
                               Example: [('A', 'B'), ('C', 'B')]
             noise_variances (dict): Dictionary mapping node names to their noise variances (diagonal covariance).
                                     Example: {'A': 0.1, 'B': 0.05, 'C': 0.2}
+            intervened_variable_list (list): List of tuples of intervened variables. Each tuple contains the name of the
+                                                intervened variables.
+            confounded_list (list): List of tuples of confounded variables. Each pair tuple contains the names of the
+                                    confounded variables that are connected via a bidirected edge. This
         """
         self.node_dimensions = node_dimensions
         self.edge_list = edge_list
         self.noise_variances = noise_variances
         self.noise_means = noise_means
+        self.confounded_list = confounded_list
 
         # Create a weight dictionary for edges
         self.edge_weights = nn.ParameterDict(
             {
                 f"{src}->{tgt}": nn.Parameter(
-                    torch.randn(node_dimensions[src], node_dimensions[tgt])
+                    torch.randn(node_dimensions[src], node_dimensions[tgt]),
+                    requires_grad=False,
                 )
                 for src, tgt in edge_list
             }
         )
 
+        # add weight dictionary for confounded variables by creating a new node for the confounded
+        # variables
+
+        # add weight dictionary for
+
         # Create a topological ordering of nodes
         self.graph = nx.DiGraph(edge_list)
         self.topological_order = list(nx.topological_sort(self.graph))
+
+        # Register buffers for node parameters (non-trainable)
+        for node in node_dimensions:
+            # For each node, register noise mean and variance as buffers
+            self.register_buffer(
+                f"noise_mean_{node}", torch.tensor(noise_means.get(node, 0.0))
+            )
+            self.register_buffer(
+                f"noise_variance_{node}", torch.tensor(noise_variances.get(node, 1.0))
+            )
 
     def sample(self, batch_size):
         """

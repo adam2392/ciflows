@@ -171,14 +171,14 @@ if __name__ == "__main__":
     root = Path("/Users/adam2392/pytorch_data/celeba")
     root = Path("/home/adam2392/projects/data/")
 
-    checkpoint_dir = root / "CausalCelebA" / "vae_reduction"
+    checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / 'latentdim24'
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    latent_dim = 48
+    latent_dim = 24
     batch_size = 256
-    model_fname = f"celeba_vaereduction_batch256_latentdim48_v1.pt"
+    model_fname = f"celeba_vaereduction_batch256_latentdim24_v2.pt"
 
-    max_epochs = 10_000
+    max_epochs = 1000
     lr = 3e-4
     lr_min = 1e-8
     lr_scheduler = "cosine"
