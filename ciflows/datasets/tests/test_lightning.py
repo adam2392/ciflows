@@ -3,11 +3,11 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
-from numpy.testing import assert_array_equal
 import pandas as pd
 import PIL
 import pytest
 import torch
+from numpy.testing import assert_array_equal
 from torchvision import transforms
 
 from ciflows.datasets.lightning import DatasetName, MultiDistrDataModule

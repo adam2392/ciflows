@@ -2,17 +2,19 @@ import os
 from pathlib import Path
 
 import lightning as pl
+import normflows as nf
 import numpy as np
 import torch
-import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision.utils import save_image
 from tqdm import tqdm
 
-from ciflows.datasets.causalceleba import CausalCelebA
+from ciflows.datasets.causalceleba import CausalCelebAEmbedding
 from ciflows.datasets.multidistr import StratifiedSampler
+from ciflows.distributions.pgm import LinearGaussianDag
+from ciflows.flows.model import CausalNormalizingFlow
 from ciflows.reduction.vae import VAE
 
 
@@ -104,7 +106,7 @@ def data_loader(
         ]
     )
 
-    causal_celeba_dataset = CausalCelebA(
+    causal_celeba_dataset = CausalCelebAEmbedding(
         root=root_dir,
         graph_type=graph_type,
         transform=image_transform,
@@ -119,7 +121,7 @@ def data_loader(
     # # Split the dataset into train and validation sets
     # train_dataset, val_dataset = random_split(causal_celeba_dataset, [train_len, val_len])
 
-    distr_labels = [x[1][-1] for x in causal_celeba_dataset]
+    distr_labels = [x[1] for x in causal_celeba_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
         raise ValueError(
@@ -141,13 +143,62 @@ def data_loader(
     return train_loader
 
 
-# Reconstruction + KL divergence losses summed over all elements and batch
-def loss_function(recon_x, x, mu, log_var, image_dim):
-    MSE = F.mse_loss(recon_x, x.view(-1, image_dim))
-    KLD = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
-    kld_weight = 0.00025
-    loss = MSE + kld_weight * KLD
-    return loss
+def make_nf_model(debug=False):
+    """Make normalizing flow model."""
+    # Define list of flows
+    if debug:
+        K = 2
+        net_hidden_layers = 2
+        net_hidden_dim = 64
+    else:
+        K = 32
+        net_hidden_layers = 3
+        net_hidden_dim = 64
+
+    latent_dim = 48
+
+    flows = []
+    for i in range(K):
+        flows += [
+            nf.flows.AutoregressiveRationalQuadraticSpline(
+                latent_dim, net_hidden_layers, net_hidden_dim
+            )
+        ]
+
+    node_dimensions = {
+        0: 16,
+        1: 16,
+        2: 16,
+    }
+    edge_list = [(1, 2)]
+    noise_means = {
+        0: torch.zeros(16),
+        1: torch.zeros(16),
+        2: torch.zeros(16),
+    }
+    noise_variances = {
+        0: torch.ones(16),
+        1: torch.ones(16),
+        2: torch.ones(16),
+    }
+    intervened_node_means = [{2: torch.ones(16) + 2}, {2: torch.ones(16) + 4}]
+    intervened_node_vars = [{2: torch.ones(16)}, {2: torch.ones(16) + 2}]
+
+    confounded_list = []
+    # independent noise with causal prior
+    q0 = LinearGaussianDag(
+        node_dimensions=node_dimensions,
+        edge_list=edge_list,
+        noise_means=noise_means,
+        noise_variances=noise_variances,
+        confounded_list=confounded_list,
+        intervened_node_means=intervened_node_means,
+        intervened_node_vars=intervened_node_vars,
+    )
+
+    # Construct flow model with the multiscale architecture
+    model = CausalNormalizingFlow(q0, flows)
+    return model
 
 
 if __name__ == "__main__":
@@ -170,36 +221,46 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    root = Path("/Users/adam2392/pytorch_data/celeba")
-    root = Path("/home/adam2392/projects/data/")
-
-    checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
-    checkpoint_dir.mkdir(parents=True, exist_ok=True)
-
     latent_dim = 24
     batch_size = 256
-    model_fname = "celeba_vaereduction_batch256_latentdim24_v2.pt"
+    model_fname = "celeba_nfonvaereduction_batch256_latentdim48_v1.pt"
 
-    max_epochs = 1000
+    max_epochs = 2000
     lr = 3e-4
     lr_min = 1e-8
     lr_scheduler = "cosine"
+    max_norm = 1.0  # Threshold for gradient norm clipping
     debug = False
     num_workers = 6
     graph_type = "chain"
 
     torch.set_float32_matmul_precision("high")
+
+    if debug:
+        root = Path("/Users/adam2392/pytorch_data/celeba")
+    else:
+        root = Path("/home/adam2392/projects/data/")
+
+    # checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
+    checkpoint_dir = root / "CausalCelebA" / "nf_on_vae_reduction" / "latentdim48"
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    vae_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim48"
+    vae_model_fname = "model_epoch_100.pt"
+    vae_model = VAE().to(device)
+    model_path = vae_dir / vae_model_fname
+    vae_model = load_model(vae_model, model_path, device)
     if debug:
         accelerator = "cpu"
         # device = 'cpu'
         max_epochs = 5
-        batch_size = 16
+        batch_size = 256
         check_samples_every_n_epoch = 1
         num_workers = 2
 
         fast_dev = True
 
-    model = VAE(LATENT_DIM=latent_dim)
+    model = make_nf_model(debug=debug)
     model = model.to(device)
     image_dim = 3 * 64 * 64
 
@@ -236,23 +297,32 @@ if __name__ == "__main__":
         # Training phase
         model.train()
         train_loss = 0.0
-        for batch_idx, (images, meta_labels, targets) in tqdm(
+        for batch_idx, (images, distr_idx, targets, meta_labels) in tqdm(
             enumerate(train_loader), desc="step", position=1, leave=False
         ):
             torch.cuda.empty_cache()
             images = images.to(device)
             optimizer.zero_grad()
-            reconstructed, latent_mu, latent_logvar = model(
-                images
-            )  # Model forward pass
 
-            # Clamp logvar to prevent numerical instability
-            latent_logvar = torch.clamp_(latent_logvar, -10, 10)
+            # compute negative log likelihood via the forward pass
+            # if debug:
+            # print('in training loop... ')
+            # print(len(meta_labels))
+            # print(meta_labels[0].shape)
+            # print(distr_idx)
+            # print(images.shape)
 
-            loss = loss_function(
-                reconstructed, images, latent_mu, latent_logvar, image_dim=image_dim
-            )  # Custom VAE loss function
+            # extract data from tensor to Parameterdict
+            loss = model.forward_kld(
+                images, intervention_targets=targets, distr_idx=distr_idx
+            )
+
+            # backward pass
             loss.backward()
+
+            # Gradient clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+
             optimizer.step()
 
             train_loss += loss.item()
@@ -273,17 +343,21 @@ if __name__ == "__main__":
                 f"Saving images - Epoch [{epoch}/{max_epochs}], Train Loss: {train_loss:.4f}"
             )
 
-            # Sample and save reconstructed images
-            sample_images = images[:8]  # Pick 8 images for sampling
-            reconstructed_images = model.decode(model.encode(sample_images)[0]).reshape(
-                -1, 3, 64, 64
-            )
-            save_image(
-                reconstructed_images.cpu(),
-                checkpoint_dir / f"epoch_{epoch}_samples.png",
-                nrow=4,
-                normalize=True,
-            )
+            # sample images from normalizing flow
+            for distr_idx in train_loader.dataset.distr_idx_list:
+                sample_embeddings, _ = model.sample(8, distr_idx=distr_idx)
+
+                # reconstruct images
+                reconstructed_images = vae_model.decode(sample_embeddings).reshape(
+                    -1, 3, 64, 64
+                )
+
+                save_image(
+                    reconstructed_images.cpu(),
+                    checkpoint_dir / f"epoch_{epoch}_distr-{distr_idx}_samples.png",
+                    nrow=4,
+                    normalize=True,
+                )
 
         # Track top 5 models based on validation loss
         if epoch % 5 == 0:
@@ -296,6 +370,6 @@ if __name__ == "__main__":
 
     # Usage example:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    vae_model = VAE().to(device)
-    model_path = checkpoint_dir / "final_vaereduction_model.pt"
-    vae_model = load_model(vae_model, model_path, device)
+    nf_model = model.to(device)
+    model_path = checkpoint_dir / "final_nf_model.pt"
+    nf_model = load_model(nf_model, model_path, device)

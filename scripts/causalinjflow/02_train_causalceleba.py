@@ -8,10 +8,11 @@ import torch
 import torch.nn as nn
 from lightning.pytorch.callbacks import ModelCheckpoint
 from torchvision import transforms
-from ciflows.datasets.lightning import MultiDistrDataModule, DatasetName
-from ciflows.distributions.linear import ClusteredLinearGaussianDistribution
+
+from ciflows.datasets.lightning import DatasetName, MultiDistrDataModule
 from ciflows.flows import TwoStageTraining, plCausalInjFlowModel
-from ciflows.flows.glow import GlowBlock, InjectiveGlowBlock, ReshapeFlow, Squeeze
+from ciflows.flows.glow import (GlowBlock, InjectiveGlowBlock, ReshapeFlow,
+                                Squeeze)
 
 
 def get_inj_model(input_shape):
@@ -359,7 +360,7 @@ if __name__ == "__main__":
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
     # convnet restart = v2, whcih was good
     model_name = "16dimlatent_10layerneuralspline_twostage_batch256_gradclip1_causalceleba_nottrainableq0_nstepsmse10_v2"
-    checkpoint_dir = root / 'CausalCelebA' / "results" / model_name
+    checkpoint_dir = root / "CausalCelebA" / "results" / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
     train_from_checkpoint = False
 
@@ -388,13 +389,13 @@ if __name__ == "__main__":
     print()
     # demo to load dataloader. please make sure transform is None. d
     transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Resize((64, 64)),
-                # discretize,
-                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-            ]
-        )
+        [
+            transforms.ToTensor(),
+            transforms.Resize((64, 64)),
+            # discretize,
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        ]
+    )
     data_module = MultiDistrDataModule(
         root=root,
         graph_type=graph_type,
@@ -491,7 +492,9 @@ if __name__ == "__main__":
 
         test_latent_tensor = torch.randn(2, n_chs * latent_size * latent_size)
         print(test_latent_tensor.shape)
-        test_sample = model.inj_model.forward(model.bij_model.forward(test_latent_tensor))
+        test_sample = model.inj_model.forward(
+            model.bij_model.forward(test_latent_tensor)
+        )
         print(test_sample.shape)
         print("Test passed!")
 

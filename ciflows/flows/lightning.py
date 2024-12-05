@@ -45,9 +45,7 @@ class TwoStageTraining(Callback):
             # trainer.optimizer_frequencies = [] # or optimizers frequencies if you have any
 
 
-import torch
 from torchvision.utils import make_grid
-import matplotlib.pyplot as plt
 
 
 # Function to log images
@@ -473,7 +471,7 @@ class plCausalInjFlowModel(pl.LightningModule):
 
         if (
             # not self.debug
-            # and 
+            # and
             self.n_steps_mse is not None
             and self.current_epoch < self.n_steps_mse
         ):
@@ -566,7 +564,7 @@ class plCausalInjFlowModel(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         x, meta_labels, targets = batch
         distr_idx = meta_labels[-2]
-        
+
         if self.n_steps_mse is not None and self.current_epoch < self.n_steps_mse:
             v_latent = self.inj_model.inverse(x)
             x_reconstructed = self.inj_model.forward(v_latent)
