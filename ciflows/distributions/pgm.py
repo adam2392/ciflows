@@ -238,7 +238,6 @@ class LinearGaussianDag(MultidistrCausalFlow):
         return x
 
     def _tensor_to_dict(self, x):
-        # dataset = TensorDict()
         dataset = dict()
         start = 0
         for node, node_dim in self.node_dimensions.items():
@@ -327,7 +326,7 @@ class LinearGaussianDag(MultidistrCausalFlow):
                         node
                     ].items():
                         node_noise_var += confounder_var
-                node_noise_std = torch.sqrt(torch.tensor(node_noise_var))
+                node_noise_std = torch.sqrt(node_noise_var)
                 # Combine all contributions to compute the node's conditional mean
                 conditional_mean = (
                     parent_contributions + confounder_contributions + noise_mean

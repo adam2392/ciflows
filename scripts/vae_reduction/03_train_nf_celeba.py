@@ -231,7 +231,7 @@ if __name__ == "__main__":
     lr_scheduler = "cosine"
     max_norm = 1.0  # Threshold for gradient norm clipping
     debug = False
-    num_workers = 6
+    num_workers = 10
     graph_type = "chain"
 
     torch.set_float32_matmul_precision("high")
@@ -300,17 +300,9 @@ if __name__ == "__main__":
         for batch_idx, (images, distr_idx, targets, meta_labels) in tqdm(
             enumerate(train_loader), desc="step", position=1, leave=False
         ):
-            torch.cuda.empty_cache()
+            # torch.cuda.empty_cache()
             images = images.to(device)
             optimizer.zero_grad()
-
-            # compute negative log likelihood via the forward pass
-            # if debug:
-            # print('in training loop... ')
-            # print(len(meta_labels))
-            # print(meta_labels[0].shape)
-            # print(distr_idx)
-            # print(images.shape)
 
             # extract data from tensor to Parameterdict
             loss = model.forward_kld(

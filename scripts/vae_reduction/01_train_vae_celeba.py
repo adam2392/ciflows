@@ -297,5 +297,5 @@ if __name__ == "__main__":
     # Usage example:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     vae_model = VAE().to(device)
-    model_path = checkpoint_dir / "final_vaereduction_model.pt"
+    model_path = checkpoint_dir / model_fname
     vae_model = load_model(vae_model, model_path, device)
