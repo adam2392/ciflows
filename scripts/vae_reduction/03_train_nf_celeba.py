@@ -151,7 +151,7 @@ def make_nf_model(debug=False):
         net_hidden_layers = 2
         net_hidden_dim = 64
     else:
-        K = 32
+        K = 8
         net_hidden_layers = 3
         net_hidden_dim = 64
 
@@ -223,7 +223,10 @@ if __name__ == "__main__":
 
     latent_dim = 24
     batch_size = 256
-    model_fname = "celeba_nfonvaereduction_batch256_latentdim48_v1.pt"
+
+    # v1: K=32
+    # v2: K=8
+    model_fname = "celeba_nfonvaereduction_batch256_latentdim48_v2.pt"
 
     max_epochs = 2000
     lr = 3e-4
