@@ -1,11 +1,11 @@
 from pathlib import Path
+
+import lightning as pl
+import numpy as np
 import torch
 from torchvision import transforms
 from torchvision.utils import save_image
-from PIL import Image
-import os
-import numpy as np
-import lightning as pl
+
 from ciflows.datasets.causalceleba_scm.pretrained import MultiTaskResNet
 from ciflows.eval import load_model
 
@@ -76,7 +76,7 @@ if __name__ == "__main__":
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
     )
-    
+
     # Observational setting:
     # U_{g,a} = U[0, 1]
     # P(gender == male) = U_{g,a}

@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import lightning as pl
@@ -6,17 +5,16 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.utils import save_image
 from tqdm import tqdm
-from torch.utils.data import random_split
 
 from ciflows.datasets.causalceleba import CausalCelebA
 from ciflows.datasets.multidistr import StratifiedSampler
+from ciflows.eval import load_model
 from ciflows.reduction.vae import VAE
 from ciflows.training import TopKModelSaver
-from ciflows.eval import load_model
 
 
 class EarlyStopping:
@@ -89,13 +87,21 @@ def data_loader(
         causal_celeba_dataset, [train_len, val_len]
     )
 
-    distr_labels = [x[1][-1] for x in causal_celeba_dataset]
+    distr_labels = [x[1][-1] for x in train_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
         raise ValueError(
             f"Batch size must be at least {unique_distrs} for stratified sampling."
         )
     train_sampler = StratifiedSampler(distr_labels, batch_size)
+
+    distr_labels = [x[1][-1] for x in val_dataset]
+    unique_distrs = len(np.unique(distr_labels))
+    if batch_size < unique_distrs:
+        raise ValueError(
+            f"Batch size must be at least {unique_distrs} for stratified sampling."
+        )
+    val_sampler = StratifiedSampler(distr_labels, batch_size)
 
     # Define the DataLoader
     train_loader = DataLoader(
@@ -111,6 +117,7 @@ def data_loader(
         dataset=val_dataset,
         batch_size=batch_size,
         shuffle=False,  # Do not shuffle data during validation
+        sampler=val_sampler,
         num_workers=num_workers // 2,
         pin_memory=True,  # Enable if using a GPU
     )
@@ -147,14 +154,13 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    root = Path("/Users/adam2392/pytorch_data/celeba")
-    root = Path("/home/adam2392/projects/data/")
-
+    root = Path("/Users/adam2392/pytorch_data/")
+    # root = Path("/home/adam2392/projects/data/")
 
     latent_dim = 48
     batch_size = 256
     model_fname = "celeba_vaereduction_batch256_latentdim48_img128_v1.pt"
-    
+
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
@@ -253,7 +259,8 @@ if __name__ == "__main__":
 
         val_loss = 0.0
         with torch.no_grad():
-            for val_images, target in val_loader:
+            for batch_idx, (val_images, meta_labels, targets) in enumerate(val_loader):
+                val_images = val_images.to(device)
                 reconstructed, latent_mu, latent_logvar = model(
                     val_images
                 )  # Model forward pass

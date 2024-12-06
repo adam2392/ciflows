@@ -14,10 +14,10 @@ from tqdm import tqdm
 from ciflows.datasets.causalceleba import CausalCelebAEmbedding
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.distributions.pgm import LinearGaussianDag
+from ciflows.eval import load_model
 from ciflows.flows.model import CausalNormalizingFlow
 from ciflows.reduction.vae import VAE
 
-from ciflows.eval import load_model
 
 class TopKModelSaver:
     def __init__(self, save_dir, k=5):
@@ -79,7 +79,6 @@ class TopKModelSaver:
             if os.path.exists(filename):
                 os.remove(filename)
                 print(f"Removed worse model {filename}")
-
 
 
 def data_loader(
