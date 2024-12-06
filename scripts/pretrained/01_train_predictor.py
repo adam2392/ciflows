@@ -206,6 +206,11 @@ if __name__ == "__main__":
         avg_train_acc_hair = acc_hair.compute()
         avg_train_acc_age = acc_age.compute()
 
+        lr = scheduler.get_last_lr()[0]
+        print(
+            f"====> Epoch: {epoch} Average train loss: {avg_train_loss:.4f}, LR: {lr:.6f}"
+        )
+
         # Log training results to TensorBoard
         writer.add_scalar("train_loss", avg_train_loss, epoch)
         writer.add_scalar("train_acc_gender", avg_train_acc_gender, epoch)
@@ -273,6 +278,10 @@ if __name__ == "__main__":
             writer.add_scalar("val_acc_hair", avg_val_acc_hair, epoch)
             writer.add_scalar("val_acc_age", avg_val_acc_age, epoch)
 
+            print(
+                f"====> Epoch: {epoch} Average Val loss: {avg_val_loss:.4f} Val Acc (Gender): {avg_val_acc_gender:.4f}"
+            )
+
         # Reset metrics for the next epoch
         acc_gender.reset()
         acc_hair.reset()
@@ -281,9 +290,7 @@ if __name__ == "__main__":
         print(
             f"====> Epoch {epoch+1}/{max_epochs}, "
             f"Train Loss: {avg_train_loss:.4f}, "
-            f"Val Loss: {avg_val_loss:.4f}, "
             f"Train Acc (Gender): {avg_train_acc_gender:.4f}, "
-            f"Val Acc (Gender): {avg_val_acc_gender:.4f}"
         )
 
         # Track top 5 models based on validation loss

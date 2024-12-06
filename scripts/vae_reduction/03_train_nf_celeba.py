@@ -322,6 +322,7 @@ if __name__ == "__main__":
         scheduler.step()
 
         train_loss /= len(train_loader)
+        lr = scheduler.get_last_lr()[0]
         print(f"====> Epoch: {epoch} Average loss: {train_loss:.4f}, LR: {lr:.6f}")
 
         # Validation phase
@@ -331,7 +332,7 @@ if __name__ == "__main__":
         if debug or epoch % 10 == 0:
             print()
             print(
-                f"Saving images - Epoch [{epoch}/{max_epochs}], Train Loss: {train_loss:.4f}"
+                f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}"
             )
 
             # sample images from normalizing flow

@@ -253,6 +253,7 @@ if __name__ == "__main__":
         scheduler.step()
 
         train_loss /= len(train_loader)
+        lr = scheduler.get_last_lr()[0]
         print(
             f"====> Epoch: {epoch} Average Train loss: {train_loss:.4f}, LR: {lr:.6f}"
         )
