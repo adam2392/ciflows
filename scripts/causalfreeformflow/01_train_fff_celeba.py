@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+from torch import nn
 import lightning as pl
 import normflows as nf
 import numpy as np
@@ -16,12 +17,41 @@ from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.eval import load_model
 from ciflows.training import TopKModelSaver
-from ciflows.flows.model import CausalNormalizingFlow
 from ciflows.reduction.vae import VAE
 from ciflows.loss import volume_change_surrogate
+from ciflows.resnet_celeba import ResNetCelebA, ResNetCelebADecoder, ResNetCelebAEncoder
 
 
-def compute_loss(model, x, distr_idx, beta):
+class Freeformflow(nn.Module):
+    def __init__(
+        self,
+        encoder: ResNetCelebAEncoder,
+        decoder: ResNetCelebADecoder,
+        latent: LinearGaussianDag,
+    ) -> None:
+        super(Freeformflow, self).__init__()
+
+        self.encoder = encoder
+        self.decoder = decoder
+        self.latent = latent
+        self.latent_dim = encoder.latent_dim
+
+    def forward(self, x):
+        z = self.encoder(x)
+        return self.decoder(z)
+
+    def encode(self, x):
+        return self.encoder(x)
+
+    def decode(self, z):
+        return self.decoder(z)
+
+    def sample(self, num_samples, distr_idx=None):
+        z = self.latent.sample(num_samples, distr_idx=distr_idx)
+        return self.decoder(z), z
+
+
+def compute_loss(model: Freeformflow, x, distr_idx, beta):
     # calculate volume change surrogate loss
     surrogate_loss, v_hat, x_hat = volume_change_surrogate(
         images, model.encoder, model.decoder, hutchinson_samples=hutchinson_samples
@@ -31,7 +61,7 @@ def compute_loss(model, x, distr_idx, beta):
     loss_reconstruction = torch.nn.functional.mse_loss(x_hat, x)
 
     # get negative log likelihoood over the distributions
-    embed_dim = model.decoder.embed_dim
+    embed_dim = model.decoder.latent_dim
     v_hat = v_hat.view(-1, embed_dim)
     loss_nll = (
         -model.latent.log_prob(v_hat, distr_idx=distr_idx).mean() - surrogate_loss
@@ -51,9 +81,7 @@ def data_loader(
     # Define the image transformations
     image_transform = transforms.Compose(
         [
-            transforms.Resize(
-                (img_size, img_size), antialias=True
-            ),  # Resize images to 128x128
+            transforms.Resize((img_size, img_size)),  # Resize images to 128x128
             transforms.CenterCrop(img_size),  # Ensure square crop
             transforms.ToTensor(),  # Convert images to PyTorch tensors
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
@@ -98,28 +126,7 @@ def data_loader(
     return train_loader
 
 
-def make_nf_model(debug=False):
-    """Make normalizing flow model."""
-    # Define list of flows
-    if debug:
-        K = 2
-        net_hidden_layers = 2
-        net_hidden_dim = 64
-    else:
-        K = 8
-        net_hidden_layers = 3
-        net_hidden_dim = 64
-
-    latent_dim = 48
-
-    flows = []
-    for i in range(K):
-        flows += [
-            nf.flows.AutoregressiveRationalQuadraticSpline(
-                latent_dim, net_hidden_layers, net_hidden_dim
-            )
-        ]
-
+def make_fff_model(debug=False):
     node_dimensions = {
         0: 16,
         1: 16,
@@ -139,9 +146,11 @@ def make_nf_model(debug=False):
     intervened_node_means = [{2: torch.ones(16) + 2}, {2: torch.ones(16) + 4}]
     intervened_node_vars = [{2: torch.ones(16)}, {2: torch.ones(16) + 2}]
 
+    latent_dim = 48
+
     confounded_list = []
     # independent noise with causal prior
-    q0 = LinearGaussianDag(
+    latent = LinearGaussianDag(
         node_dimensions=node_dimensions,
         edge_list=edge_list,
         noise_means=noise_means,
@@ -151,13 +160,12 @@ def make_nf_model(debug=False):
         intervened_node_vars=intervened_node_vars,
     )
 
-    # Construct flow model with the multiscale architecture
-    model = CausalNormalizingFlow(q0, flows)
+    # define the encoder and decoder
+    encoder = ResNetCelebAEncoder(latent_dim=latent_dim)
+    decoder = ResNetCelebADecoder(latent_dim=latent_dim)
+    model = Freeformflow(encoder, decoder, latent=latent)
     return model
 
-
-def make_fff_model(debug=False):
-    pass
 
 if __name__ == "__main__":
     seed = 1234
@@ -180,18 +188,28 @@ if __name__ == "__main__":
     print(f"Using accelerator: {accelerator}")
 
     batch_size = 256
-    hutchinson_samples = 2
-    beta = torch.tensor(10.0).to(device)
     img_size = 128
-
     max_epochs = 2000
     lr = 3e-4
     lr_min = 1e-8
     lr_scheduler = "cosine"
     max_norm = 1.0  # Threshold for gradient norm clipping
-    debug = False
-    num_workers = 10
+    debug = True
+    num_workers = 4
     graph_type = "chain"
+
+    if debug:
+        accelerator = "cpu"
+        device = "cpu"
+        max_epochs = 5
+        batch_size = 8
+        check_samples_every_n_epoch = 1
+        num_workers = 2
+
+        fast_dev = True
+
+    hutchinson_samples = 2
+    beta = torch.tensor(10.0).to(device)
 
     torch.set_float32_matmul_precision("high")
 
@@ -203,35 +221,18 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfonvaereduction_batch1024_latentdim48_v2.pt"
+    model_fname = "celeba_fff_batch256_latentdim48_v1.pt"
 
     # checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
-    checkpoint_dir = (
-        root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split(".")[0]
-    )
+    checkpoint_dir = root / "CausalCelebA" / "fff" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    vae_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim48"
-    vae_model_fname = "model_epoch_100.pt"
-    vae_model = VAE().to(device)
-    model_path = vae_dir / vae_model_fname
-    vae_model = load_model(vae_model, model_path, device)
-    if debug:
-        accelerator = "cpu"
-        # device = 'cpu'
-        max_epochs = 5
-        batch_size = 256
-        check_samples_every_n_epoch = 1
-        num_workers = 2
-
-        fast_dev = True
-
-    model = make_nf_model(debug=debug)
+    model = make_fff_model(debug=debug)
     model = model.to(device)
     image_dim = 3 * img_size * img_size
 
     # compile the model
-    model = torch.compile(model)
+    # model = torch.compile(model)
 
     # print the number of parameters in the model
     print(sum(p.numel() for p in model.parameters()) / 1e6, "M parameters")
@@ -282,6 +283,11 @@ if __name__ == "__main__":
             loss, loss_reconstruction, loss_nll, surrogate_loss = compute_loss(
                 model, images, distr_idx, beta
             )
+
+            loss = loss.mean()
+            loss_reconstruction = loss_reconstruction.mean()
+            loss_nll = loss_nll.mean()
+            surrogate_loss = surrogate_loss.mean()
 
             # backward pass
             loss.backward()

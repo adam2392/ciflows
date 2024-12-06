@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Directory containing the Python script
-SCRIPT_NAME="01_train_basic_models.py"
-SCRIPT_NAME="02_train_causalceleba.py"
+SCRIPT_NAME="01_train_fff_celeba.py"
+
 
 LOG_DIR="/home/adam2392/projects/logs/"
 
@@ -33,7 +33,7 @@ CMD="python3 $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 
 # Optionally, you can use a job scheduler like `nohup` to run the command in the background
 # or `&` to run the command in the background
-LOG_FILE="16dimlatent_10layerneuralspline_twostage_batch256_gradclip1_causalcelebadim128_nstepsmse10_v2_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
+LOG_FILE="celeba_fff_batch256_latentdim48_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
 nohup $CMD > $LOG_FILE 2>&1 &
 
 echo $TRAINING_SEED

@@ -128,6 +128,7 @@ class CausalCelebA(Dataset):
         img = PIL.Image.open(filename)
 
         meta_label = self.causal_main_df.iloc[index]
+        distr_idx = meta_label["distr_idx"]
 
         # XXX: only can handle one type of intervention
         target = self.intervention_targets[index]
@@ -140,7 +141,7 @@ class CausalCelebA(Dataset):
         if self.transform is not None:
             img = self.transform(img)
 
-        return img, meta_label, target
+        return img, distr_idx, target, meta_label
 
     @property
     def meta_label_strs(self):

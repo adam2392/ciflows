@@ -18,17 +18,20 @@ class ResBlock(nn.Module):
         return F.relu(out + identity)
 
 
-class ResNetCelebA(nn.Module):
+class ResNetCelebAEncoder(nn.Module):
     def __init__(self, latent_dim):
-        super(ResNetCelebA, self).__init__()
+        super(ResNetCelebAEncoder, self).__init__()
 
-        # Encoder
+        self.latent_dim = latent_dim
+
         self.encoder = nn.Sequential(
             nn.Conv2d(3, 64, kernel_size=4, stride=2, padding=1),  # (64, 32, 32)
             nn.ReLU(),
             nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1),  # (128, 16, 16)
             nn.ReLU(),
-            nn.Conv2d(128, 128, kernel_size=3, stride=2, padding=1),  # (128, 8, 8)    # added to make 128x128
+            nn.Conv2d(
+                128, 128, kernel_size=3, stride=2, padding=1
+            ),  # (128, 8, 8)    # added to make 128x128
             nn.ReLU(),
             nn.Conv2d(128, 128, kernel_size=3, stride=2, padding=1),  # (128, 8, 8)
             nn.ReLU(),
@@ -37,10 +40,21 @@ class ResNetCelebA(nn.Module):
             ResBlock(128, 32, 128),
             ResBlock(128, 32, 128),
         )
-        self.fc1 = nn.Linear(128 * 4 * 4, latent_dim)  # To latent_dim
+        self.fc = nn.Linear(128 * 4 * 4, latent_dim)
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = x.view(x.size(0), -1)
+        return self.fc(x)
+
+
+class ResNetCelebADecoder(nn.Module):
+    def __init__(self, latent_dim):
+        super(ResNetCelebADecoder, self).__init__()
+
+        self.latent_dim = latent_dim
 
         # Decoder
-        self.fc2 = nn.Linear(latent_dim, 128 * 4 * 4)  # From latent_dim
         self.decoder = nn.Sequential(
             nn.ConvTranspose2d(
                 128, 128, kernel_size=3, stride=2, padding=1, output_padding=1
@@ -66,15 +80,57 @@ class ResNetCelebA(nn.Module):
             nn.Sigmoid(),
         )
 
-    def encode(self, x):
-        x = self.encoder(x)
-        x = x.view(x.size(0), -1)
-        return self.fc1(x)
+        self.fc = nn.Linear(latent_dim, 128 * 4 * 4)  # From latent_dim
 
-    def decode(self, z):
-        x = self.fc2(z)
+    def forward(self, x):
+        x = self.fc(x)
         x = x.view(x.size(0), 128, 4, 4)
         return self.decoder(x)
+
+
+class ResNetCelebA(nn.Module):
+    def __init__(self, latent_dim):
+        super(ResNetCelebA, self).__init__()
+
+        # Encoder
+        self.encoder = ResNetCelebAEncoder(latent_dim=latent_dim)
+        # Decoder
+        self.decoder = ResNetCelebADecoder(latent_dim=latent_dim)
+        # self.fc2 = nn.Linear(latent_dim, 128 * 4 * 4)  # From latent_dim
+        # self.decoder = nn.Sequential(
+        #     nn.ConvTranspose2d(
+        #         128, 128, kernel_size=3, stride=2, padding=1, output_padding=1
+        #     ),  # (128, 8, 8)
+        #     nn.ReLU(),
+        #     ResBlock(128, 32, 128),
+        #     ResBlock(128, 32, 128),
+        #     nn.ConvTranspose2d(
+        #         128, 128, kernel_size=4, stride=2, padding=1, output_padding=0
+        #     ),  # (128, 16, 16)
+        #     nn.ReLU(),  # added to make 128x128
+        #     nn.ConvTranspose2d(
+        #         128, 64, kernel_size=5, stride=2, padding=2, output_padding=1
+        #     ),  # (64, 16, 16)
+        #     nn.ReLU(),
+        #     nn.ConvTranspose2d(
+        #         64, 64, kernel_size=5, stride=2, padding=2, output_padding=1
+        #     ),  # (64, 32, 32)
+        #     nn.ReLU(),
+        #     nn.ConvTranspose2d(
+        #         64, 3, kernel_size=4, stride=2, padding=1
+        #     ),  # (3, 64, 64)
+        #     nn.Sigmoid(),
+        # )
+
+    def encode(self, x):
+        return self.encoder(x)
+        # x = x.view(x.size(0), -1)
+        # return self.fc1(x)
+
+    def decode(self, z):
+        # x = self.fc2(z)
+        # x = x.view(x.size(0), 128, 4, 4)
+        return self.decoder(z)
 
     def forward(self, x):
         z = self.encode(x)
