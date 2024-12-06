@@ -154,8 +154,11 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    root = Path("/Users/adam2392/pytorch_data/")
-    # root = Path("/home/adam2392/projects/data/")
+    debug = False
+    if debug:
+        root = Path("/Users/adam2392/pytorch_data/")
+    else:
+        root = Path("/home/adam2392/projects/data/")
 
     latent_dim = 48
     batch_size = 256
@@ -168,7 +171,6 @@ if __name__ == "__main__":
     lr = 3e-4
     lr_min = 1e-8
     lr_scheduler = "cosine"
-    debug = False
     num_workers = 4
     graph_type = "chain"
 
