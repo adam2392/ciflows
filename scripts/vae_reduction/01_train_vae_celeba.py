@@ -2,6 +2,7 @@ from pathlib import Path
 
 import lightning as pl
 import numpy as np
+from torch import nn
 import torch
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -15,6 +16,20 @@ from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
 from ciflows.reduction.vae import VAE
 from ciflows.training import TopKModelSaver
+
+
+def weights_init(m):
+    if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+        nn.init.kaiming_normal_(m.weight, nonlinearity="leaky_relu")
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0)
+    elif isinstance(m, nn.Linear):
+        nn.init.xavier_normal_(m.weight)
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0)
+    elif isinstance(m, nn.BatchNorm2d):
+        nn.init.constant_(m.weight, 1)
+        nn.init.constant_(m.bias, 0)
 
 
 class EarlyStopping:
@@ -62,7 +77,7 @@ def data_loader(
     image_transform = transforms.Compose(
         [
             transforms.Resize(
-                (img_size, img_size), antialias=True
+                (img_size, img_size)
             ),  # Resize images to 128x128
             transforms.CenterCrop(img_size),  # Ensure square crop
             transforms.ToTensor(),  # Convert images to PyTorch tensors
@@ -163,7 +178,8 @@ if __name__ == "__main__":
 
     latent_dim = 48
     batch_size = 256
-    model_fname = "celeba_vaereduction_batch256_latentdim48_img128_v1.pt"
+    # v2 = xavier init and no antialias
+    model_fname = "celeba_vaereduction_batch256_latentdim48_img128_v2.pt"
 
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -187,6 +203,7 @@ if __name__ == "__main__":
         fast_dev = True
 
     model = VAE(LATENT_DIM=latent_dim)
+    model.apply(weights_init)
     model = model.to(device)
     img_size = 128
     image_dim = 3 * img_size * img_size

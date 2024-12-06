@@ -12,8 +12,7 @@ from torchvision import transforms
 from ciflows.datasets.lightning import DatasetName, MultiDistrDataModule
 from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.flows import TwoStageTraining, plCausalInjFlowModel
-from ciflows.flows.glow import (GlowBlock, InjectiveGlowBlock, ReshapeFlow,
-                                Squeeze)
+from ciflows.flows.glow import GlowBlock, InjectiveGlowBlock, ReshapeFlow, Squeeze
 from ciflows.flows.model import CausalNormalizingFlow
 
 

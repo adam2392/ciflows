@@ -1,9 +1,8 @@
 #!/bin/bash
 
 # Directory containing the Python script
-SCRIPT_NAME="01_train_vae_celeba.py"
-# SCRIPT_NAME="02_train_approx_models.py"
-# SCRIPT_NAME="03_train_nf_celeba.py"
+SCRIPT_NAME="01_train_basic_models.py"
+SCRIPT_NAME="02_train_causalceleba.py"
 
 LOG_DIR="/home/adam2392/projects/logs/"
 
@@ -18,13 +17,12 @@ NUM_GPUS=8
 # Define the training seeds from 1 to 100
 training_seeds=($(seq 4 4))
 
-
 # TRAINING_SEED=$(expr ${training_seeds[$i]} \* 20)
 TRAINING_SEED=0
 
 # Calculate the GPU index to use for this job
 # GPU_INDEX=$(((({TRAINING_SEED[$i]}) % $NUM_GPUS) + 1))
-GPU_INDEX=0
+GPU_INDEX=1
 
 # Set the environment variable for the GPU
 # export CUDA_VISIBLE_DEVICES=$GPU_INDEX,$((GPU_INDEX + 1))
@@ -35,7 +33,7 @@ CMD="python3 $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 
 # Optionally, you can use a job scheduler like `nohup` to run the command in the background
 # or `&` to run the command in the background
-LOG_FILE="celeba_vaereduction_batch256_latentdim48_img128_v2_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
+LOG_FILE="16dimlatent_10layerneuralspline_twostage_batch256_gradclip1_causalcelebadim128_nstepsmse10_v2_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
 nohup $CMD > $LOG_FILE 2>&1 &
 
 echo $TRAINING_SEED
