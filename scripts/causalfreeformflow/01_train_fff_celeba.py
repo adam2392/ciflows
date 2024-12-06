@@ -30,7 +30,7 @@ def compute_loss(model, x, distr_idx, beta):
     # compute reconstruction loss
     loss_reconstruction = torch.nn.functional.mse_loss(x_hat, x)
 
-    # get negative log likelihoood
+    # get negative log likelihoood over the distributions
     embed_dim = model.decoder.embed_dim
     v_hat = v_hat.view(-1, embed_dim)
     loss_nll = (
@@ -155,6 +155,9 @@ def make_nf_model(debug=False):
     model = CausalNormalizingFlow(q0, flows)
     return model
 
+
+def make_fff_model(debug=False):
+    pass
 
 if __name__ == "__main__":
     seed = 1234

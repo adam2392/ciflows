@@ -28,6 +28,8 @@ class ResNetCelebA(nn.Module):
             nn.ReLU(),
             nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1),  # (128, 16, 16)
             nn.ReLU(),
+            nn.Conv2d(128, 128, kernel_size=3, stride=2, padding=1),  # (128, 8, 8)    # added to make 128x128
+            nn.ReLU(),
             nn.Conv2d(128, 128, kernel_size=3, stride=2, padding=1),  # (128, 8, 8)
             nn.ReLU(),
             nn.Conv2d(128, 128, kernel_size=3, stride=2, padding=1),  # (128, 4, 4)
@@ -46,6 +48,10 @@ class ResNetCelebA(nn.Module):
             nn.ReLU(),
             ResBlock(128, 32, 128),
             ResBlock(128, 32, 128),
+            nn.ConvTranspose2d(
+                128, 128, kernel_size=4, stride=2, padding=1, output_padding=0
+            ),  # (128, 16, 16)
+            nn.ReLU(),  # added to make 128x128
             nn.ConvTranspose2d(
                 128, 64, kernel_size=5, stride=2, padding=2, output_padding=1
             ),  # (64, 16, 16)
@@ -78,7 +84,7 @@ class ResNetCelebA(nn.Module):
 if __name__ == "__main__":
     # Example usage
     model = ResNetCelebA(latent_dim=16 * 3)
-    x = torch.randn(16, 3, 64, 64)  # Batch of 16 images
+    x = torch.randn(16, 3, 128, 128)  # Batch of 16 images
     output = model(x)
     print(output.shape)  # Should be (16, 3, 64, 64)
 

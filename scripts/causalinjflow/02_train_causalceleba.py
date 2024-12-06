@@ -18,7 +18,7 @@ from ciflows.flows.model import CausalNormalizingFlow
 
 def get_inj_model(input_shape):
     use_lu = True
-    gamma = 1e-6
+    gamma = 1e-3
     activation = "linear"
     dropout_probability = 0.2
 
@@ -427,6 +427,7 @@ if __name__ == "__main__":
         [
             transforms.ToTensor(),
             transforms.Resize((image_size, image_size)),
+            transforms.CenterCrop(image_size),
             # discretize,
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]
