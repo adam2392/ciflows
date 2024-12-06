@@ -74,6 +74,7 @@ def data_loader(
         root=root_dir,
         graph_type=graph_type,
         transform=image_transform,
+        img_size=img_size,
         fast_dev_run=False,  # Set to True for debugging
     )
 
