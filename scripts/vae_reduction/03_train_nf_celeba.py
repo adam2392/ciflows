@@ -17,6 +17,7 @@ from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.flows.model import CausalNormalizingFlow
 from ciflows.reduction.vae import VAE
 
+from ciflows.eval import load_model
 
 class TopKModelSaver:
     def __init__(self, save_dir, k=5):
@@ -79,15 +80,6 @@ class TopKModelSaver:
                 os.remove(filename)
                 print(f"Removed worse model {filename}")
 
-
-def load_model(model, model_path, device):
-    """Load a model's weights from a saved file with device compatibility."""
-    # Map to the desired device (CPU or GPU)
-    state_dict = torch.load(model_path, map_location=device)
-    model.load_state_dict(state_dict)
-    model.eval()  # Set to evaluation mode
-    print(f"Model loaded from {model_path}")
-    return model
 
 
 def data_loader(
@@ -235,7 +227,7 @@ if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
 
     if debug:
-        root = Path("/Users/adam2392/pytorch_data/celeba")
+        root = Path("/Users/adam2392/pytorch_data/")
     else:
         root = Path("/home/adam2392/projects/data/")
 
@@ -371,5 +363,5 @@ if __name__ == "__main__":
     # Usage example:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     nf_model = model.to(device)
-    model_path = checkpoint_dir / "final_nf_model.pt"
+    model_path = checkpoint_dir / model_fname
     nf_model = load_model(nf_model, model_path, device)

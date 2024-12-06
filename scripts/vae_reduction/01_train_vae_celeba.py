@@ -10,82 +10,46 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision.utils import save_image
 from tqdm import tqdm
+from torch.utils.data import random_split
 
 from ciflows.datasets.causalceleba import CausalCelebA
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.reduction.vae import VAE
+from ciflows.training import TopKModelSaver
+from ciflows.eval import load_model
 
 
-class TopKModelSaver:
-    def __init__(self, save_dir, k=5):
-        self.save_dir = save_dir
-        self.k = k
-        self.best_models = []  # List of tuples (loss, model_state_dict, epoch)
+class EarlyStopping:
+    def __init__(self, patience=5, delta=0, verbose=False):
+        """
+        Args:
+            patience (int): How long to wait after last improvement.
+            delta (float): Minimum change to qualify as an improvement.
+            path (str): File path to save the best model.
+            verbose (bool): If True, prints a message when an improvement occurs.
+        """
+        self.patience = patience
+        self.delta = delta
+        self.verbose = verbose
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+        self.val_loss_min = float("inf")
 
-        # Ensure the save directory exists
-        os.makedirs(save_dir, exist_ok=True)
+    def __call__(self, val_loss, model):
+        score = -val_loss  # Negative because lower validation loss is better.
 
-    def check(self, loss):
-        """Determine if the current model's loss is worth saving."""
-        # Check if the current model's loss should be saved
-        if len(self.best_models) < self.k:
-            return True  # If we have fewer than k models, always save the model
+        if self.best_score is None:
+            self.best_score = score
+        elif score < self.best_score + self.delta:
+            self.counter += 1
+            if self.verbose:
+                print(f"EarlyStopping counter: {self.counter} out of {self.patience}")
+            if self.counter >= self.patience:
+                self.early_stop = True
         else:
-            # If the current loss is better than the worst model's loss, return True
-            if loss < self.best_models[-1][0]:
-                return True
-            else:
-                return False
-
-    def save_model(self, model, epoch, loss):
-        """Save the model if it's among the top-k based on the training loss."""
-        # First, check if the model should be saved
-        if self.check(loss):
-            # If we have fewer than k models, simply append the model
-            if len(self.best_models) < self.k:
-                self.best_models.append((loss, epoch))
-            else:
-                # If the current loss is better than the worst model, replace it
-                self.best_models.append((loss, epoch))
-
-            # Sort by loss (ascending order) and remove worse models if necessary
-            self.best_models.sort(key=lambda x: x[0])  # Sort by loss (ascending)
-
-            # Save the model
-            self._save_model(model, epoch, loss)
-
-            # Remove worse models if there are more than k models
-            self.remove_worse_models()
-
-    def _save_model(self, model, epoch, loss):
-        """Helper function to save the model to disk."""
-        filename = os.path.join(self.save_dir, f"model_epoch_{epoch}.pt")
-        # Save the model state_dict
-        torch.save(model.state_dict(), filename)
-        print(f"Saved model to {filename}")
-
-    def remove_worse_models(self):
-        """Remove the worse models if there are more than k models."""
-        # Ensure the list is sorted by the loss (ascending order)
-        self.best_models.sort(key=lambda x: x[0])  # Sort by loss (ascending)
-
-        # Remove models beyond the top-k
-        while len(self.best_models) > self.k:
-            loss, epoch = self.best_models.pop()
-            filename = os.path.join(self.save_dir, f"model_epoch_{epoch}.pt")
-            if os.path.exists(filename):
-                os.remove(filename)
-                print(f"Removed worse model {filename}")
-
-
-def load_model(model, model_path, device):
-    """Load a model's weights from a saved file with device compatibility."""
-    # Map to the desired device (CPU or GPU)
-    state_dict = torch.load(model_path, map_location=device)
-    model.load_state_dict(state_dict)
-    model.eval()  # Set to evaluation mode
-    print(f"Model loaded from {model_path}")
-    return model
+            self.best_score = score
+            self.counter = 0
 
 
 def data_loader(
@@ -93,12 +57,16 @@ def data_loader(
     graph_type="chain",
     num_workers=4,
     batch_size=32,
+    val_split=0.2,
+    img_size=64,
 ):
     # Define the image transformations
     image_transform = transforms.Compose(
         [
-            transforms.Resize((64, 64), antialias=True),  # Resize images to 128x128
-            transforms.CenterCrop(64),  # Ensure square crop
+            transforms.Resize(
+                (img_size, img_size), antialias=True
+            ),  # Resize images to 128x128
+            transforms.CenterCrop(img_size),  # Ensure square crop
             transforms.ToTensor(),  # Convert images to PyTorch tensors
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]
@@ -112,12 +80,14 @@ def data_loader(
     )
 
     # Calculate the number of samples for training and validation
-    # total_len = len(causal_celeba_dataset)
-    # val_len = int(total_len * val_split)
-    # train_len = total_len - val_len
+    total_len = len(causal_celeba_dataset)
+    val_len = int(total_len * val_split)
+    train_len = total_len - val_len
 
-    # # Split the dataset into train and validation sets
-    # train_dataset, val_dataset = random_split(causal_celeba_dataset, [train_len, val_len])
+    # Split the dataset into train and validation sets
+    train_dataset, val_dataset = random_split(
+        causal_celeba_dataset, [train_len, val_len]
+    )
 
     distr_labels = [x[1][-1] for x in causal_celeba_dataset]
     unique_distrs = len(np.unique(distr_labels))
@@ -129,7 +99,7 @@ def data_loader(
 
     # Define the DataLoader
     train_loader = DataLoader(
-        dataset=causal_celeba_dataset,
+        dataset=train_dataset,
         batch_size=batch_size,
         sampler=train_sampler,
         drop_last=True,
@@ -137,8 +107,15 @@ def data_loader(
         num_workers=num_workers,
         pin_memory=True,  # Enable if using a GPU
     )
+    val_loader = DataLoader(
+        dataset=val_dataset,
+        batch_size=batch_size,
+        shuffle=False,  # Do not shuffle data during validation
+        num_workers=num_workers,
+        pin_memory=True,  # Enable if using a GPU
+    )
 
-    return train_loader
+    return train_loader, val_loader
 
 
 # Reconstruction + KL divergence losses summed over all elements and batch
@@ -173,12 +150,13 @@ if __name__ == "__main__":
     root = Path("/Users/adam2392/pytorch_data/celeba")
     root = Path("/home/adam2392/projects/data/")
 
-    checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
-    checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    latent_dim = 24
+    latent_dim = 48
     batch_size = 256
-    model_fname = "celeba_vaereduction_batch256_latentdim24_v2.pt"
+    model_fname = "celeba_vaereduction_batch256_latentdim48_img128_v1.pt"
+    
+    checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / model_fname.split(".")[0]
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     max_epochs = 1000
     lr = 3e-4
@@ -201,7 +179,8 @@ if __name__ == "__main__":
 
     model = VAE(LATENT_DIM=latent_dim)
     model = model.to(device)
-    image_dim = 3 * 64 * 64
+    img_size = 128
+    image_dim = 3 * img_size * img_size
 
     # print the number of parameters in the model
     print(sum(p.numel() for p in model.parameters()) / 1e6, "M parameters")
@@ -218,12 +197,16 @@ if __name__ == "__main__":
         checkpoint_dir, k=5
     )  # Initialize the top-k model saver
 
-    train_loader = data_loader(
+    train_loader, val_loader = data_loader(
         root_dir=root,
         graph_type=graph_type,
         num_workers=num_workers,
         batch_size=batch_size,
+        img_size=img_size,
     )
+
+    patience = 10
+    early_stopping = EarlyStopping(patience=patience, verbose=True)
 
     # training loop
     # - log the train and val loss every 10 epochs
@@ -261,10 +244,30 @@ if __name__ == "__main__":
         scheduler.step()
 
         train_loss /= len(train_loader)
-        print(f"====> Epoch: {epoch} Average loss: {train_loss:.4f}, LR: {lr:.6f}")
+        print(
+            f"====> Epoch: {epoch} Average Train loss: {train_loss:.4f}, LR: {lr:.6f}"
+        )
 
         # Validation phase
         model.eval()
+
+        val_loss = 0.0
+        with torch.no_grad():
+            for val_images, target in val_loader:
+                reconstructed, latent_mu, latent_logvar = model(
+                    val_images
+                )  # Model forward pass
+
+                loss = loss_function(
+                    reconstructed,
+                    val_images,
+                    latent_mu,
+                    latent_logvar,
+                    image_dim=image_dim,
+                )  # Custom VAE loss function
+                val_loss += loss.item()
+        val_loss /= len(val_loader)
+        print(f"====> Epoch: {epoch} Average Val loss: {val_loss:.4f}")
 
         # Log training and validation loss
         if debug or epoch % 10 == 0:
@@ -288,7 +291,13 @@ if __name__ == "__main__":
         # Track top 5 models based on validation loss
         if epoch % 5 == 0:
             # Optionally, remove worse models if there are more than k saved models
-            top_k_saver.save_model(model, epoch, train_loss)
+            top_k_saver.save_model(model, epoch, val_loss)
+
+        # Check early stopping
+        early_stopping(val_loss, model)
+        if early_stopping.early_stop:
+            print("Early stopping triggered!")
+            break
 
     # Save final model
     torch.save(model.state_dict(), checkpoint_dir / model_fname)

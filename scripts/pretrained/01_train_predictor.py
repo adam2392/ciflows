@@ -51,6 +51,7 @@ if __name__ == "__main__":
         root = Path("/Users/adam2392/pytorch_data/")
     else:
         root = Path("/home/adam2392/projects/data/")
+        # root = Path("/Users/adam2392/pytorch_data/")
 
     # v1: K=32
     # v2: K=8
@@ -117,7 +118,7 @@ if __name__ == "__main__":
 
     # Initialize the model, optimizer, and scheduler
     model = MultiTaskResNet().to(device)
-    # model = torch.compile(model)
+    model = torch.compile(model)
 
     optimizer = optim.AdamW(model.parameters(), lr=lr)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
