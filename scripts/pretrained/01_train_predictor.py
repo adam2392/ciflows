@@ -42,7 +42,7 @@ if __name__ == "__main__":
     lr_min = 1e-8
     max_norm = 1.0  # Threshold for gradient norm clipping
     debug = False
-    num_workers = 10
+    num_workers = 6
     graph_type = "chain"
 
     torch.set_float32_matmul_precision("high")
@@ -103,7 +103,7 @@ if __name__ == "__main__":
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=num_workers,
+        num_workers=num_workers // 2,
         persistent_workers=False,
     )
 
