@@ -10,9 +10,11 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from torchvision import transforms
 
 from ciflows.datasets.lightning import DatasetName, MultiDistrDataModule
+from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.flows import TwoStageTraining, plCausalInjFlowModel
 from ciflows.flows.glow import (GlowBlock, InjectiveGlowBlock, ReshapeFlow,
                                 Squeeze)
+from ciflows.flows.model import CausalNormalizingFlow
 
 
 def get_inj_model(input_shape):
@@ -24,9 +26,9 @@ def get_inj_model(input_shape):
     net_actnorm = False
     # n_hidden_list = [32, 64, 128, 256, 256, 256]
     n_hidden = 32
-    n_glow_blocks = 5
-    n_mixing_layers = 4
-    n_injective_layers = 8
+    n_glow_blocks = 3
+    n_mixing_layers = 5
+    n_injective_layers = 10
     n_layers = n_mixing_layers + n_injective_layers
 
     # hidden layers for the AutoregressiveRationalQuadraticSpline
@@ -198,6 +200,36 @@ def get_bij_model(
     #     hard_interventions_per_distr=None,
     #     confounded_variables=confounded_variables,
     # )
+    node_dimensions = {
+        0: 16,
+        1: 16,
+        2: 16,
+    }
+    edge_list = [(1, 2)]
+    noise_means = {
+        0: torch.zeros(16),
+        1: torch.zeros(16),
+        2: torch.zeros(16),
+    }
+    noise_variances = {
+        0: torch.ones(16),
+        1: torch.ones(16),
+        2: torch.ones(16),
+    }
+    intervened_node_means = [{2: torch.ones(16) + 2}, {2: torch.ones(16) + 4}]
+    intervened_node_vars = [{2: torch.ones(16)}, {2: torch.ones(16) + 2}]
+
+    confounded_list = []
+    # independent noise with causal prior
+    q0 = LinearGaussianDag(
+        node_dimensions=node_dimensions,
+        edge_list=edge_list,
+        noise_means=noise_means,
+        noise_variances=noise_variances,
+        confounded_list=confounded_list,
+        intervened_node_means=intervened_node_means,
+        intervened_node_vars=intervened_node_vars,
+    )
 
     split_mode = "checkerboard"
 
@@ -261,7 +293,8 @@ def get_bij_model(
             shape_out=(n_chs, latent_size, latent_size),
         )
     ]
-    model = nf.NormalizingFlow(q0=q0, flows=flows)
+    # model = nf.NormalizingFlow(q0=q0, flows=flows)
+    model = CausalNormalizingFlow(q0=q0, flows=flows)
 
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(pytorch_total_params)
@@ -313,9 +346,10 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    debug = False
+    debug = True
     fast_dev = False
-    input_shape = (3, 64, 64)
+    image_size = 128
+    input_shape = (3, image_size, image_size)
     max_epochs = 2000
     batch_size = 256
     devices = 1
@@ -353,14 +387,16 @@ if __name__ == "__main__":
     cluster_sizes = [16, 16, 16]
 
     # output filename for the results
-    root = Path("/Users/adam2392/pytorch_data/celeba")
-    root = Path("/home/adam2392/projects/data/")
+    if debug:
+        root = Path("/Users/adam2392/pytorch_data/")
+    else:
+        root = Path("/home/adam2392/projects/data/")
 
     # v2 = trainable q0
     # v3 = also make 512 latent dim, and fix initialization of coupling to 1.0 standard deviation
     # convnet restart = v2, whcih was good
-    model_name = "16dimlatent_10layerneuralspline_twostage_batch256_gradclip1_causalceleba_nottrainableq0_nstepsmse10_v2"
-    checkpoint_dir = root / "CausalCelebA" / "results" / model_name
+    model_name = "16dimlatent_10layerneuralspline_twostage_batch256_gradclip1_causalcelebadim128_nstepsmse10_v2"
+    checkpoint_dir = root / "CausalCelebA" / "causalinjflow" / model_name
     checkpoint_dir.mkdir(exist_ok=True, parents=True)
     train_from_checkpoint = False
 
@@ -391,7 +427,7 @@ if __name__ == "__main__":
     transform = transforms.Compose(
         [
             transforms.ToTensor(),
-            transforms.Resize((64, 64)),
+            transforms.Resize((image_size, image_size)),
             # discretize,
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]

@@ -2,25 +2,12 @@ import os
 import re
 from copy import copy
 from pathlib import Path
-from pprint import pprint
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-from albumentations import (
-    CoarseDropout,
-    Compose,
-    ElasticTransform,
-    GridDistortion,
-    HorizontalFlip,
-    OneOf,
-    RandomBrightnessContrast,
-    HueSaturationValue,
-    GaussianBlur,
-    Perspective,
-    RandomCrop,
-)
+from albumentations import (CoarseDropout, Compose, HorizontalFlip,
+                            OneOf, RandomCrop)
 from albumentations.pytorch import ToTensorV2
 from PIL import Image
 from torchvision import transforms

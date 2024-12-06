@@ -61,6 +61,7 @@ class MultiDistrDataModule(pl.LightningDataModule):
         root,
         graph_type,
         batch_size: int,
+        img_size: int = 64,
         stratify_distrs: bool = True,
         num_workers: int = -1,
         train_size: float = 0.8,
@@ -76,6 +77,7 @@ class MultiDistrDataModule(pl.LightningDataModule):
         self.dataset_name = dataset_name
         self.log_dir = Path(log_dir) if log_dir is not None else log_dir
 
+        self.img_size = img_size
         self.stratify_distrs = stratify_distrs
         self.train_size = train_size
         self.val_size = val_size
@@ -108,6 +110,7 @@ class MultiDistrDataModule(pl.LightningDataModule):
                 root=self.root,
                 graph_type=self.graph_type,
                 transform=self.transform,
+                img_size=self.img_size,
                 fast_dev_run=self.fast_dev_run,
             )
 
