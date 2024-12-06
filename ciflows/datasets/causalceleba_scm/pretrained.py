@@ -1,11 +1,13 @@
 import lightning as pl
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 import torchvision
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision.datasets import CelebA
+from torchvision.models.resnet import ResNet18_Weights
 
 
 # Replace the fully connected layer with task-specific classifiers
@@ -13,7 +15,7 @@ class MultiTaskResNet(nn.Module):
     def __init__(self):
         super(MultiTaskResNet, self).__init__()
         # Load pretrained ResNet-18 model
-        base_model = torchvision.models.resnet18(pretrained=True)
+        base_model = torchvision.models.resnet18(weights=ResNet18_Weights.DEFAULT)
 
         # Freeze pretrained weights (optional, depending on dataset size and training strategy)
         for param in base_model.parameters():
@@ -41,12 +43,22 @@ class MultiTaskResNet(nn.Module):
         x = self.features(x)
         x = torch.flatten(x, 1)  # Flatten the features
 
-        # Task-specific outputs
-        gender_out = self.fc_gender(x)
-        hair_out = self.fc_hair(x)
-        age_out = self.fc_age(x)
+        # Task-specific logits
+        gender_logits = self.fc_gender(x)
+        hair_logits = self.fc_hair(x)
+        age_logits = self.fc_age(x)
 
-        return gender_out, hair_out, age_out
+        # Compute probabilities from logits
+        gender_probs = F.softmax(gender_logits, dim=1)  # Probabilities for gender
+        hair_probs = F.softmax(hair_logits, dim=1)  # Probabilities for hair
+        age_probs = F.softmax(age_logits, dim=1)  # Probabilities for age
+
+        return (
+            (gender_logits, gender_probs),
+            (hair_logits, hair_probs),
+            (age_logits, age_probs),
+        )
+        # return gender_out, hair_out, age_out
 
 
 class PredictorPipeline(pl.LightningModule):
