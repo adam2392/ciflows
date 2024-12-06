@@ -213,7 +213,7 @@ if __name__ == "__main__":
         img_size=img_size,
     )
 
-    patience = 10
+    patience = 50
     early_stopping = EarlyStopping(patience=patience, verbose=True)
 
     # training loop
@@ -303,10 +303,10 @@ if __name__ == "__main__":
             top_k_saver.save_model(model, epoch, val_loss)
 
         # Check early stopping
-        early_stopping(val_loss, model)
-        if early_stopping.early_stop:
-            print("Early stopping triggered!")
-            break
+        # early_stopping(val_loss, model)
+        # if early_stopping.early_stop:
+        #     print("Early stopping triggered!")
+        #     break
 
     # Save final model
     torch.save(model.state_dict(), checkpoint_dir / model_fname)

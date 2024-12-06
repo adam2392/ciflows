@@ -35,7 +35,7 @@ class VAE(nn.Module):
     def __init__(self, LATENT_DIM=48):
         super(VAE, self).__init__()
 
-        hidden_dims = [32, 64, 128, 256, 512]
+        hidden_dims = [32, 64, 128, 256, 512, 1024]
         self.final_dim = hidden_dims[-1]
         in_channels = 3
         modules = []
