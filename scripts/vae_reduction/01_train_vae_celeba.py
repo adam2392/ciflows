@@ -76,9 +76,7 @@ def data_loader(
     # Define the image transformations
     image_transform = transforms.Compose(
         [
-            transforms.Resize(
-                (img_size, img_size)
-            ),  # Resize images to 128x128
+            transforms.Resize((img_size, img_size)),  # Resize images to 128x128
             transforms.CenterCrop(img_size),  # Ensure square crop
             transforms.ToTensor(),  # Convert images to PyTorch tensors
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
@@ -177,9 +175,9 @@ if __name__ == "__main__":
         root = Path("/home/adam2392/projects/data/")
 
     latent_dim = 48
-    batch_size = 256
+    batch_size = 128
     # v2 = xavier init and no antialias
-    model_fname = "celeba_vaereduction_batch256_latentdim48_img128_v2.pt"
+    model_fname = "celeba_vaereduction_batch128_latentdim48_img128_v3.pt"
 
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -248,7 +246,6 @@ if __name__ == "__main__":
         for batch_idx, (images, meta_labels, targets) in tqdm(
             enumerate(train_loader), desc="step", position=1, leave=False
         ):
-            torch.cuda.empty_cache()
             images = images.to(device)
             optimizer.zero_grad()
             reconstructed, latent_mu, latent_logvar = model(
@@ -306,9 +303,10 @@ if __name__ == "__main__":
 
             # Sample and save reconstructed images
             sample_images = images[:8]  # Pick 8 images for sampling
-            reconstructed_images = model.decode(model.encode(sample_images)[0]).reshape(
-                -1, 3, 64, 64
-            )
+            with torch.no_grad():
+                reconstructed_images = model.decode(
+                    model.encode(sample_images)[0]
+                ).reshape(-1, 3, 64, 64)
             save_image(
                 reconstructed_images.cpu(),
                 checkpoint_dir / f"epoch_{epoch}_samples.png",
