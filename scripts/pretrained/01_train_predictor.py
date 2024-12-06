@@ -229,7 +229,19 @@ if __name__ == "__main__":
             val_loss = 0.0
             with torch.no_grad():
                 for batch_idx, (images, labels) in enumerate(val_loader):
-                    gender, hair, age = labels["gender"], labels["hair"], labels["age"]
+                    images = images.to(device)
+                    labels = labels.to(device)
+                    gender, hair, age = (
+                        labels[:, gender_idx],
+                        labels[:, hair_cols],
+                        labels[:, age_idx],
+                    )
+
+                    # 0: black
+                    # 1: blond
+                    # 2: brown
+                    # 3: gray
+                    hair = torch.argmax(hair, axis=1)
 
                     # Forward pass
                     (
