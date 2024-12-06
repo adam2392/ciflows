@@ -36,6 +36,7 @@ if __name__ == "__main__":
     print(f"Using accelerator: {accelerator}")
 
     batch_size = 256
+    image_size = 64
 
     max_epochs = 1000
     lr = 3e-4
@@ -77,8 +78,8 @@ if __name__ == "__main__":
     # Data preparation and augmentation
     transform = transforms.Compose(
         [
-            transforms.Resize((64, 64)),
-            transforms.CenterCrop(64),
+            transforms.Resize((image_size, image_size)),
+            transforms.CenterCrop(image_size),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
@@ -288,5 +289,5 @@ if __name__ == "__main__":
     # Usage example:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     nf_model = model.to(device)
-    model_path = checkpoint_dir / "final_nf_model.pt"
+    model_path = checkpoint_dir / model_fname
     nf_model = load_model(nf_model, model_path, device)
