@@ -111,7 +111,7 @@ def data_loader(
         dataset=val_dataset,
         batch_size=batch_size,
         shuffle=False,  # Do not shuffle data during validation
-        num_workers=num_workers,
+        num_workers=num_workers // 2,
         pin_memory=True,  # Enable if using a GPU
     )
 
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     lr_min = 1e-8
     lr_scheduler = "cosine"
     debug = False
-    num_workers = 6
+    num_workers = 4
     graph_type = "chain"
 
     torch.set_float32_matmul_precision("high")
