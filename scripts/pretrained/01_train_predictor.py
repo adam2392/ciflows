@@ -44,7 +44,7 @@ if __name__ == "__main__":
     debug = False
     num_workers = 6
     graph_type = "chain"
-
+    check_samples_every_n_epoch = 5
     torch.set_float32_matmul_precision("high")
 
     if debug:
