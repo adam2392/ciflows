@@ -24,8 +24,8 @@ def get_inj_model(input_shape):
 
     net_actnorm = False
     # n_hidden_list = [32, 64, 128, 256, 256, 256]
-    n_hidden = 32
-    n_glow_blocks = 3
+    n_hidden = 128
+    n_glow_blocks = 2
     n_mixing_layers = 5
     n_injective_layers = 10
     n_layers = n_mixing_layers + n_injective_layers
