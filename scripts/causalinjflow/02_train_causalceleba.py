@@ -346,7 +346,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    debug = True
+    debug = False
     fast_dev = False
     image_size = 128
     input_shape = (3, image_size, image_size)
