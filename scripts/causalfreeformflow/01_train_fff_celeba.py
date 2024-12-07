@@ -17,9 +17,8 @@ from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.eval import load_model
 from ciflows.training import TopKModelSaver
-from ciflows.reduction.vae import VAE
 from ciflows.loss import volume_change_surrogate
-from ciflows.resnet_celeba import ResNetCelebA, ResNetCelebADecoder, ResNetCelebAEncoder
+from ciflows.resnet_celeba import ResNetCelebADecoder, ResNetCelebAEncoder
 
 
 class Freeformflow(nn.Module):
@@ -223,7 +222,6 @@ if __name__ == "__main__":
     # v3: K=8, batch higher
     model_fname = "celeba_fff_batch256_latentdim48_v1.pt"
 
-    # checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
     checkpoint_dir = root / "CausalCelebA" / "fff" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
@@ -328,12 +326,8 @@ if __name__ == "__main__":
 
             # sample images from normalizing flow
             for distr_idx in train_loader.dataset.distr_idx_list:
-                sample_embeddings, _ = model.sample(8, distr_idx=distr_idx)
-
                 # reconstruct images
-                reconstructed_images = vae_model.decode(sample_embeddings).reshape(
-                    -1, 3, 64, 64
-                )
+                reconstructed_images, _ = model.sample(8, distr_idx=distr_idx)[0]
 
                 save_image(
                     reconstructed_images.cpu(),
