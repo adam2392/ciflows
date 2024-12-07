@@ -2,7 +2,7 @@
 
 # Directory containing the Python script
 SCRIPT_NAME="01_train_basic_models.py"
-SCRIPT_NAME="02_train_approx_models.py"
+# SCRIPT_NAME="02_train_approx_models.py"
 
 LOG_DIR="/home/adam2392/projects/logs/"
 
@@ -23,7 +23,7 @@ TRAINING_SEED=0
 
 # Calculate the GPU index to use for this job
 # GPU_INDEX=$(((({TRAINING_SEED[$i]}) % $NUM_GPUS) + 1))
-GPU_INDEX=2
+GPU_INDEX=0
 
 # Set the environment variable for the GPU
 # export CUDA_VISIBLE_DEVICES=$GPU_INDEX,$((GPU_INDEX + 1))
@@ -34,7 +34,7 @@ CMD="python3 $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 
 # Optionally, you can use a job scheduler like `nohup` to run the command in the background
 # or `&` to run the command in the background
-LOG_FILE="validate_injflow_twostage_mnist_${SCRIPT_NAME}_seed_${TRAINING_SEED}.log"
+LOG_FILE="16dimlatent_adamw_unet_injflow_10layerneuralspline_twostage_batch256_gradclip1_mnist_nottrainableq0_nstepsmse10_v1_${SCRIPT_NAME}_seed_${TRAINING_SEED}.log"
 nohup $CMD > $LOG_FILE 2>&1 &
 
 echo $TRAINING_SEED
