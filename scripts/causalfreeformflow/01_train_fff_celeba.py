@@ -220,7 +220,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_fff_batch256_latentdim48_v1.pt"
+    model_fname = "celeba_fff_batch256_latentdim48_v2.pt"
 
     checkpoint_dir = root / "CausalCelebA" / "fff" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
