@@ -15,6 +15,7 @@ from ciflows.datasets.causalceleba import CausalCelebA
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
 from ciflows.reduction.vae import VAE
+from ciflows.reduction.better_vae import VAEUNet
 from ciflows.training import TopKModelSaver
 
 
@@ -101,7 +102,7 @@ def data_loader(
         causal_celeba_dataset, [train_len, val_len]
     )
 
-    distr_labels = [x[1][-1] for x in train_dataset]
+    distr_labels = [x[1] for x in train_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
         raise ValueError(
@@ -109,7 +110,7 @@ def data_loader(
         )
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
-    distr_labels = [x[1][-1] for x in val_dataset]
+    distr_labels = [x[1] for x in val_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
         raise ValueError(
@@ -177,7 +178,7 @@ if __name__ == "__main__":
     latent_dim = 48
     batch_size = 128
     # v2 = xavier init and no antialias
-    model_fname = "celeba_vaereduction_batch128_latentdim48_img128_v3.pt"
+    model_fname = "celeba_vaeunetreduction_batch128_latentdim48_img128_v1.pt"
 
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -200,7 +201,14 @@ if __name__ == "__main__":
 
         fast_dev = True
 
-    model = VAE(LATENT_DIM=latent_dim)
+    # model = VAE(LATENT_DIM=latent_dim)
+    in_channels = 3
+    out_channels = 3
+    latent_dim = 48
+    # Create the model
+    model = VAEUNet(
+        in_channels=in_channels, out_channels=out_channels, latent_dim=latent_dim
+    )
     model.apply(weights_init)
     model = model.to(device)
     img_size = 128
@@ -335,6 +343,8 @@ if __name__ == "__main__":
 
     # Usage example:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    vae_model = VAE().to(device)
+    vae_model = VAEUNet(
+        in_channels=in_channels, out_channels=out_channels, latent_dim=latent_dim
+    ).to(device)
     model_path = checkpoint_dir / model_fname
     vae_model = load_model(vae_model, model_path, device)
