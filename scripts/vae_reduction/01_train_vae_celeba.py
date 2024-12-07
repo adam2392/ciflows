@@ -306,9 +306,13 @@ if __name__ == "__main__":
             with torch.no_grad():
                 reconstructed_images = model.decode(
                     model.encode(sample_images)[0]
-                ).reshape(-1, 3, 64, 64)
+                ).reshape(-1, 3, image_dim, image_dim)
+            sample_images = torch.cat(
+                (sample_images.cpu(), reconstructed_images.cpu()), dim=0
+            )
             save_image(
-                reconstructed_images.cpu(),
+                # reconstructed_images.cpu(),
+                sample_images,
                 checkpoint_dir / f"epoch_{epoch}_samples.png",
                 nrow=4,
                 normalize=True,
