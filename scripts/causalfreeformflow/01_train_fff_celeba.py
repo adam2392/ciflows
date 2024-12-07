@@ -119,7 +119,7 @@ def data_loader(
         drop_last=True,
         # shuffle=True,  # Shuffle data during training
         num_workers=num_workers,
-        pin_memory=True,  # Enable if using a GPU
+        # pin_memory=True,  # Enable if using a GPU
     )
 
     return train_loader
