@@ -124,7 +124,7 @@ class MultiDistrDataModule(pl.LightningDataModule):
         ) = random_split(self.dataset, [train_size, val_size, test_size])
 
         if self.stratify_distrs:
-            distr_labels = [x[1][-1] for x in self.train_dataset]
+            distr_labels = [x[1] for x in self.train_dataset]
             unique_distrs = len(np.unique(distr_labels))
             if self.batch_size < unique_distrs:
                 raise ValueError(
