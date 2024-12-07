@@ -134,7 +134,7 @@ def data_loader(
         shuffle=False,  # Do not shuffle data during validation
         sampler=val_sampler,
         num_workers=num_workers // 2,
-        pin_memory=True,  # Enable if using a GPU
+        # pin_memory=True,  # Enable if using a GPU
     )
 
     return train_loader, val_loader
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     lr = 3e-4
     lr_min = 1e-8
     lr_scheduler = "cosine"
-    num_workers = 4
+    num_workers = 3
     graph_type = "chain"
 
     torch.set_float32_matmul_precision("high")
