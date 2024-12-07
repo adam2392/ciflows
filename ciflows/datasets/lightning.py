@@ -132,7 +132,7 @@ class MultiDistrDataModule(pl.LightningDataModule):
                 )
             self.train_sampler = StratifiedSampler(distr_labels, self.batch_size)
 
-            distr_labels = [x[1][-1] for x in self.val_dataset]
+            distr_labels = [x[1] for x in self.val_dataset]
             unique_distrs = len(np.unique(distr_labels))
             if self.batch_size < unique_distrs:
                 raise ValueError(
