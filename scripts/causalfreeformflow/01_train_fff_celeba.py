@@ -194,7 +194,7 @@ if __name__ == "__main__":
     lr_scheduler = "cosine"
     max_norm = 1.0  # Threshold for gradient norm clipping
     debug = False
-    num_workers = 2
+    num_workers = 1
     graph_type = "chain"
 
     if debug:
