@@ -284,7 +284,9 @@ if __name__ == "__main__":
 
         val_loss = 0.0
         with torch.no_grad():
-            for batch_idx, (val_images, meta_labels, targets) in enumerate(val_loader):
+            for batch_idx, (val_images, distr_idx, targets, meta_labels) in enumerate(
+                val_loader
+            ):
                 val_images = val_images.to(device)
                 reconstructed, latent_mu, latent_logvar = model(
                     val_images
