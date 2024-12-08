@@ -250,7 +250,7 @@ if __name__ == "__main__":
         # Training phase
         model.train()
         train_loss = 0.0
-        for batch_idx, (images, meta_labels, targets) in tqdm(
+        for batch_idx, (images, distr_idx, targets, meta_labels) in tqdm(
             enumerate(train_loader), desc="step", position=1, leave=False
         ):
             images = images.to(device)

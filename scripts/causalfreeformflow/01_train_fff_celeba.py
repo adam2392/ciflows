@@ -310,7 +310,7 @@ if __name__ == "__main__":
         train_surrogate_loss /= len(train_loader)
         lr = scheduler.get_last_lr()[0]
         print(
-            f"====> Epoch: {epoch} Average loss: {train_loss:.4f}, LR: {lr:.6f}"
+            f"====> Epoch: {epoch} Average loss: {train_loss:.4f}, LR: {lr:.6f} "
             f"Reconstruction Loss: {train_reconstruction_loss:.4f}, NLL Loss: {train_nll_loss:.4f}, Surrogate Loss: {train_surrogate_loss:.4f}"
         )
 
@@ -327,7 +327,7 @@ if __name__ == "__main__":
             # sample images from normalizing flow
             for distr_idx in train_loader.dataset.distr_idx_list:
                 # reconstruct images
-                reconstructed_images, _ = model.sample(8, distr_idx=distr_idx)[0]
+                reconstructed_images, _ = model.sample(8, distr_idx=distr_idx)
 
                 save_image(
                     reconstructed_images.cpu(),
