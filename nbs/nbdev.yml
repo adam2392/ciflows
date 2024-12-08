@@ -1,9 +1,0 @@
-project:
-  output-dir: _docs
-
-website:
-  title: "ciflows"
-  site-url: "https://adam2392.github.io/ciflows"
-  description: "Causal injective flows"
-  repo-branch: main
-  repo-url: "https://github.com/adam2392/ciflows"
