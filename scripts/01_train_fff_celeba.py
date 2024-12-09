@@ -290,7 +290,7 @@ if __name__ == "__main__":
     image_dim = 3 * img_size * img_size
 
     # compile the model
-    # model = torch.compile(model)
+    model = torch.compile(model)
 
     # print the number of parameters in the model
     print(sum(p.numel() for p in model.parameters()) / 1e6, "M parameters")
@@ -339,7 +339,12 @@ if __name__ == "__main__":
 
             # compute the loss
             loss, loss_reconstruction, loss_nll, surrogate_loss = compute_loss(
-                model, images, distr_idx, beta, causal=causal
+                model,
+                images,
+                distr_idx,
+                beta,
+                causal=causal,
+                hutchinson_samples=hutchinson_samples,
             )
 
             loss = loss.mean()

@@ -176,8 +176,8 @@ if __name__ == "__main__":
         root = Path("/home/adam2392/projects/data/")
 
     latent_dim = 48
-    batch_size = 128
-    model_fname = "celeba_vaereduction_batch128_latentdim48_img128_v1.pt"
+    batch_size = 512
+    model_fname = "celeba_vaereduction_batch512_latentdim48_img128_v1.pt"
 
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
