@@ -190,6 +190,7 @@ if __name__ == "__main__":
     lr_scheduler = "cosine"
     num_workers = 4
     graph_type = "chain"
+    max_norm = 2.0
 
     torch.set_float32_matmul_precision("high")
     if debug:
@@ -206,6 +207,7 @@ if __name__ == "__main__":
     in_channels = 3
     out_channels = 3
     latent_dim = 48
+
     # Create the model
     model = VAEUNet(
         in_channels=in_channels, out_channels=out_channels, latent_dim=latent_dim
@@ -268,6 +270,10 @@ if __name__ == "__main__":
                 reconstructed, images, latent_mu, latent_logvar, image_dim=image_dim
             )  # Custom VAE loss function
             loss.backward()
+
+            # Gradient clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+
             optimizer.step()
 
             train_loss += loss.item()
