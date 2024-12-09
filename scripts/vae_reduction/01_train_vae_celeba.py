@@ -143,7 +143,8 @@ def data_loader(
 
 # Reconstruction + KL divergence losses summed over all elements and batch
 def loss_function(recon_x, x, mu, log_var, image_dim):
-    MSE = F.mse_loss(recon_x, x.view(-1, image_dim))
+    # print(recon_x.shape, x.shape)
+    MSE = F.mse_loss(recon_x.view(-1, image_dim), x.view(-1, image_dim))
     KLD = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
     kld_weight = 0.00025
     loss = MSE + kld_weight * KLD
@@ -271,6 +272,9 @@ if __name__ == "__main__":
 
             train_loss += loss.item()
 
+            if debug:
+                break
+
         # Step the scheduler at the end of the epoch
         scheduler.step()
 
@@ -301,6 +305,9 @@ if __name__ == "__main__":
                     image_dim=image_dim,
                 )  # Custom VAE loss function
                 val_loss += loss.item()
+
+                if debug:
+                    break
         val_loss /= len(val_loader)
         print(f"====> Epoch: {epoch} Average Val loss: {val_loss:.4f}")
 
@@ -314,10 +321,17 @@ if __name__ == "__main__":
             # Sample and save reconstructed images
             sample_images = images[:8]  # Pick 8 images for sampling
             with torch.no_grad():
-                mean_encoding = model.encode(sample_images)[0]
-                reconstructed_images = model.decode(mean_encoding).reshape(
+                # VAE Unet
+                mean_encoding, _, skips = model.encode(sample_images)
+                reconstructed_images = model.decode(mean_encoding, skips).reshape(
                     -1, 3, img_size, img_size
                 )
+
+                # Standard VAE
+                # mean_encoding, _ = model.encode(sample_images)
+                # reconstructed_images = model.decode(mean_encoding).reshape(
+                #     -1, 3, img_size, img_size
+                # )
             sample_images = torch.cat(
                 (sample_images.cpu(), reconstructed_images.cpu()), dim=0
             )
@@ -346,9 +360,9 @@ if __name__ == "__main__":
 
     # Usage example:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    vae_model = VAE().to(device)
-    # vae_model = VAEUNet(
-    #     in_channels=in_channels, out_channels=out_channels, latent_dim=latent_dim
-    # ).to(device)
+    # vae_model = VAE().to(device)
+    vae_model = VAEUNet(
+        in_channels=in_channels, out_channels=out_channels, latent_dim=latent_dim
+    ).to(device)
     model_path = checkpoint_dir / model_fname
     vae_model = load_model(vae_model, model_path, device)

@@ -113,6 +113,13 @@ class VAEUNet(nn.Module):
         recon_x = self.decoder(z, skips)
         return recon_x, mu, logvar
 
+    def encode(self, x):
+        mu, logvar, skips = self.encoder(x)
+        return mu, logvar, skips
+
+    def decode(self, z, skips):
+        return self.decoder(z, skips)
+
 
 if __name__ == "__main__":
     # Ensure reproducibility
