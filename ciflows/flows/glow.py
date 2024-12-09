@@ -260,7 +260,7 @@ class Injective1x1Conv(Flow):
         if torch.linalg.cond(self.W) > 1e6:  # Check condition number
             self.W.data = torch.randn_like(self.W)
             torch.nn.init.orthogonal_(self.W)  # Reinitialize
-        
+
         svals = torch.linalg.svdvals(self.W)
 
         # compute log of its regularized singular values and sum them

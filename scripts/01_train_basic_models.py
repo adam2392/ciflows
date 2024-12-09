@@ -12,8 +12,7 @@ from torchvision import transforms
 from torchvision.datasets import MNIST
 
 from ciflows.flows import TwoStageTraining, plInjFlowModel
-from ciflows.flows.glow import (GlowBlock, InjectiveGlowBlock, ReshapeFlow,
-                                Squeeze)
+from ciflows.flows.glow import GlowBlock, InjectiveGlowBlock, ReshapeFlow, Squeeze
 
 
 def get_inj_model():

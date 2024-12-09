@@ -6,9 +6,11 @@ import lightning as pl
 import torch
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 
-from ciflows.datasets.celeba_scm.pretrained import (CelebaDataModule,
-                                                    MultiTaskResNet,
-                                                    PredictorPipeline)
+from ciflows.datasets.celeba_scm.pretrained import (
+    CelebaDataModule,
+    MultiTaskResNet,
+    PredictorPipeline,
+)
 
 if __name__ == "__main__":
     # get args

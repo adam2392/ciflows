@@ -1,7 +1,11 @@
 import torch
 
-from ciflows.vit import (PatchEmbedding, TransformerEncoderLayer,
-                         VisionTransformerDecoder, VisionTransformerEncoder)
+from ciflows.vit import (
+    PatchEmbedding,
+    TransformerEncoderLayer,
+    VisionTransformerDecoder,
+    VisionTransformerEncoder,
+)
 
 
 def test_patch_embedding_output_shape():

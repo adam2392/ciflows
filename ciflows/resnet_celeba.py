@@ -39,6 +39,8 @@ class ResNetCelebAEncoder(nn.Module):
             nn.ReLU(),
             ResBlock(128, 32, 128),
             ResBlock(128, 32, 128),
+            ResBlock(128, 32, 128),
+            ResBlock(128, 32, 128),
         )
         self.fc = nn.Linear(128 * 4 * 4, latent_dim)
 
@@ -60,6 +62,8 @@ class ResNetCelebADecoder(nn.Module):
                 128, 128, kernel_size=3, stride=2, padding=1, output_padding=1
             ),  # (128, 8, 8)
             nn.ReLU(),
+            ResBlock(128, 32, 128),
+            ResBlock(128, 32, 128),
             ResBlock(128, 32, 128),
             ResBlock(128, 32, 128),
             nn.ConvTranspose2d(

@@ -7,9 +7,12 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from .utils import (set_initial_confounder_edge_coeffs,
-                    set_initial_confounder_parameters, set_initial_edge_coeffs,
-                    set_initial_noise_parameters)
+from .utils import (
+    set_initial_confounder_edge_coeffs,
+    set_initial_confounder_parameters,
+    set_initial_edge_coeffs,
+    set_initial_noise_parameters,
+)
 
 
 class MultidistrCausalFlow(nf.distributions.BaseDistribution):

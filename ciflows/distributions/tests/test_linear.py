@@ -4,9 +4,12 @@ import torch
 from numpy.testing import assert_array_equal
 from torch.distributions import Normal
 
-from ciflows.distributions.linear import (ClusteredLinearGaussianDistribution,
-                                          log_prob_from_dag, sample_from_dag,
-                                          sample_linear_gaussian_dag)
+from ciflows.distributions.linear import (
+    ClusteredLinearGaussianDistribution,
+    log_prob_from_dag,
+    sample_from_dag,
+    sample_linear_gaussian_dag,
+)
 
 
 # Define a function to generate data from a known linear Gaussian DAG

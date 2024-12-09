@@ -2,9 +2,9 @@ from pathlib import Path
 
 import lightning as pl
 import numpy as np
-from torch import nn
 import torch
 import torch.nn.functional as F
+from torch import nn
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
@@ -14,8 +14,8 @@ from tqdm import tqdm
 from ciflows.datasets.causalceleba import CausalCelebA
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
-from ciflows.reduction.vae import VAE
 from ciflows.reduction.better_vae import VAEUNet
+from ciflows.reduction.vae import VAE
 from ciflows.training import TopKModelSaver
 
 

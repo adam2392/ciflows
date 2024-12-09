@@ -11,8 +11,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from ciflows.datasets.causalmnist import MultiDistrDataModule
 from ciflows.distributions.linear import ClusteredLinearGaussianDistribution
 from ciflows.flows import TwoStageTraining, plCausalInjFlowModel
-from ciflows.flows.glow import (GlowBlock, InjectiveGlowBlock, ReshapeFlow,
-                                Squeeze)
+from ciflows.flows.glow import GlowBlock, InjectiveGlowBlock, ReshapeFlow, Squeeze
 
 
 def get_inj_model():

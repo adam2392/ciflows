@@ -21,6 +21,56 @@ from ciflows.resnet_celeba import ResNetCelebADecoder, ResNetCelebAEncoder
 from ciflows.training import TopKModelSaver
 
 
+class SkipConnection(nn.Module):
+    def __init__(self, inner: nn.Module, id_init=False):
+        super().__init__()
+        self.inner = inner
+        if id_init:
+            self.scale = torch.nn.Parameter(torch.zeros(1))
+        else:
+            self.scale = None
+
+    def forward(self, x):
+        out = self.inner(x)
+        if self.scale is not None:
+            out = out * self.scale
+        return x[..., : out.shape[-1]] + out
+
+
+def build_dense_network(
+    layer_sizes,
+    activation=nn.SiLU,
+    output_activation=None,
+    dropout=0.0,
+    batch_norm=False,
+):
+    layers = []
+
+    # Build hidden layers
+    for i in range(len(layer_sizes) - 1):
+        layers.append(
+            nn.Linear(layer_sizes[i], layer_sizes[i + 1])
+        )  # Fully connected layer
+
+        # Add activation for all layers except the output layer
+        if i < len(layer_sizes) - 2:
+            layers.append(activation())
+
+            # Optionally add batch normalization
+            if batch_norm:
+                layers.append(nn.BatchNorm1d(layer_sizes[i + 1]))
+
+            # Optionally add dropout
+            if dropout > 0.0:
+                layers.append(nn.Dropout(p=dropout))
+
+    # Combine layers into a sequential model
+    return nn.Sequential(*layers)
+
+
+ƒ
+
+
 class Freeformflow(nn.Module):
     def __init__(
         self,
@@ -50,7 +100,9 @@ class Freeformflow(nn.Module):
         return self.decoder(z), z
 
 
-def compute_loss(model: Freeformflow, x, distr_idx, beta, hutchinson_samples=2):
+def compute_loss(
+    model: Freeformflow, x, distr_idx, beta, hutchinson_samples=2, causal=True
+):
     # calculate volume change surrogate loss
     surrogate_loss, v_hat, x_hat = volume_change_surrogate(
         images, model.encoder, model.decoder, hutchinson_samples=hutchinson_samples
@@ -62,9 +114,13 @@ def compute_loss(model: Freeformflow, x, distr_idx, beta, hutchinson_samples=2):
     # get negative log likelihoood over the distributions
     embed_dim = model.decoder.latent_dim
     v_hat = v_hat.view(-1, embed_dim)
-    loss_nll = (
-        -model.latent.log_prob(v_hat, distr_idx=distr_idx).mean() - surrogate_loss
-    )
+
+    if causal:
+        loss_nll = (
+            -model.latent.log_prob(v_hat, distr_idx=distr_idx).mean() - surrogate_loss
+        )
+    else:
+        loss_nll = -model.latent.log_prob(v_hat).mean() - surrogate_loss
 
     loss = beta * loss_reconstruction + loss_nll
     return loss, loss_reconstruction, loss_nll, surrogate_loss
@@ -125,7 +181,7 @@ def data_loader(
     return train_loader
 
 
-def make_fff_model(debug=False):
+def make_fff_model(debug=False, causal=True):
     node_dimensions = {
         0: 16,
         1: 16,
@@ -149,15 +205,18 @@ def make_fff_model(debug=False):
 
     confounded_list = []
     # independent noise with causal prior
-    latent = LinearGaussianDag(
-        node_dimensions=node_dimensions,
-        edge_list=edge_list,
-        noise_means=noise_means,
-        noise_variances=noise_variances,
-        confounded_list=confounded_list,
-        intervened_node_means=intervened_node_means,
-        intervened_node_vars=intervened_node_vars,
-    )
+    if causal:
+        latent = LinearGaussianDag(
+            node_dimensions=node_dimensions,
+            edge_list=edge_list,
+            noise_means=noise_means,
+            noise_variances=noise_variances,
+            confounded_list=confounded_list,
+            intervened_node_means=intervened_node_means,
+            intervened_node_vars=intervened_node_vars,
+        )
+    else:
+        latent = nf.distributions.DiagGaussian(latent_dim, trainable=False)
 
     # define the encoder and decoder
     encoder = ResNetCelebAEncoder(latent_dim=latent_dim)
@@ -186,15 +245,16 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
+    causal = True
     batch_size = 512
     img_size = 128
     max_epochs = 2000
     lr = 3e-4
     lr_min = 1e-8
     lr_scheduler = "cosine"
-    max_norm = 1.0  # Threshold for gradient norm clipping
+    max_norm = 2.0  # Threshold for gradient norm clipping
     debug = False
-    num_workers = 1
+    num_workers = 3
     graph_type = "chain"
 
     if debug:
@@ -220,12 +280,12 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_fff_batch256_latentdim48_v2.pt"
+    model_fname = "celeba_fff_batch512_beta10_latentdim48_v1.pt"
 
     checkpoint_dir = root / "CausalCelebA" / "fff" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    model = make_fff_model(debug=debug)
+    model = make_fff_model(debug=debug, causal=causal)
     model = model.to(device)
     image_dim = 3 * img_size * img_size
 
@@ -279,7 +339,7 @@ if __name__ == "__main__":
 
             # compute the loss
             loss, loss_reconstruction, loss_nll, surrogate_loss = compute_loss(
-                model, images, distr_idx, beta
+                model, images, distr_idx, beta, causal=causal
             )
 
             loss = loss.mean()
@@ -310,7 +370,7 @@ if __name__ == "__main__":
         train_surrogate_loss /= len(train_loader)
         lr = scheduler.get_last_lr()[0]
         print(
-            f"====> Epoch: {epoch} Average loss: {train_loss:.4f}, LR: {lr:.6f} "
+            f"====> Epoch: {epoch} Training Stats: \nAverage loss: {train_loss:.4f}, LR: {lr:.6f} "
             f"Reconstruction Loss: {train_reconstruction_loss:.4f}, NLL Loss: {train_nll_loss:.4f}, Surrogate Loss: {train_surrogate_loss:.4f}"
         )
 
@@ -319,10 +379,18 @@ if __name__ == "__main__":
 
         # Log training and validation loss
         if debug or epoch % 10 == 0:
+            # compute the loss
+            # val_loss, loss_reconstruction, loss_nll, surrogate_loss = compute_loss(
+            #     model, images, distr_idx, beta, causal=causal
+            # )
+
+            # loss = loss.mean()
+            # loss_reconstruction = loss_reconstruction.mean()
+            # loss_nll = loss_nll.mean()
+            # surrogate_loss = surrogate_loss.mean()
+
             print()
-            print(
-                f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}"
-            )
+            print(f"Saving images - Epoch [{epoch}/{max_epochs}]")
 
             # sample images from normalizing flow
             for distr_idx in train_loader.dataset.distr_idx_list:

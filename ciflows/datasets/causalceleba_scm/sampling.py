@@ -6,8 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from albumentations import (CoarseDropout, Compose, HorizontalFlip,
-                            OneOf, RandomCrop)
+from albumentations import CoarseDropout, Compose, HorizontalFlip, OneOf, RandomCrop
 from albumentations.pytorch import ToTensorV2
 from PIL import Image
 from torchvision import transforms
