@@ -313,9 +313,10 @@ if __name__ == "__main__":
             # Sample and save reconstructed images
             sample_images = images[:8]  # Pick 8 images for sampling
             with torch.no_grad():
-                reconstructed_images = model.decode(
-                    model.encode(sample_images)[0]
-                ).reshape(-1, 3, image_dim, image_dim)
+                mean_encoding = model.encode(sample_images)[0]
+                reconstructed_images = model.decode(mean_encoding).reshape(
+                    -1, 3, img_size, img_size
+                )
             sample_images = torch.cat(
                 (sample_images.cpu(), reconstructed_images.cpu()), dim=0
             )

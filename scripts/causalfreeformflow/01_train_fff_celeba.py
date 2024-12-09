@@ -50,7 +50,7 @@ class Freeformflow(nn.Module):
         return self.decoder(z), z
 
 
-def compute_loss(model: Freeformflow, x, distr_idx, beta):
+def compute_loss(model: Freeformflow, x, distr_idx, beta, hutchinson_samples=2):
     # calculate volume change surrogate loss
     surrogate_loss, v_hat, x_hat = volume_change_surrogate(
         images, model.encoder, model.decoder, hutchinson_samples=hutchinson_samples
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    batch_size = 256
+    batch_size = 512
     img_size = 128
     max_epochs = 2000
     lr = 3e-4
