@@ -126,7 +126,8 @@ def data_loader(
         drop_last=True,
         # shuffle=True,  # Shuffle data during training
         num_workers=num_workers,
-        # pin_memory=True,  # Enable if using a GPU
+        pin_memory=True,  # Enable if using a GPU
+        persistent_workers=True,
     )
     val_loader = DataLoader(
         dataset=val_dataset,
@@ -134,7 +135,7 @@ def data_loader(
         shuffle=False,  # Do not shuffle data during validation
         sampler=val_sampler,
         num_workers=num_workers // 2,
-        # pin_memory=True,  # Enable if using a GPU
+        pin_memory=True,  # Enable if using a GPU
     )
 
     return train_loader, val_loader
@@ -177,7 +178,7 @@ if __name__ == "__main__":
 
     latent_dim = 48
     batch_size = 512
-    model_fname = "celeba_vaereduction_batch512_latentdim48_img128_v1.pt"
+    model_fname = "celeba_vaeunetreduction_batch512_latentdim48_img128_v1.pt"
 
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -186,7 +187,7 @@ if __name__ == "__main__":
     lr = 3e-4
     lr_min = 1e-8
     lr_scheduler = "cosine"
-    num_workers = 3
+    num_workers = 4
     graph_type = "chain"
 
     torch.set_float32_matmul_precision("high")
@@ -200,14 +201,14 @@ if __name__ == "__main__":
 
         fast_dev = True
 
-    model = VAE(LATENT_DIM=latent_dim)
+    # model = VAE(LATENT_DIM=latent_dim)
     in_channels = 3
     out_channels = 3
     latent_dim = 48
     # Create the model
-    # model = VAEUNet(
-    #     in_channels=in_channels, out_channels=out_channels, latent_dim=latent_dim
-    # )
+    model = VAEUNet(
+        in_channels=in_channels, out_channels=out_channels, latent_dim=latent_dim
+    )
     model.apply(weights_init)
     model = model.to(device)
     img_size = 128
