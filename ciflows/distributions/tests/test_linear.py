@@ -39,9 +39,9 @@ def generate_linear_gaussian_dag_data():
 
     # Sample data
     n_samples = 10
-    X1 = weight_ux0 * Normal(
-        dag.nodes["U_1"]["mean"], dag.nodes["U_1"]["variance"] ** 0.5
-    ).sample((n_samples,))
+    X1 = weight_ux0 * Normal(dag.nodes["U_1"]["mean"], dag.nodes["U_1"]["variance"] ** 0.5).sample(
+        (n_samples,)
+    )
     X2 = 2.0 * X1 + weight_ux1 * Normal(
         dag.nodes["U_2"]["mean"], dag.nodes["U_2"]["variance"] ** 0.5
     ).sample((n_samples,))
@@ -152,9 +152,7 @@ def test_log_prob_from_random_dag():
     )
 
     assert log_prob_distr0.shape == (n_samples,)
-    assert (
-        log_prob_distr0.sum() > log_prob_distr1.sum()
-    ), f"{log_prob_distr0}, {log_prob_distr1}"
+    assert log_prob_distr0.sum() > log_prob_distr1.sum(), f"{log_prob_distr0}, {log_prob_distr1}"
 
     prior = ClusteredLinearGaussianDistribution(
         cluster_sizes=cluster_sizes,

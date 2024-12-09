@@ -201,9 +201,7 @@ if __name__ == "__main__":
         # Load the model from a checkpoint
         checkpoint_path = checkpoint_dir / f"epoch={epoch}-step={step}.ckpt"
         model = plFFFConvVAE.load_from_checkpoint(checkpoint_path)
-        checkpoint = torch.load(
-            checkpoint_path, map_location=lambda storage, loc: storage
-        )
+        checkpoint = torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
         current_max_epochs = checkpoint["epoch"]
         max_epochs += current_max_epochs
     else:

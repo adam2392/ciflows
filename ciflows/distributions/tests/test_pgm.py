@@ -36,9 +36,7 @@ def test_linear_gaussian_dag():
     # Test edge weights
     for src, tgt in edge_list:
         weight_name = f"{src}->{tgt}"
-        assert (
-            weight_name in dag.edge_weights
-        ), f"Edge weight for {src}->{tgt} not initialized."
+        assert weight_name in dag.edge_weights, f"Edge weight for {src}->{tgt} not initialized."
 
     # Test topological order
     expected_order = ["A", "B", "C"]

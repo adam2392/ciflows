@@ -101,8 +101,8 @@ if __name__ == "__main__":
             fake_images = transform(fake_images)
 
             # Forward pass
-            (gender_out, gender_prob), (hair_out, hair_prob), (age_out, age_prob) = (
-                classifier(fake_images)
+            (gender_out, gender_prob), (hair_out, hair_prob), (age_out, age_prob) = classifier(
+                fake_images
             )
 
             # now decide which images to save

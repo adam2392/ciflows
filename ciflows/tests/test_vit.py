@@ -9,9 +9,7 @@ from ciflows.vit import (
 
 
 def test_patch_embedding_output_shape():
-    patch_embedding = PatchEmbedding(
-        img_size=224, patch_size=16, in_channels=3, embed_dim=768
-    )
+    patch_embedding = PatchEmbedding(img_size=224, patch_size=16, in_channels=3, embed_dim=768)
 
     # Test that output shape is correct for valid input
     B, C, H, W = 1, 3, 224, 224  # Batch size 1, 3 channels, 224x224 image
@@ -28,9 +26,7 @@ def test_patch_embedding_output_shape():
         expected_embed_dim,
     ), f"Expected output shape {(B, expected_num_patches, expected_embed_dim)}, but got {output.shape}"
 
-    patch_embedding = PatchEmbedding(
-        img_size=28, patch_size=4, in_channels=3, embed_dim=768
-    )
+    patch_embedding = PatchEmbedding(img_size=28, patch_size=4, in_channels=3, embed_dim=768)
     # Test that output shape is correct for valid input
     B, C, H, W = 1, 3, 28, 28  # Batch size 1, 3 channels, 224x224 image
     input_tensor = torch.randn(B, C, H, W)
@@ -58,9 +54,7 @@ def test_transformer_encoder_layer_output_shape():
         2,
         768,
     )  # Example sequence length, batch size, and embedding dim
-    input_tensor = torch.randn(
-        batch_size, seq_length, embed_dim
-    )  # Input shape (S, B, E)
+    input_tensor = torch.randn(batch_size, seq_length, embed_dim)  # Input shape (S, B, E)
 
     output = transformer_encoder_layer(input_tensor)
 
@@ -112,9 +106,7 @@ def test_vit_decoder():
         dropout=0.1,
     )
     reconstructed_img = decoder(encoder_output)
-    print(
-        reconstructed_img.shape
-    )  # Output will be [batch_size, channels, height, width]
+    print(reconstructed_img.shape)  # Output will be [batch_size, channels, height, width]
     assert reconstructed_img.shape == (
         1,
         49,
@@ -138,9 +130,7 @@ def test_vit_decoder_from_latent():
         dropout=0.1,
     )
     reconstructed_img = decoder(encoder_output)
-    print(
-        reconstructed_img.shape
-    )  # Output will be [batch_size, channels, height, width]
+    print(reconstructed_img.shape)  # Output will be [batch_size, channels, height, width]
     assert reconstructed_img.shape == (
         16,
         1,

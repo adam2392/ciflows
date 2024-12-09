@@ -23,9 +23,7 @@ class MultiTaskResNet(nn.Module):
 
         # Modify the input layer for smaller images
         self.base_model = base_model
-        self.base_model.conv1 = nn.Conv2d(
-            3, 64, kernel_size=3, stride=1, padding=1, bias=False
-        )
+        self.base_model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
         self.base_model.maxpool = nn.Identity()  # Remove max-pooling layer
 
         # Extract the feature extractor (all layers except the original FC)
@@ -161,9 +159,7 @@ class CelebaDataModule(pl.LightningDataModule):
                 transforms.Resize((64, 64)),
                 transforms.RandomHorizontalFlip(),  # data augmentation
                 transforms.ToTensor(),
-                transforms.Normalize(
-                    [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
-                ),  # normalization
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),  # normalization
             ]
         )
         self.transforms_test = transforms.Compose(
@@ -171,9 +167,7 @@ class CelebaDataModule(pl.LightningDataModule):
                 transforms.Resize((64, 64)),
                 # transforms.RandomHorizontalFlip(),  # data augmentation
                 transforms.ToTensor(),
-                transforms.Normalize(
-                    [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
-                ),  # normalization
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),  # normalization
             ]
         )
 

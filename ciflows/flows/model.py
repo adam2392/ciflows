@@ -39,9 +39,7 @@ class CausalNormalizingFlow(nf.NormalizingFlow):
         """
         super().__init__(q0=q0, flows=flows, p=p)
 
-    def forward_kld(
-        self, x, distr_idx=None, intervention_targets=None, hard_interventions=None
-    ):
+    def forward_kld(self, x, distr_idx=None, intervention_targets=None, hard_interventions=None):
         """Estimates forward KL divergence, see [arXiv 1912.02762](https://arxiv.org/abs/1912.02762)
 
         Args:
@@ -74,9 +72,7 @@ class CausalNormalizingFlow(nf.NormalizingFlow):
             log_q -= log_det
         return z, log_q
 
-    def log_prob(
-        self, x, distr_idx=None, intervention_targets=None, hard_interventions=None
-    ):
+    def log_prob(self, x, distr_idx=None, intervention_targets=None, hard_interventions=None):
         """Get log probability for batch
 
         Args:

@@ -114,9 +114,7 @@ class VisionTransformerEncoder(nn.Module):
         self.patch_size = patch_size
 
         self.patch_embed = PatchEmbedding(img_size, in_channels, patch_size, embed_dim)
-        self.pos_embed = nn.Parameter(
-            torch.randn(1, self.patch_embed.num_patches, embed_dim)
-        )
+        self.pos_embed = nn.Parameter(torch.randn(1, self.patch_embed.num_patches, embed_dim))
 
         # how many layers of transformer encoder to stack
         self.encoder_layers = nn.ModuleList(
@@ -236,17 +234,11 @@ class VisionTransformerDecoder(nn.Module):
         # Map back to original patch dimension (unflatten the patches)
         # (B, n_patches, embed_dim) -> (B, n_patches, img_size * img_size * in_channels)
         patches = self.output_projection(x)
-        patches = patches.view(
-            B, n_patches, self.img_size, self.img_size, self.in_channels
-        )
-        patches = patches.permute(
-            0, 4, 2, 3, 1
-        )  # [B, 3, img_size, img_size, num_patches]
+        patches = patches.view(B, n_patches, self.img_size, self.img_size, self.in_channels)
+        patches = patches.permute(0, 4, 2, 3, 1)  # [B, 3, img_size, img_size, num_patches]
 
         # Reconstruct the original image by reshaping patches
-        img = patches.reshape(
-            B, n_patches, self.in_channels, self.img_size, self.img_size
-        )
+        img = patches.reshape(B, n_patches, self.in_channels, self.img_size, self.img_size)
         return img  # Reconstructed image
 
     # def forward(self, encoding):

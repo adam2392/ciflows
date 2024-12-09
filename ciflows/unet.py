@@ -36,9 +36,7 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(Decoder, self).__init__()
-        self.upconv = nn.ConvTranspose2d(
-            in_channels, out_channels, kernel_size=2, stride=2
-        )
+        self.upconv = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
         self.double_conv = DoubleConv(in_channels, out_channels)
 
     def forward(self, x, skip_x):
@@ -74,9 +72,7 @@ class UNet(nn.Module):
             self.encoders.append(Encoder(in_channels, out_channels))
 
         # Bottleneck
-        self.bottleneck = DoubleConv(
-            out_channels, out_channels * 2
-        )  # 64x7x7 -> 128x7x7
+        self.bottleneck = DoubleConv(out_channels, out_channels * 2)  # 64x7x7 -> 128x7x7
         out_channels *= 2
 
         # Decoder: Upsampling path

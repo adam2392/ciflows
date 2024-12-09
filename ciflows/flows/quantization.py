@@ -40,9 +40,7 @@ class Dequantization(nn.Module):
             ldj -= np.log(1 - self.alpha) * np.prod(z.shape[1:])
             z = (z - 0.5 * self.alpha) / (1 - self.alpha)
         else:
-            z = (
-                z * (1 - self.alpha) + 0.5 * self.alpha
-            )  # Scale to prevent boundaries 0 and 1
+            z = z * (1 - self.alpha) + 0.5 * self.alpha  # Scale to prevent boundaries 0 and 1
             ldj += np.log(1.0 - self.alpha) * np.prod(z.shape[1:])
             ldj += (-torch.log(z) - torch.log(1 - z)).sum(dim=[1, 2, 3])
             z = torch.log(z) - torch.log(1 - z)
@@ -70,9 +68,7 @@ class VariationalDequantization(Dequantization):
 
     def dequant(self, z, ldj):
         z = z.to(torch.float32)
-        img = (
-            z / 255.0
-        ) * 2 - 1  # We condition the flows on x, i.e. the original image
+        img = (z / 255.0) * 2 - 1  # We condition the flows on x, i.e. the original image
 
         # Prior of u is a uniform distribution as before
         # As most flow transformations are defined on [-infinity,+infinity], we apply an inverse sigmoid first.

@@ -58,9 +58,7 @@ def test_volume_change_surrogate():
     decoder = ConvDecoder(hidden_size, channels, height, width)
 
     # Run the volume change surrogate function
-    surrogate_loss, v, xhat = volume_change_surrogate(
-        x, encoder, decoder, hutchinson_samples=2
-    )
+    surrogate_loss, v, xhat = volume_change_surrogate(x, encoder, decoder, hutchinson_samples=2)
 
     # Print the results
     print("Surrogate Loss:", surrogate_loss.item())
@@ -85,9 +83,7 @@ def test_volume_change_surrogate_linear():
     decoder = LinearDecoder(latent_dim, input_dim)
 
     # Run the volume change surrogate function
-    surrogate_loss, v, xhat = volume_change_surrogate(
-        x, encoder, decoder, hutchinson_samples=2
-    )
+    surrogate_loss, v, xhat = volume_change_surrogate(x, encoder, decoder, hutchinson_samples=2)
 
     # Print the results
     print("Surrogate Loss:", surrogate_loss.item())

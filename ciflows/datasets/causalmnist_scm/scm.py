@@ -7,9 +7,7 @@ from PIL import Image
 from scipy.stats import truncnorm
 
 
-def add_bar(
-    img, color_bar_val=255, start_height=0, height=3, start_width=0, width=None
-):
+def add_bar(img, color_bar_val=255, start_height=0, height=3, start_width=0, width=None):
     if width is None:
         width = img.shape[1]
 
@@ -49,9 +47,7 @@ def alter_digitbar_img(img, color_digit, color_bar):
     colored_arr = np.zeros((h, w, 3), dtype=np.uint8)
     mask = img > 0  # Mask to identify the digit
     for i in range(3):
-        colored_arr[:, :, i][mask] = (
-            color_value[i] * 255
-        )  # Apply uniform color to the digit
+        colored_arr[:, :, i][mask] = color_value[i] * 255  # Apply uniform color to the digit
     img = colored_arr
 
     # add bar
@@ -119,9 +115,7 @@ def bar_digit_scm(intervention_idx, labels):
     color_digit_means = torch.linspace(
         0, 1, 10
     )  # 10 possible digits, evenly spaced means from 0 to 1
-    color_digit_stds = 0.15 * torch.ones(
-        10
-    )  # Standard deviation of 0.15 for each digit
+    color_digit_stds = 0.15 * torch.ones(10)  # Standard deviation of 0.15 for each digit
     color_digit = torch.zeros(n_samples)
 
     # sample the color-digit conditioned on the digit
@@ -161,9 +155,7 @@ def bar_digit_scm(intervention_idx, labels):
     else:
         raise ValueError("Invalid intervention_idx. Must be 0, 1, 2 or 3.")
 
-    causal_labels.update(
-        {"digit": digit, "color_digit": color_digit, "color_bar": color_bar}
-    )
+    causal_labels.update({"digit": digit, "color_digit": color_digit, "color_bar": color_bar})
 
     return causal_labels
 
@@ -194,9 +186,7 @@ def alter_digitbar_img(img, color_digit, color_bar, dtype=None):
     colored_arr = np.zeros((h, w, 3), dtype=np.uint8)
     mask = img > 0  # Mask to identify the digit
     for i in range(3):
-        colored_arr[:, :, i][mask] = (
-            color_value[i] * 255
-        )  # Apply uniform color to the digit
+        colored_arr[:, :, i][mask] = color_value[i] * 255  # Apply uniform color to the digit
     img = colored_arr
 
     # add bar
@@ -216,9 +206,7 @@ def alter_digitbar_img(img, color_digit, color_bar, dtype=None):
     elif dtype == "torch":
         img = torch.tensor(img, dtype=torch.float32)
     elif dtype is not None:
-        raise ValueError(
-            f"Invalid dtype: {dtype} Must be PIL or torch or None for numpy array."
-        )
+        raise ValueError(f"Invalid dtype: {dtype} Must be PIL or torch or None for numpy array.")
     return img
 
 
@@ -263,9 +251,7 @@ if __name__ == "__main__":
         else:
             keys = list(causal_labels.keys())
             for key in keys:
-                labels_dataset[key] = torch.vstack(
-                    (labels_dataset[key], causal_labels[key])
-                )
+                labels_dataset[key] = torch.vstack((labels_dataset[key], causal_labels[key]))
 
         for idx, img in enumerate(images):
             color_bar = causal_labels["color_bar"][idx]

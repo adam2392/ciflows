@@ -43,12 +43,8 @@ def get_inj_model():
 
     n_chs = int(n_channels * 4**n_mixing_layers * (1 / 2) ** n_injective_layers)
     latent_size = int(img_size / (2**n_mixing_layers))
-    print(
-        "Starting at latent representation: ", n_chs, "with latent size: ", latent_size
-    )
-    q0 = nf.distributions.DiagGaussian(
-        (n_chs, latent_size, latent_size), trainable=False
-    )
+    print("Starting at latent representation: ", n_chs, "with latent size: ", latent_size)
+    q0 = nf.distributions.DiagGaussian((n_chs, latent_size, latent_size), trainable=False)
 
     split_mode = "channel"
 
@@ -181,9 +177,7 @@ def get_bij_model(
     # q0 = nf.distributions.DiagGaussian(
     #     (n_chs, latent_size, latent_size), trainable=False
     # )
-    q0 = nf.distributions.DiagGaussian(
-        (n_chs * latent_size * latent_size,), trainable=False
-    )
+    q0 = nf.distributions.DiagGaussian((n_chs * latent_size * latent_size,), trainable=False)
 
     q0 = ClusteredLinearGaussianDistribution(
         adjacency_matrix=adj_mat,
@@ -383,9 +377,7 @@ if __name__ == "__main__":
     print(data_module.dataset.labels.shape)
     for distr_idx in data_module.dataset.distribution_idx.unique():
         idx = np.argwhere(data_module.dataset.distribution_idx == distr_idx)[0][0]
-        intervention_targets_per_distr.append(
-            data_module.dataset.intervention_targets[idx]
-        )
+        intervention_targets_per_distr.append(data_module.dataset.intervention_targets[idx])
     print(idx)
 
     print(intervention_targets_per_distr)

@@ -9,9 +9,7 @@ from ciflows.reduction.vae import VAE
 
 
 # Encode images in a directory
-def encode_images_in_directory(
-    directory, model: VAE, transform: transforms.Compose, device="cpu"
-):
+def encode_images_in_directory(directory, model: VAE, transform: transforms.Compose, device="cpu"):
     image_files = sorted([f for f in os.listdir(directory) if f.endswith(".jpg")])
     encodings = []
 

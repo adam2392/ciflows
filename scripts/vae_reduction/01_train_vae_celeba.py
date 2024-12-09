@@ -15,6 +15,7 @@ from ciflows.datasets.causalceleba import CausalCelebA
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
 from ciflows.reduction.better_vae import VAEUNet
+from ciflows.reduction.resnetvae import DeepResNetVAE
 from ciflows.reduction.vae import VAE
 from ciflows.training import TopKModelSaver
 
@@ -98,24 +99,18 @@ def data_loader(
     train_len = total_len - val_len
 
     # Split the dataset into train and validation sets
-    train_dataset, val_dataset = random_split(
-        causal_celeba_dataset, [train_len, val_len]
-    )
+    train_dataset, val_dataset = random_split(causal_celeba_dataset, [train_len, val_len])
 
     distr_labels = [x[1] for x in train_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(
-            f"Batch size must be at least {unique_distrs} for stratified sampling."
-        )
+        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
     distr_labels = [x[1] for x in val_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(
-            f"Batch size must be at least {unique_distrs} for stratified sampling."
-        )
+        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
     val_sampler = StratifiedSampler(distr_labels, batch_size)
 
     # Define the DataLoader
@@ -179,7 +174,7 @@ if __name__ == "__main__":
 
     latent_dim = 48
     batch_size = 512
-    model_fname = "celeba_vaeunetreduction_batch512_latentdim48_img128_v1.pt"
+    model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
 
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -207,15 +202,20 @@ if __name__ == "__main__":
     in_channels = 3
     out_channels = 3
     latent_dim = 48
+    num_blocks_per_stage = 3
 
     # Create the model
-    model = VAEUNet(
-        in_channels=in_channels, out_channels=out_channels, latent_dim=latent_dim
-    )
+    # model = VAEUNet(
+    #     in_channels=in_channels, out_channels=out_channels, latent_dim=latent_dim
+    # )
+
+    model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
     model.apply(weights_init)
     model = model.to(device)
     img_size = 128
     image_dim = 3 * img_size * img_size
+
+    # model = torch.compile(model)
 
     # print the number of parameters in the model
     print(sum(p.numel() for p in model.parameters()) / 1e6, "M parameters")
@@ -224,13 +224,9 @@ if __name__ == "__main__":
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
     # Cosine Annealing Scheduler (adjust the T_max for the number of epochs)
-    scheduler = CosineAnnealingLR(
-        optimizer, T_max=max_epochs, eta_min=1e-6
-    )  # T_max = total epochs
+    scheduler = CosineAnnealingLR(optimizer, T_max=max_epochs, eta_min=1e-6)  # T_max = total epochs
 
-    top_k_saver = TopKModelSaver(
-        checkpoint_dir, k=5
-    )  # Initialize the top-k model saver
+    top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
 
     train_loader, val_loader = data_loader(
         root_dir=root,
@@ -259,9 +255,7 @@ if __name__ == "__main__":
         ):
             images = images.to(device)
             optimizer.zero_grad()
-            reconstructed, latent_mu, latent_logvar = model(
-                images
-            )  # Model forward pass
+            reconstructed, latent_mu, latent_logvar = model(images)  # Model forward pass
 
             # Clamp logvar to prevent numerical instability
             latent_logvar = torch.clamp_(latent_logvar, -10, 10)
@@ -286,22 +280,16 @@ if __name__ == "__main__":
 
         train_loss /= len(train_loader)
         lr = scheduler.get_last_lr()[0]
-        print(
-            f"====> Epoch: {epoch} Average Train loss: {train_loss:.4f}, LR: {lr:.6f}"
-        )
+        print(f"====> Epoch: {epoch} Average Train loss: {train_loss:.4f}, LR: {lr:.6f}")
 
         # Validation phase
         model.eval()
 
         val_loss = 0.0
         with torch.no_grad():
-            for batch_idx, (val_images, distr_idx, targets, meta_labels) in enumerate(
-                val_loader
-            ):
+            for batch_idx, (val_images, distr_idx, targets, meta_labels) in enumerate(val_loader):
                 val_images = val_images.to(device)
-                reconstructed, latent_mu, latent_logvar = model(
-                    val_images
-                )  # Model forward pass
+                reconstructed, latent_mu, latent_logvar = model(val_images)  # Model forward pass
 
                 loss = loss_function(
                     reconstructed,
@@ -320,27 +308,23 @@ if __name__ == "__main__":
         # Log training and validation loss
         if debug or epoch % 10 == 0:
             print()
-            print(
-                f"Saving images - Epoch [{epoch}/{max_epochs}], Train Loss: {train_loss:.4f}"
-            )
+            print(f"Saving images - Epoch [{epoch}/{max_epochs}], Train Loss: {train_loss:.4f}")
 
             # Sample and save reconstructed images
             sample_images = images[:8]  # Pick 8 images for sampling
             with torch.no_grad():
                 # VAE Unet
-                mean_encoding, _, skips = model.encode(sample_images)
-                reconstructed_images = model.decode(mean_encoding, skips).reshape(
-                    -1, 3, img_size, img_size
-                )
-
-                # Standard VAE
-                # mean_encoding, _ = model.encode(sample_images)
-                # reconstructed_images = model.decode(mean_encoding).reshape(
+                # mean_encoding, _, skips = model.encode(sample_images)
+                # reconstructed_images = model.decode(mean_encoding, skips).reshape(
                 #     -1, 3, img_size, img_size
                 # )
-            sample_images = torch.cat(
-                (sample_images.cpu(), reconstructed_images.cpu()), dim=0
-            )
+
+                # Standard VAE
+                mean_encoding, _ = model.encode(sample_images)
+                reconstructed_images = model.decode(mean_encoding).reshape(
+                    -1, 3, img_size, img_size
+                )
+            sample_images = torch.cat((sample_images.cpu(), reconstructed_images.cpu()), dim=0)
             save_image(
                 # reconstructed_images.cpu(),
                 sample_images,
@@ -367,8 +351,9 @@ if __name__ == "__main__":
     # Usage example:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # vae_model = VAE().to(device)
-    vae_model = VAEUNet(
-        in_channels=in_channels, out_channels=out_channels, latent_dim=latent_dim
-    ).to(device)
+    # vae_model = VAEUNet(
+    #     in_channels=in_channels, out_channels=out_channels, latent_dim=latent_dim
+    # ).to(device)
+    vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage).to(device)
     model_path = checkpoint_dir / model_fname
     vae_model = load_model(vae_model, model_path, device)

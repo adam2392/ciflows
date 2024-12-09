@@ -166,9 +166,7 @@ if __name__ == "__main__":
     channels = 1  # For grayscale images (like MNIST); set to 3 for RGB (like CelebA)
     height = 28  # Height of the input image (28 for MNIST)
     width = 28  # Width of the input image (28 for MNIST)
-    model = Conv_VAE(channels=channels, height=height, width=width, hidden_size=16).to(
-        device
-    )
+    model = Conv_VAE(channels=channels, height=height, width=width, hidden_size=16).to(device)
 
     def count_trainable_parameters(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)

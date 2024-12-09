@@ -27,19 +27,13 @@ class CausalDigitBarMNIST(Dataset):
             root / self.__class__.__name__ / graph_type / f"{graph_type}-imgs-train.pt"
         )
         self.labels = torch.load(
-            root
-            / self.__class__.__name__
-            / graph_type
-            / f"{graph_type}-labels-train.pt"
+            root / self.__class__.__name__ / graph_type / f"{graph_type}-labels-train.pt"
         )
         if isinstance(self.labels, list):
             self.labels = torch.vstack(self.labels)
 
         self.intervention_targets = torch.load(
-            root
-            / self.__class__.__name__
-            / graph_type
-            / f"{graph_type}-targets-train.pt"
+            root / self.__class__.__name__ / graph_type / f"{graph_type}-targets-train.pt"
         )
         if isinstance(self.intervention_targets, list):
             self.intervention_targets = torch.vstack(self.intervention_targets)
@@ -50,9 +44,7 @@ class CausalDigitBarMNIST(Dataset):
                 len(self.data) == len(self.intervention_targets),
             ]
         ):
-            raise ValueError(
-                "Data, labels and intervention targets must have the same length."
-            )
+            raise ValueError("Data, labels and intervention targets must have the same length.")
 
         if fast_dev_run:
             subsample = 100

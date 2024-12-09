@@ -38,9 +38,7 @@ def setup_dummy_data(root_dir):
 
         # Create dummy image files
         for i in range(10):
-            img = PIL.Image.new(
-                "RGB", (64, 64), color=(i * 20 % 255, i * 40 % 255, i * 60 % 255)
-            )
+            img = PIL.Image.new("RGB", (64, 64), color=(i * 20 % 255, i * 40 % 255, i * 60 % 255))
             img.save(distr_path / f"sample_{i}.jpg")
 
 
@@ -84,9 +82,7 @@ def setup_dummy_data_causal_celeba_embedding(root_dir):
         meta_attrs.to_csv(distr_path / "meta_attrs.csv", index=False)
 
         # Dummy image encodings
-        encodings = torch.rand(
-            10, 128
-        )  # Example: 10 samples, 128-dimensional embeddings
+        encodings = torch.rand(10, 128)  # Example: 10 samples, 128-dimensional embeddings
         torch.save(encodings, distr_path / f"{distr_type}_encodings.pt")
 
     # Create intervention targets

@@ -35,9 +35,7 @@ def setup_dummy_data_causal_digitbar_mnist(root_dir, graph_type="graph_type_dumm
 
     # Create dummy labels (num_samples x 4) -> digit, color_digit, color_bar, distr_idx
     dummy_labels = torch.randint(0, 10, (num_samples, 1))  # Digits 0-9
-    dummy_color_digit = torch.randint(
-        0, 3, (num_samples, 1)
-    )  # 3 color labels for digit
+    dummy_color_digit = torch.randint(0, 3, (num_samples, 1))  # 3 color labels for digit
     dummy_color_bar = torch.randint(0, 3, (num_samples, 1))  # 3 color labels for bar
     dummy_distr_idx = torch.randint(0, 4, (num_samples, 1))  # 4 distribution indices
     dummy_meta_labels = torch.hstack(
@@ -46,12 +44,8 @@ def setup_dummy_data_causal_digitbar_mnist(root_dir, graph_type="graph_type_dumm
     torch.save(dummy_meta_labels, dataset_path / f"{graph_type}-labels-train.pt")
 
     # Create dummy intervention targets (num_samples x latent_dim)
-    dummy_intervention_targets = torch.randint(
-        0, 2, (num_samples, 4)
-    )  # 4 latent variables
-    torch.save(
-        dummy_intervention_targets, dataset_path / f"{graph_type}-targets-train.pt"
-    )
+    dummy_intervention_targets = torch.randint(0, 2, (num_samples, 4))  # 4 latent variables
+    torch.save(dummy_intervention_targets, dataset_path / f"{graph_type}-targets-train.pt")
 
 
 # Prepare a temporary directory structure with dummy data
@@ -80,9 +74,7 @@ def setup_dummy_data_causalceleba(root_dir, graph_type="graph_type_dummy"):
 
         # Create dummy image files
         for i in range(10):
-            img = PIL.Image.new(
-                "RGB", (64, 64), color=(i * 20 % 255, i * 40 % 255, i * 60 % 255)
-            )
+            img = PIL.Image.new("RGB", (64, 64), color=(i * 20 % 255, i * 40 % 255, i * 60 % 255))
             img.save(distr_path / f"sample_{i}.jpg")
 
 

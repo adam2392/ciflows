@@ -65,9 +65,7 @@ class VAE(nn.Module):
 
         # Build Decoder
         modules = []
-        self.decoder_input = nn.Linear(
-            LATENT_DIM, hidden_dims[-1] * self.size * self.size
-        )
+        self.decoder_input = nn.Linear(LATENT_DIM, hidden_dims[-1] * self.size * self.size)
         hidden_dims.reverse()
 
         for i in range(len(hidden_dims) - 1):

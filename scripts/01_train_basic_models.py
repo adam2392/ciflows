@@ -44,12 +44,8 @@ def get_inj_model():
 
     n_chs = int(n_channels * 4**n_mixing_layers * (1 / 2) ** n_injective_layers)
     latent_size = int(img_size / (2**n_mixing_layers))
-    print(
-        "Starting at latent representation: ", n_chs, "with latent size: ", latent_size
-    )
-    q0 = nf.distributions.DiagGaussian(
-        (n_chs, latent_size, latent_size), trainable=False
-    )
+    print("Starting at latent representation: ", n_chs, "with latent size: ", latent_size)
+    q0 = nf.distributions.DiagGaussian((n_chs, latent_size, latent_size), trainable=False)
 
     split_mode = "channel"
 
@@ -187,9 +183,7 @@ def get_bij_model(n_chs, latent_size):
     # q0 = nf.distributions.DiagGaussian(
     #     (n_chs, latent_size, latent_size), trainable=False
     # )
-    q0 = nf.distributions.DiagGaussian(
-        (n_chs * latent_size * latent_size,), trainable=False
-    )
+    q0 = nf.distributions.DiagGaussian((n_chs * latent_size * latent_size,), trainable=False)
 
     split_mode = "checkerboard"
 
@@ -307,12 +301,8 @@ class MNISTDataModule(pl.LightningDataModule):
         self.fast_dev_run = fast_dev_run
 
     def setup(self, stage: str):
-        self.mnist_test = MNIST(
-            self.data_dir, download=True, train=False, transform=self.transform
-        )
-        mnist_full = MNIST(
-            self.data_dir, download=True, train=True, transform=self.transform
-        )
+        self.mnist_test = MNIST(self.data_dir, download=True, train=False, transform=self.transform)
+        mnist_full = MNIST(self.data_dir, download=True, train=True, transform=self.transform)
         if self.fast_dev_run:
             self.mnist_train, self.mnist_val, _ = random_split(
                 mnist_full,
@@ -346,9 +336,7 @@ class MNISTDataModule(pl.LightningDataModule):
         )
 
     def test_dataloader(self):
-        return DataLoader(
-            self.mnist_test, batch_size=self.batch_size, num_workers=self.num_workers
-        )
+        return DataLoader(self.mnist_test, batch_size=self.batch_size, num_workers=self.num_workers)
 
 
 if __name__ == "__main__":

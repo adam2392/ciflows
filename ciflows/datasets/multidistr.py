@@ -9,8 +9,7 @@ class StratifiedSampler(Sampler):
         self.num_samples = len(labels)
         self.unique_labels = np.unique(labels)
         self.label_indices = {
-            label: np.where(np.array(labels) == label)[0]
-            for label in self.unique_labels
+            label: np.where(np.array(labels) == label)[0] for label in self.unique_labels
         }
         self.indices = self._generate_indices()
 

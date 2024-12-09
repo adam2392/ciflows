@@ -60,9 +60,7 @@ def collider_bar_digit_scm(intervention_idx, labels):
         sampling_probabilities = digit_probabilities[labels]
 
         # Sample with replacement using the skewed probabilities
-        digit_idx = torch.multinomial(
-            sampling_probabilities, n_samples, replacement=True
-        )
+        digit_idx = torch.multinomial(sampling_probabilities, n_samples, replacement=True)
         # Get the sampled labels
         digit = labels[digit_idx]
 
@@ -81,8 +79,6 @@ def collider_bar_digit_scm(intervention_idx, labels):
         num_samples = mask.sum().item()
         color_bar[mask] = truncated_normal(color_digit[i], 0.2, 0, 1, num_samples)
 
-    causal_labels.update(
-        {"digit": digit, "color_digit": color_digit, "color_bar": color_bar}
-    )
+    causal_labels.update({"digit": digit, "color_digit": color_digit, "color_bar": color_bar})
 
     return causal_labels, digit_idx

@@ -62,9 +62,7 @@ def compute_loss(model: Freeformflow, x, distr_idx, beta, hutchinson_samples=2):
     # get negative log likelihoood over the distributions
     embed_dim = model.decoder.latent_dim
     v_hat = v_hat.view(-1, embed_dim)
-    loss_nll = (
-        -model.latent.log_prob(v_hat, distr_idx=distr_idx).mean() - surrogate_loss
-    )
+    loss_nll = -model.latent.log_prob(v_hat, distr_idx=distr_idx).mean() - surrogate_loss
 
     loss = beta * loss_reconstruction + loss_nll
     return loss, loss_reconstruction, loss_nll, surrogate_loss
@@ -106,9 +104,7 @@ def data_loader(
     distr_labels = [x[1] for x in causal_celeba_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(
-            f"Batch size must be at least {unique_distrs} for stratified sampling."
-        )
+        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
     # Define the DataLoader
@@ -243,9 +239,7 @@ if __name__ == "__main__":
         optimizer, T_max=max_epochs, eta_min=lr_min
     )  # T_max = total epochs
 
-    top_k_saver = TopKModelSaver(
-        checkpoint_dir, k=5
-    )  # Initialize the top-k model saver
+    top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
 
     train_loader = data_loader(
         root_dir=root,
@@ -320,9 +314,7 @@ if __name__ == "__main__":
         # Log training and validation loss
         if debug or epoch % 10 == 0:
             print()
-            print(
-                f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}"
-            )
+            print(f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}")
 
             # sample images from normalizing flow
             for distr_idx in train_loader.dataset.distr_idx_list:

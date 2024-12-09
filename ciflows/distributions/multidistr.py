@@ -159,9 +159,7 @@ class ClusteredCausalDistribution(MultidistrCausalFlow):
             ind_noise_dim = 0
         self.ind_noise_dim = ind_noise_dim
         if self.ind_noise_dim > 0:
-            self.ind_noise_q0 = nf.distributions.DiagGaussian(
-                ind_noise_dim, trainable=True
-            )
+            self.ind_noise_q0 = nf.distributions.DiagGaussian(ind_noise_dim, trainable=True)
 
         if cluster_sizes is None:
             cluster_sizes = [1] * adjacency_matrix.shape[0]
@@ -176,15 +174,11 @@ class ClusteredCausalDistribution(MultidistrCausalFlow):
 
         self.dag = nx.DiGraph(adjacency_matrix)
         self.latent_dim = (
-            self.dag.number_of_nodes()
-            if self.cluster_sizes is None
-            else np.sum(self.cluster_sizes)
+            self.dag.number_of_nodes() if self.cluster_sizes is None else np.sum(self.cluster_sizes)
         ) + self.ind_noise_dim
 
         if input_shape is not None:
-            assert np.sum(self.cluster_sizes) + self.ind_noise_dim == np.prod(
-                input_shape
-            )
+            assert np.sum(self.cluster_sizes) + self.ind_noise_dim == np.prod(input_shape)
 
         # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -237,9 +231,7 @@ class ClusteredCausalDistribution(MultidistrCausalFlow):
             for node1, node2 in self.confounded_variables:
                 # self.confounder_mapping[node1].append(node2)
                 if node1 not in self.dag.nodes or node2 not in self.dag.nodes:
-                    raise ValueError(
-                        f"Confounded variable {node1}, or {node2} is not in the DAG."
-                    )
+                    raise ValueError(f"Confounded variable {node1}, or {node2} is not in the DAG.")
 
             # sample the confounding variable distribution parameters
             confounder_cluster_sizes = []
@@ -401,18 +393,14 @@ class ClusteredCausalDistribution(MultidistrCausalFlow):
             # compute the log probability of the variable given the
             # parametrized normal distribution using the parents mean and variance
             log_p += (
-                torch.distributions.Normal(
-                    parent_contribution + noise_contribution, var.sqrt()
-                )
+                torch.distributions.Normal(parent_contribution + noise_contribution, var.sqrt())
                 .log_prob(samples[:, cluster_idx])
                 .mean(axis=1)
             )
 
         # sample from the independent noise distributions
         if self.ind_noise_dim > 0:
-            samples[:, -self.ind_noise_dim :], ind_log_p = self.ind_noise_q0.forward(
-                num_samples
-            )
+            samples[:, -self.ind_noise_dim :], ind_log_p = self.ind_noise_q0.forward(num_samples)
             log_p += ind_log_p
 
         # reshape for the rest of the flow
@@ -537,8 +525,7 @@ class ClusteredCausalDistribution(MultidistrCausalFlow):
 
                 # compute the contribution of the parents
                 if len(parents) == 0 or (
-                    intervention_targets_env[0, idx] == 1
-                    and hard_interventions_env[0, idx] == 1
+                    intervention_targets_env[0, idx] == 1 and hard_interventions_env[0, idx] == 1
                 ):
                     parent_contribution = 0.0
                     var = self.noise_stds[noise_env_idx][idx] ** 2
@@ -558,9 +545,7 @@ class ClusteredCausalDistribution(MultidistrCausalFlow):
                     parent_contribution = torch.zeros_like(v_env[:, cluster_idx])
                     for jdx, p in enumerate(parents):
                         p_cluster_idx = np.arange(*self.cluster_mapping[p], dtype=int)
-                        parent_contribution += (
-                            parent_coeffs[jdx] * v_env[:, p_cluster_idx]
-                        )
+                        parent_contribution += parent_coeffs[jdx] * v_env[:, p_cluster_idx]
 
                     # print('\n\n Parent contribution is nonzero')
                     # print(parent_contribution.shape, parent_coeffs.shape)
@@ -578,9 +563,7 @@ class ClusteredCausalDistribution(MultidistrCausalFlow):
                 if self.confounded_variables is not None:
                     # add the contribution for each confounder to this variable
                     for confounder_idx in self.confounder_mapping[idx]:
-                        confounder_coeff = self.confounder_coeff_values[confounder_idx][
-                            str(idx)
-                        ]
+                        confounder_coeff = self.confounder_coeff_values[confounder_idx][str(idx)]
                         confounder_means = self.confounder_means[confounder_idx]
                         confounder_stds = self.confounder_stds[confounder_idx]
 
@@ -605,9 +588,7 @@ class ClusteredCausalDistribution(MultidistrCausalFlow):
                     parent_contribution + noise_contribution + confounder_contribution,
                     var.sqrt(),
                 )
-                log_p_distr = (distr.log_prob(v_env[:, cluster_idx]).sum(axis=1)).to(
-                    log_p.device
-                )
+                log_p_distr = (distr.log_prob(v_env[:, cluster_idx]).sum(axis=1)).to(log_p.device)
                 log_p[env_mask] += log_p_distr
 
         # sample from the independent noise distributions

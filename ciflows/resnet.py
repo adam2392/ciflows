@@ -73,9 +73,7 @@ class ConvTBlock(nn.Module):
 
 
 class ConvNetEncoder(nn.Module):
-    def __init__(
-        self, latent_dim, in_channels, hidden_dim=512, start_channels=32, debug=False
-    ):
+    def __init__(self, latent_dim, in_channels, hidden_dim=512, start_channels=32, debug=False):
         super(ConvNetEncoder, self).__init__()
 
         self.convblocks = nn.Sequential()
@@ -115,9 +113,7 @@ class ConvNetEncoder(nn.Module):
 
 
 class ConvNetDecoder(nn.Module):
-    def __init__(
-        self, latent_dim, out_channels, hidden_dim=512, start_channels=32, debug=False
-    ):
+    def __init__(self, latent_dim, out_channels, hidden_dim=512, start_channels=32, debug=False):
         super(ConvNetDecoder, self).__init__()
 
         # 4x Residual Blocks with inner_dim=512
@@ -179,9 +175,7 @@ class ConvNetDecoder(nn.Module):
             in_channels = out_channels
 
         self.convblocks.append(
-            nn.ConvTranspose2d(
-                in_channels, out_chs, kernel_size=kernel_size, stride=2, padding=1
-            )
+            nn.ConvTranspose2d(in_channels, out_chs, kernel_size=kernel_size, stride=2, padding=1)
         )
         if debug:
             print(

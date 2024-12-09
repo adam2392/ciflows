@@ -9,9 +9,7 @@ import torch.autograd as autograd
 from ciflows.loss import sample_orthonormal_vectors, volume_change_surrogate_transformer
 from ciflows.vit import VisionTransformerDecoder, VisionTransformerEncoder
 
-SurrogateOutput = namedtuple(
-    "SurrogateOutput", ["surrogate", "z", "x1", "regularizations"]
-)
+SurrogateOutput = namedtuple("SurrogateOutput", ["surrogate", "z", "x1", "regularizations"])
 
 
 def test_volume_change_surrogate_shape():
@@ -86,9 +84,7 @@ def sample_v(x: torch.Tensor, hutchinson_samples: int, manifold=None) -> torch.T
         )
 
     if manifold is None:
-        v = torch.randn(
-            batch_size, total_dim, hutchinson_samples, device=x.device, dtype=x.dtype
-        )
+        v = torch.randn(batch_size, total_dim, hutchinson_samples, device=x.device, dtype=x.dtype)
         q = torch.linalg.qr(v).Q.reshape(*x.shape, hutchinson_samples)
         return q * sqrt(total_dim)
     # M-FFF: Sample v in the tangent space of the manifold at x
@@ -199,12 +195,8 @@ def test_compare_surrogates():
         surrogate_output_v1.surrogate, surrogate_loss_v2
     ), "Surrogate losses do not match."
 
-    assert torch.allclose(
-        surrogate_output_v1.z, v_v2
-    ), "Latent representations do not match."
-    assert torch.allclose(
-        surrogate_output_v1.x1, xhat_v2
-    ), "Reconstructions do not match."
+    assert torch.allclose(surrogate_output_v1.z, v_v2), "Latent representations do not match."
+    assert torch.allclose(surrogate_output_v1.x1, xhat_v2), "Reconstructions do not match."
 
     # Compare outputs
     print()
@@ -214,11 +206,7 @@ def test_compare_surrogates():
     print(f"Surrogate Loss V2: {surrogate_loss_v2}")
 
     # Compare latent representations
-    print(
-        f"Latent Representation Difference (z): {torch.abs(surrogate_output_v1.z - v_v2).sum()}"
-    )
+    print(f"Latent Representation Difference (z): {torch.abs(surrogate_output_v1.z - v_v2).sum()}")
 
     # Compare reconstructions
-    print(
-        f"Reconstruction Difference (x1): {torch.abs(surrogate_output_v1.x1 - xhat_v2).sum()}"
-    )
+    print(f"Reconstruction Difference (x1): {torch.abs(surrogate_output_v1.x1 - xhat_v2).sum()}")

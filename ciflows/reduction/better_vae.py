@@ -5,9 +5,7 @@ import torch.nn.functional as F
 
 # Basic convolutional block with optional batch normalization and activation
 class ConvBlock(nn.Module):
-    def __init__(
-        self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, use_bn=True
-    ):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, use_bn=True):
         super().__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
         self.bn = nn.BatchNorm2d(out_channels) if use_bn else nn.Identity()
@@ -64,24 +62,16 @@ class Decoder(nn.Module):
         x = self.fc(z).view(-1, 1024, 8, 8)
 
         # Up-sampling and skip connections
-        x = F.interpolate(
-            self.up5(x), scale_factor=2, mode="bilinear", align_corners=False
-        )
+        x = F.interpolate(self.up5(x), scale_factor=2, mode="bilinear", align_corners=False)
         x = torch.cat([x, self._resize_to_match(x, skips[3])], dim=1)
 
-        x = F.interpolate(
-            self.up4(x), scale_factor=2, mode="bilinear", align_corners=False
-        )
+        x = F.interpolate(self.up4(x), scale_factor=2, mode="bilinear", align_corners=False)
         x = torch.cat([x, self._resize_to_match(x, skips[2])], dim=1)
 
-        x = F.interpolate(
-            self.up3(x), scale_factor=2, mode="bilinear", align_corners=False
-        )
+        x = F.interpolate(self.up3(x), scale_factor=2, mode="bilinear", align_corners=False)
         x = torch.cat([x, self._resize_to_match(x, skips[1])], dim=1)
 
-        x = F.interpolate(
-            self.up2(x), scale_factor=2, mode="bilinear", align_corners=False
-        )
+        x = F.interpolate(self.up2(x), scale_factor=2, mode="bilinear", align_corners=False)
         x = torch.cat([x, self._resize_to_match(x, skips[0])], dim=1)
 
         # Final layer
@@ -90,9 +80,7 @@ class Decoder(nn.Module):
 
     def _resize_to_match(self, x, skip):
         """Resize skip connection tensor to match the spatial dimensions of x."""
-        return F.interpolate(
-            skip, size=x.shape[2:], mode="bilinear", align_corners=False
-        )
+        return F.interpolate(skip, size=x.shape[2:], mode="bilinear", align_corners=False)
 
 
 # VAE-U-Net model
@@ -131,9 +119,7 @@ if __name__ == "__main__":
     latent_dim = 48
 
     # Create the model
-    model = VAEUNet(
-        in_channels=in_channels, out_channels=out_channels, latent_dim=latent_dim
-    )
+    model = VAEUNet(in_channels=in_channels, out_channels=out_channels, latent_dim=latent_dim)
 
     # Generate a random input tensor of shape (batch_size, channels, height, width)
     batch_size = 1  # Single image for testing
@@ -141,6 +127,10 @@ if __name__ == "__main__":
 
     # Pass the input through the model
     recon_x, mu, logvar = model(test_input)
+
+    # print reconstruction loss
+    loss = F.mse_loss(recon_x, test_input)
+    print(loss.mean())
 
     # Print results
     print(f"Input Shape: {test_input.shape}")

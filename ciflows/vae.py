@@ -5,12 +5,8 @@ import torch.nn as nn
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1, dropout=0.0):
         super(ResidualBlock, self).__init__()
-        self.conv1 = nn.Conv2d(
-            in_channels, out_channels, kernel_size=3, stride=stride, padding=1
-        )
-        self.conv2 = nn.Conv2d(
-            out_channels, out_channels, kernel_size=3, stride=1, padding=1
-        )
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
 
         # Shortcut connection to downsample residual
         self.shortcut = (
@@ -36,9 +32,7 @@ class ResidualBlock(nn.Module):
 class UpsampleBlock(nn.Module):
     def __init__(self, in_channels, out_channels, dropout=0.0):
         super(UpsampleBlock, self).__init__()
-        self.conv = nn.Conv2d(
-            in_channels, out_channels, kernel_size=3, stride=1, padding=1
-        )
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
         self.upsample = nn.Upsample(scale_factor=2, mode="nearest")
         self.shortcut = (
             nn.Conv2d(in_channels, out_channels, kernel_size=1)
@@ -91,9 +85,7 @@ class Encoder(nn.Module):
         assert n_compression_layers > 1, "n_compression_layers must be greater than 1"
         # Wrapping the layers in a Sequential block
         self.layers = nn.Sequential(
-            ResidualBlock(
-                in_channels, 32, stride=2, dropout=dropout
-            ),  # Initial channels
+            ResidualBlock(in_channels, 32, stride=2, dropout=dropout),  # Initial channels
         )
 
         # for idx in range(1, n_bottleneck_layers + 1):
@@ -131,12 +123,8 @@ class Encoder(nn.Module):
         #     nn.Linear(hidden_dim, embed_dim),
         #     nn.Dropout(dropout),
         # )
-        self.fc_mu = nn.Linear(
-            out_ch * self.final_conv_size * self.final_conv_size, embed_dim
-        )
-        self.fc_logvar = nn.Linear(
-            out_ch * self.final_conv_size * self.final_conv_size, embed_dim
-        )
+        self.fc_mu = nn.Linear(out_ch * self.final_conv_size * self.final_conv_size, embed_dim)
+        self.fc_logvar = nn.Linear(out_ch * self.final_conv_size * self.final_conv_size, embed_dim)
 
     def forward(self, x):
         x = self.layers(x)
@@ -194,9 +182,7 @@ class Decoder(nn.Module):
             out_ch = int(32 * (2 ** (n_upsample_layers - idx)))
             if debug:
                 print(in_ch, out_ch)
-            self.bottleneck_layers.append(
-                ResidualBlock(in_ch, out_ch, stride=1, dropout=dropout)
-            )
+            self.bottleneck_layers.append(ResidualBlock(in_ch, out_ch, stride=1, dropout=dropout))
 
         self.upsample_layers = nn.Sequential()
         for idx in range(n_upsample_layers - 1, 0, -1):
@@ -245,9 +231,7 @@ class ConvEncoder(nn.Module):
     def __init__(self, channels: int, hidden_size: int, height: int, width: int):
         super(ConvEncoder, self).__init__()
 
-        assert (
-            height % 4 == 0 and width % 4 == 0
-        ), "Choose height and width to be divisible by 4"
+        assert height % 4 == 0 and width % 4 == 0, "Choose height and width to be divisible by 4"
 
         self.channels = channels
         self.height = height
@@ -276,9 +260,7 @@ class ConvEncoder(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=3, stride=2),  # Output: 128x3x3
             Flatten(),
-            nn.Linear(
-                128 * final_height * final_width, 32 * final_height * final_width
-            ),
+            nn.Linear(128 * final_height * final_width, 32 * final_height * final_width),
             nn.LeakyReLU(),
             nn.BatchNorm1d(32 * final_height * final_width),
             nn.Linear(32 * final_height * final_width, hidden_size),
@@ -340,9 +322,7 @@ class Conv_VAE(nn.Module):
     ):
         super(Conv_VAE, self).__init__()
 
-        assert (
-            height % 4 == 0 and width % 4 == 0
-        ), "Choose height and width to be divisible by 4"
+        assert height % 4 == 0 and width % 4 == 0, "Choose height and width to be divisible by 4"
 
         self.channels = channels
         self.height = height
@@ -452,8 +432,7 @@ class Conv_VAE(nn.Module):
         log_p = -0.5 * self.hidden_size * torch.log(
             torch.Tensor([2 * torch.pi]).to(vhat.device)
         ) - torch.sum(
-            self.log_scale
-            + 0.5 * torch.pow((vhat - self.loc) / torch.exp(self.log_scale), 2)
+            self.log_scale + 0.5 * torch.pow((vhat - self.loc) / torch.exp(self.log_scale), 2)
         )
         return log_p
 

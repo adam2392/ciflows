@@ -236,9 +236,7 @@ class plInjFlowModel(pl.LightningModule):
         # return optimizer_list, scheduler_list
         return [optimizer_mse, optimizer_nll], [scheduler, scheduler_nll]
 
-    def optimizer_step(
-        self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure
-    ):
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure):
         if self.debug:
             print()
         # Only step optimizer 1 during the first phase
@@ -269,9 +267,9 @@ class plInjFlowModel(pl.LightningModule):
             v_latent = self.inj_model.inverse(x)
             v_latent_recon = self.inj_model.inverse(x_reconstructed)
 
-            loss = torch.nn.functional.mse_loss(
-                x_reconstructed, x
-            ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
+            loss = torch.nn.functional.mse_loss(x_reconstructed, x) + torch.nn.functional.mse_loss(
+                v_latent_recon, v_latent
+            )
 
             # check if any nans
             if self.debug:
@@ -282,9 +280,7 @@ class plInjFlowModel(pl.LightningModule):
                         x_reconstructed.shape,
                     )
                 if torch.isnan(v_latent_recon).any():
-                    print(
-                        "v_latent_recon has nans", v_latent_recon, v_latent_recon.shape
-                    )
+                    print("v_latent_recon has nans", v_latent_recon, v_latent_recon.shape)
 
             optimizer_mse.zero_grad()
             self.manual_backward(loss)
@@ -331,16 +327,10 @@ class plInjFlowModel(pl.LightningModule):
 
         # logging the loss
         self.log("train_loss", loss)
-        if (
-            self.current_epoch % self.check_val_every_n_epoch == 0
-            and batch_idx == 0
-            or self.debug
-        ):
+        if self.current_epoch % self.check_val_every_n_epoch == 0 and batch_idx == 0 or self.debug:
 
             print()
-            print(
-                f"train_loss: {loss} | lr: {lr} | epoch_counter: {self.current_epoch}"
-            )
+            print(f"train_loss: {loss} | lr: {lr} | epoch_counter: {self.current_epoch}")
 
         if (
             self.check_samples_every_n_epoch is not None
@@ -372,9 +362,9 @@ class plInjFlowModel(pl.LightningModule):
             # reconstruct the latents
             v_latent_recon = self.inj_model.inverse(x_reconstructed)
 
-            loss = torch.nn.functional.mse_loss(
-                x_reconstructed, x
-            ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
+            loss = torch.nn.functional.mse_loss(x_reconstructed, x) + torch.nn.functional.mse_loss(
+                v_latent_recon, v_latent
+            )
         else:
             # nll_loss = self.inj_model.forward_kld(x)
 
@@ -396,11 +386,7 @@ class plInjFlowModel(pl.LightningModule):
         self.log("val_loss", loss)
 
         # Print the loss to the console
-        if (
-            self.current_epoch % self.check_val_every_n_epoch == 0
-            and batch_idx == 0
-            or self.debug
-        ):
+        if self.current_epoch % self.check_val_every_n_epoch == 0 and batch_idx == 0 or self.debug:
             print()
             print(
                 f"Nsteps_mse {self.n_steps_mse}, epoch_counter: {self.current_epoch}, val_loss: {loss}"
@@ -483,9 +469,9 @@ class plCausalInjFlowModel(pl.LightningModule):
             v_latent = self.inj_model.inverse(x)
             v_latent_recon = self.inj_model.inverse(x_reconstructed)
 
-            loss = torch.nn.functional.mse_loss(
-                x_reconstructed, x
-            ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
+            loss = torch.nn.functional.mse_loss(x_reconstructed, x) + torch.nn.functional.mse_loss(
+                v_latent_recon, v_latent
+            )
 
             # check if any nans
             if self.debug:
@@ -496,9 +482,7 @@ class plCausalInjFlowModel(pl.LightningModule):
                         x_reconstructed.shape,
                     )
                 if torch.isnan(v_latent_recon).any():
-                    print(
-                        "v_latent_recon has nans", v_latent_recon, v_latent_recon.shape
-                    )
+                    print("v_latent_recon has nans", v_latent_recon, v_latent_recon.shape)
 
             optimizer_mse.zero_grad()
             self.manual_backward(loss)
@@ -537,16 +521,10 @@ class plCausalInjFlowModel(pl.LightningModule):
 
         # logging the loss
         self.log("train_loss", loss)
-        if (
-            self.current_epoch % self.check_val_every_n_epoch == 0
-            and batch_idx == 0
-            or self.debug
-        ):
+        if self.current_epoch % self.check_val_every_n_epoch == 0 and batch_idx == 0 or self.debug:
 
             print()
-            print(
-                f"train_loss: {loss} | lr: {lr} | epoch_counter: {self.current_epoch}"
-            )
+            print(f"train_loss: {loss} | lr: {lr} | epoch_counter: {self.current_epoch}")
 
         if (
             self.check_samples_every_n_epoch is not None
@@ -571,9 +549,9 @@ class plCausalInjFlowModel(pl.LightningModule):
             # reconstruct the latents
             v_latent_recon = self.inj_model.inverse(x_reconstructed)
 
-            loss = torch.nn.functional.mse_loss(
-                x_reconstructed, x
-            ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
+            loss = torch.nn.functional.mse_loss(x_reconstructed, x) + torch.nn.functional.mse_loss(
+                v_latent_recon, v_latent
+            )
         else:
             inj_v = self.inj_model.inverse(x)
             vhat, log_q = self.bij_model.inverse_and_log_det(inj_v)
@@ -587,11 +565,7 @@ class plCausalInjFlowModel(pl.LightningModule):
         self.log("val_loss", loss)
 
         # Print the loss to the console
-        if (
-            self.current_epoch % self.check_val_every_n_epoch == 0
-            and batch_idx == 0
-            or self.debug
-        ):
+        if self.current_epoch % self.check_val_every_n_epoch == 0 and batch_idx == 0 or self.debug:
             print()
             print(
                 f"Nsteps_mse {self.n_steps_mse}, epoch_counter: {self.current_epoch}, val_loss: {loss}"
@@ -713,9 +687,7 @@ class plCausalInjFlowModel(pl.LightningModule):
         # return optimizer_list, scheduler_list
         return [optimizer_mse, optimizer_nll], [scheduler, scheduler_nll]
 
-    def optimizer_step(
-        self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure
-    ):
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure):
         if self.debug:
             print()
         # Only step optimizer 1 during the first phase

@@ -49,9 +49,7 @@ def nonmarkov_bar_digit_scm(intervention_idx, labels):
         color_digit_means = torch.linspace(
             0, 1, 10
         )  # 10 possible digits, evenly spaced means from 0 to 1
-        color_digit_stds = 0.15 * torch.ones(
-            10
-        )  # Standard deviation of 0.15 for each digit
+        color_digit_stds = 0.15 * torch.ones(10)  # Standard deviation of 0.15 for each digit
         causal_labels["intervention_targets"] = torch.Tensor([[0, 0, 0]] * n_samples)
     elif intervention_idx == 1:
         # Observational distribution
@@ -60,9 +58,7 @@ def nonmarkov_bar_digit_scm(intervention_idx, labels):
             0, 2, 10
         )  # 10 possible digits, evenly spaced means from 0 to 1
         color_digit_means = torch.flip(color_digit_means, [0]) / color_digit_means.sum()
-        color_digit_stds = 0.15 * torch.ones(
-            10
-        )  # Standard deviation of 0.15 for each digit
+        color_digit_stds = 0.15 * torch.ones(10)  # Standard deviation of 0.15 for each digit
         causal_labels["intervention_targets"] = torch.Tensor([[0, 1, 0]] * n_samples)
     elif intervention_idx == 2:
         # Define the skewed probabilities (higher for digits 5-9)
@@ -76,9 +72,7 @@ def nonmarkov_bar_digit_scm(intervention_idx, labels):
         sampling_probabilities = digit_probabilities[labels]
 
         # Sample with replacement using the skewed probabilities
-        digit_idx = torch.multinomial(
-            sampling_probabilities, n_samples, replacement=True
-        )
+        digit_idx = torch.multinomial(sampling_probabilities, n_samples, replacement=True)
         # Get the sampled labels
         digit = labels[digit_idx]
 
@@ -87,9 +81,7 @@ def nonmarkov_bar_digit_scm(intervention_idx, labels):
         color_digit_means = torch.linspace(
             0, 1, 10
         )  # 10 possible digits, evenly spaced means from 0 to 1
-        color_digit_stds = 0.15 * torch.ones(
-            10
-        )  # Standard deviation of 0.15 for each digit
+        color_digit_stds = 0.15 * torch.ones(10)  # Standard deviation of 0.15 for each digit
         causal_labels["intervention_targets"] = torch.Tensor([[1, 0, 0]] * n_samples)
     else:
         raise ValueError("Invalid intervention_idx. Must be 0, 1, 2 or 3.")

@@ -44,9 +44,7 @@ def sample_linear_gaussian_dag(
         node_dim = cluster_sizes[i]
 
         for distr_idx in range(intervention_targets_per_distr.shape[0]):
-            intervention_targets = np.argwhere(
-                intervention_targets_per_distr[distr_idx] == 1
-            )
+            intervention_targets = np.argwhere(intervention_targets_per_distr[distr_idx] == 1)
             # print('INtervention targets: ', intervention_targets)
 
             # add the exogenous node
@@ -86,18 +84,12 @@ def sample_linear_gaussian_dag(
 def sample_from_dag(dag, n_samples=100, distr_idx=0, device="cpu"):
     # sample in topological order
     nodes = [
-        node
-        for node in nx.topological_sort(dag)
-        if not dag.nodes[node].get("exogenous", False)
+        node for node in nx.topological_sort(dag) if not dag.nodes[node].get("exogenous", False)
     ]
 
     # get cluster sizes per node in topological order
     cluster_sizes = torch.tensor(
-        [
-            dag.nodes[node]["dim"]
-            for node in nodes
-            if not dag.nodes[node].get("exogenous", False)
-        ]
+        [dag.nodes[node]["dim"] for node in nodes if not dag.nodes[node].get("exogenous", False)]
     )
     samples = torch.zeros((n_samples, cluster_sizes.sum())).to(device)
 
@@ -111,13 +103,9 @@ def sample_from_dag(dag, n_samples=100, distr_idx=0, device="cpu"):
 
         # parametrize the multivariate normal distribution
         parametrized_mean = torch.zeros(n_samples, cluster_sizes[idx])
-        parametrized_variance = torch.zeros(
-            n_samples, cluster_sizes[idx], cluster_sizes[idx]
-        )
+        parametrized_variance = torch.zeros(n_samples, cluster_sizes[idx], cluster_sizes[idx])
 
-        node_idx = np.arange(
-            cluster_sizes[:idx].sum(), cluster_sizes[: idx + 1].sum(), dtype=int
-        )
+        node_idx = np.arange(cluster_sizes[:idx].sum(), cluster_sizes[: idx + 1].sum(), dtype=int)
         node_dim = cluster_sizes[idx]
 
         # accumulate the mean and variance
@@ -183,16 +171,10 @@ def log_prob_from_dag(
     n_samples, n_dims = X.shape
     # get the nodes in topological order
     nodes = [
-        node
-        for node in nx.topological_sort(dag)
-        if not dag.nodes[node].get("exogenous", False)
+        node for node in nx.topological_sort(dag) if not dag.nodes[node].get("exogenous", False)
     ]
     cluster_sizes = torch.tensor(
-        [
-            dag.nodes[node]["dim"]
-            for node in nodes
-            if not dag.nodes[node].get("exogenous", False)
-        ]
+        [dag.nodes[node]["dim"] for node in nodes if not dag.nodes[node].get("exogenous", False)]
     )
 
     if debug:
@@ -220,9 +202,7 @@ def log_prob_from_dag(
             if debug:
                 print("Node idx: ", node_idx, idx, node)
             parents = [
-                par
-                for par in dag.predecessors(node)
-                if not dag.nodes[par].get("exogenous", False)
+                par for par in dag.predecessors(node) if not dag.nodes[par].get("exogenous", False)
             ]
 
             # get exogenous parents for this distribution index
@@ -255,16 +235,11 @@ def log_prob_from_dag(
             par_contributions = torch.zeros((len(env_mask), node_dim)).to(X.device)
 
             # accumulate the mean and variance from the parents
-            if (
-                intervention_targets_env[0, idx] != 1
-                and hard_interventions_env[0, idx] != 1
-            ):
+            if intervention_targets_env[0, idx] != 1 and hard_interventions_env[0, idx] != 1:
                 exogenous_parents = exogenous_parents + confounded_parents
                 for par in parents:
                     par_weight = torch.atleast_2d(dag[par][node]["weight"]).to(X.device)
-                    par_node_idx = (
-                        np.argwhere(np.array(nodes) == par).flatten().squeeze()
-                    )
+                    par_node_idx = np.argwhere(np.array(nodes) == par).flatten().squeeze()
 
                     par_idx = np.arange(
                         cluster_sizes[:par_node_idx].sum(),
@@ -384,9 +359,7 @@ class ClusteredLinearGaussianDistribution(MultidistrCausalFlow):
     @property
     def latent_dim(self):
         latent_nodes = [
-            node
-            for node in self.dag.nodes
-            if not self.dag.nodes[node].get("exogenous", False)
+            node for node in self.dag.nodes if not self.dag.nodes[node].get("exogenous", False)
         ]
         return sum([self.dag[node].get("dim", 1) for node in latent_nodes])
 
@@ -466,6 +439,4 @@ class ClusteredLinearGaussianDistribution(MultidistrCausalFlow):
         log_p : Tensor of shape (n_distributions, 1)
             The log probability of the latent variables in each distribution.
         """
-        return log_prob_from_dag(
-            self.dag, v_latent, e, intervention_targets, hard_interventions
-        )
+        return log_prob_from_dag(self.dag, v_latent, e, intervention_targets, hard_interventions)

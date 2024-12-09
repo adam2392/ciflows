@@ -30,12 +30,8 @@ class MNISTDataModule(pl.LightningDataModule):
         self.fast_dev_run = fast_dev_run
 
     def setup(self, stage: str):
-        self.mnist_test = MNIST(
-            self.data_dir, download=True, train=False, transform=self.transform
-        )
-        mnist_full = MNIST(
-            self.data_dir, download=True, train=True, transform=self.transform
-        )
+        self.mnist_test = MNIST(self.data_dir, download=True, train=False, transform=self.transform)
+        mnist_full = MNIST(self.data_dir, download=True, train=True, transform=self.transform)
         if self.fast_dev_run:
             self.mnist_train, self.mnist_val = random_split(
                 mnist_full,
@@ -65,6 +61,4 @@ class MNISTDataModule(pl.LightningDataModule):
         )
 
     def test_dataloader(self):
-        return DataLoader(
-            self.mnist_test, batch_size=self.batch_size, num_workers=self.num_workers
-        )
+        return DataLoader(self.mnist_test, batch_size=self.batch_size, num_workers=self.num_workers)

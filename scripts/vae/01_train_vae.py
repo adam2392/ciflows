@@ -39,14 +39,10 @@ class VAE(nn.Module):
             nn.Linear(128, 64 * 7 * 7),
             nn.ReLU(),
             nn.Unflatten(1, (64, 7, 7)),
-            nn.ConvTranspose2d(
-                64, 32, kernel_size=4, stride=2, padding=1
-            ),  # Input: 64x7x7
+            nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1),  # Input: 64x7x7
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.ConvTranspose2d(
-                32, 1, kernel_size=4, stride=2, padding=1
-            ),  # Input: 32x14x14
+            nn.ConvTranspose2d(32, 1, kernel_size=4, stride=2, padding=1),  # Input: 32x14x14
             nn.Sigmoid(),  # Output: 1x28x28
         )
 
@@ -87,28 +83,18 @@ if __name__ == "__main__":
         accelerator = "cpu"
 
     # MNIST dataset loader
-    transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
-    )
-    train_dataset = datasets.MNIST(
-        root="./data", train=True, transform=transform, download=True
-    )
-    train_loader = DataLoader(
-        dataset=train_dataset, batch_size=batch_size, shuffle=True
-    )
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+    train_dataset = datasets.MNIST(root="./data", train=True, transform=transform, download=True)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
 
-    val_dataset = datasets.MNIST(
-        root="./data", train=False, transform=transform, download=True
-    )
+    val_dataset = datasets.MNIST(root="./data", train=False, transform=transform, download=True)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False)
 
     # Initialize your Encoder and Decoder
     channels = 1  # For grayscale images (like MNIST); set to 3 for RGB (like CelebA)
     height = 28  # Height of the input image (28 for MNIST)
     width = 28  # Width of the input image (28 for MNIST)
-    model = Conv_VAE(channels=channels, height=height, width=width, hidden_size=16).to(
-        device
-    )
+    model = Conv_VAE(channels=channels, height=height, width=width, hidden_size=16).to(device)
     # encoder = Encoder(
     #     in_channels=1,
     #     img_size=28,

@@ -27,9 +27,7 @@ def print_transforms(transforms, indent=0):
             print("  " * indent + f"Transformation {i+1}: OneOf")
             print_transforms(transform.transforms, indent + 1)
         else:
-            print(
-                "  " * indent + f"Transformation {i+1}: {transform.__class__.__name__}"
-            )
+            print("  " * indent + f"Transformation {i+1}: {transform.__class__.__name__}")
 
 
 # Albumentations transformations pipeline
@@ -78,9 +76,7 @@ def get_random_transforms(image_size):
     )
 
 
-def obs_sample_img_indices(
-    male_attrs, young_attrs, hair_attrs, n_samples=1000, seed=None
-):
+def obs_sample_img_indices(male_attrs, young_attrs, hair_attrs, n_samples=1000, seed=None):
     """Set up the observational SCM."""
     rng = np.random.default_rng(seed)
 
@@ -136,9 +132,7 @@ def obs_sample_img_indices(
 
         # now sample an individual that is Male, Old and X-Hair color
         matching_indices = image_attrs[
-            (image_attrs[:, 1] == gender)
-            & (image_attrs[:, 2] == age)
-            & (image_attrs[:, 3] == hair)
+            (image_attrs[:, 1] == gender) & (image_attrs[:, 2] == age) & (image_attrs[:, 3] == hair)
         ][
             :, 0
         ].tolist()  # Extract indices
@@ -211,9 +205,7 @@ def interventional_sample_img_indices(
 
         # now sample an individual that is Male, Old and X-Hair color
         matching_indices = image_attrs[
-            (image_attrs[:, 1] == gender)
-            & (image_attrs[:, 2] == age)
-            & (image_attrs[:, 3] == hair)
+            (image_attrs[:, 1] == gender) & (image_attrs[:, 2] == age) & (image_attrs[:, 3] == hair)
         ][
             :, 0
         ].tolist()  # Extract indices
@@ -298,9 +290,7 @@ def celeba_scm(
 
         # Convert to a PIL Image
         # Convert to a PIL Image
-        transformed_image = (
-            transformed_image * 0.5 + 0.5
-        )  # Undo normalization (if applied)
+        transformed_image = transformed_image * 0.5 + 0.5  # Undo normalization (if applied)
         transformed_image = (transformed_image.numpy() * 255).astype(np.uint8)
         if transformed_image.shape[0] == 3:
             transformed_image = np.transpose(transformed_image, (1, 2, 0))
@@ -379,15 +369,11 @@ if __name__ == "__main__":
         # Check if the files already exist and append if they do
         if causal_attrs_path.exists():
             existing_causal_df = pd.read_csv(causal_attrs_path, index_col=0)
-            saved_causal_df = pd.concat(
-                [existing_causal_df, saved_causal_df], ignore_index=True
-            )
+            saved_causal_df = pd.concat([existing_causal_df, saved_causal_df], ignore_index=True)
 
         if meta_attrs_path.exists():
             existing_attrs_df = pd.read_csv(meta_attrs_path, index_col=0)
-            saved_attrs_df = pd.concat(
-                [existing_attrs_df, saved_attrs_df], ignore_index=True
-            )
+            saved_attrs_df = pd.concat([existing_attrs_df, saved_attrs_df], ignore_index=True)
 
     saved_causal_df.to_csv(causal_attrs_path)
     saved_attrs_df.to_csv(meta_attrs_path)

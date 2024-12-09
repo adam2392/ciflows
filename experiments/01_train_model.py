@@ -32,9 +32,7 @@ if __name__ == "__main__":
     checkpoints_dir = root_dir / "celeba" / "predictor-64x64" / "checkpoints"
     checkpoints_dir.mkdir(exist_ok=True, parents=True)
 
-    data_module = CelebaDataModule(
-        root=root_dir, batch_size=batch_size, num_workers=num_workers
-    )
+    data_module = CelebaDataModule(root=root_dir, batch_size=batch_size, num_workers=num_workers)
 
     # Initialize Model
     base_model = MultiTaskResNet()

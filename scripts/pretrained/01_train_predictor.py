@@ -85,9 +85,7 @@ if __name__ == "__main__":
         ]
     )
 
-    top_k_saver = TopKModelSaver(
-        checkpoint_dir, k=5
-    )  # Initialize the top-k model saver
+    top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
 
     # Load CelebA dataset
     train_dataset = CelebA(root=root, split="train", transform=transform, download=True)
@@ -176,9 +174,7 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             # Forward pass
-            (gender_out, gender_prob), (hair_out, hair_prob), (age_out, age_prob) = (
-                model(images)
-            )
+            (gender_out, gender_prob), (hair_out, hair_prob), (age_out, age_prob) = model(images)
 
             # Calculate loss
             loss_g = loss_gender(gender_out, gender)
@@ -207,9 +203,7 @@ if __name__ == "__main__":
         avg_train_acc_age = acc_age.compute()
 
         lr = scheduler.get_last_lr()[0]
-        print(
-            f"====> Epoch: {epoch} Average train loss: {avg_train_loss:.4f}, LR: {lr:.6f}"
-        )
+        print(f"====> Epoch: {epoch} Average train loss: {avg_train_loss:.4f}, LR: {lr:.6f}")
 
         # Log training results to TensorBoard
         writer.add_scalar("train_loss", avg_train_loss, epoch)

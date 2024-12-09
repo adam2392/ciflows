@@ -126,19 +126,13 @@ class ConvolutionalNeuralNetwork(nn.Module):
         latent_channels *= self.ch_factor
         n_channels = latent_channels + self.hidden_dim
 
-        decoder.append(
-            nn.Linear(self.latent_dim + self.hidden_dim, n_channels * prod(latent_size))
-        )
+        decoder.append(nn.Linear(self.latent_dim + self.hidden_dim, n_channels * prod(latent_size)))
         decoder.append(nn.Unflatten(-1, (n_channels, *latent_size)))
 
         for i, conv_spec in enumerate(self.decoder_spec[1:]):
             is_last_layer = i + 1 == len(self.decoder_spec) - 1
             out_channels, *args = conv_spec
-            out_channels = (
-                out_channels * self.ch_factor
-                if not is_last_layer
-                else self.out_channels
-            )
+            out_channels = out_channels * self.ch_factor if not is_last_layer else self.out_channels
             decoder.append(nn.ConvTranspose2d(n_channels, out_channels, *args))
             if not is_last_layer:
                 if self.batch_norm:
@@ -221,12 +215,8 @@ class MNISTDataModule(pl.LightningDataModule):
         )
 
     def setup(self, stage: str):
-        self.mnist_test = MNIST(
-            self.data_dir, download=True, train=False, transform=self.transform
-        )
-        mnist_full = MNIST(
-            self.data_dir, download=True, train=True, transform=self.transform
-        )
+        self.mnist_test = MNIST(self.data_dir, download=True, train=False, transform=self.transform)
+        mnist_full = MNIST(self.data_dir, download=True, train=True, transform=self.transform)
         self.mnist_train, self.mnist_val = random_split(
             mnist_full, [55000, 5000], generator=torch.Generator().manual_seed(42)
         )
@@ -249,9 +239,7 @@ class MNISTDataModule(pl.LightningDataModule):
         )
 
     def test_dataloader(self):
-        return DataLoader(
-            self.mnist_test, batch_size=self.batch_size, num_workers=self.num_workers
-        )
+        return DataLoader(self.mnist_test, batch_size=self.batch_size, num_workers=self.num_workers)
 
 
 if __name__ == "__main__":

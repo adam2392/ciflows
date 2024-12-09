@@ -35,27 +35,17 @@ if __name__ == "__main__":
         accelerator = "cpu"
 
     # MNIST dataset loader
-    transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
-    )
-    train_dataset = datasets.MNIST(
-        root="./data", train=True, transform=transform, download=True
-    )
-    train_loader = DataLoader(
-        dataset=train_dataset, batch_size=batch_size, shuffle=True
-    )
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+    train_dataset = datasets.MNIST(root="./data", train=True, transform=transform, download=True)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
 
-    val_dataset = datasets.MNIST(
-        root="./data", train=False, transform=transform, download=True
-    )
+    val_dataset = datasets.MNIST(root="./data", train=False, transform=transform, download=True)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False)
 
     torch.autograd.set_detect_anomaly(True)
 
     # Initialize your Encoder and Decoder
-    model = UNet(in_channels=1, out_channels=1, n_layers=2, n_channels_start=32).to(
-        device
-    )
+    model = UNet(in_channels=1, out_channels=1, n_layers=2, n_channels_start=32).to(device)
 
     def count_trainable_parameters(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)

@@ -50,9 +50,7 @@ class Unet(nn.Module):
             self.conv_blocks1.append(ConvBlock(in_ch, out_ch))
 
         # Bridge
-        self.conv_block_bridge = ConvBlock(
-            self.encoder_filters[-1], self.encoder_filters[-1]
-        )
+        self.conv_block_bridge = ConvBlock(self.encoder_filters[-1], self.encoder_filters[-1])
 
         # Decoder conv blocks
         self.conv_blocks2 = nn.ModuleList()
