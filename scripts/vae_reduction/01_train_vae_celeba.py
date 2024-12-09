@@ -138,8 +138,8 @@ def data_loader(
 
 # Reconstruction + KL divergence losses summed over all elements and batch
 def loss_function(recon_x, x, mu, log_var, image_dim):
-    # print(recon_x.shape, x.shape)
-    MSE = F.mse_loss(recon_x.view(-1, image_dim), x.view(-1, image_dim))
+    print(recon_x.shape, x.shape)
+    MSE = F.mse_loss(recon_x, x)
     KLD = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
     kld_weight = 0.00025
     loss = MSE + kld_weight * KLD
@@ -210,7 +210,7 @@ if __name__ == "__main__":
     # )
 
     model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
-    model.apply(weights_init)
+    # model.apply(weights_init)
     model = model.to(device)
     img_size = 128
     image_dim = 3 * img_size * img_size
