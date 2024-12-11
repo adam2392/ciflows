@@ -88,7 +88,9 @@ def volume_change_surrogate_old_transformer(
 
             # from transformer encoding
             eta_samples = sample_orthonormal_vectors(v, hutchinson_samples).to(x.device)
-            eta_samples = eta_samples.reshape(B, n_patches, embed_dim, hutchinson_samples)
+            eta_samples = eta_samples.reshape(
+                B, n_patches, embed_dim, hutchinson_samples
+            )
 
         for k in range(hutchinson_samples):
             eta = eta_samples[..., k]
@@ -165,8 +167,12 @@ def volume_change_surrogate(
         x.requires_grad_()
 
         # encode the data to get the latent representation
-        v = encoder(x)
-        B, embed_dim = v.shape
+        try:
+            v = encoder(x)
+            B, embed_dim = v.shape
+        except Exception as e:
+            print(v.shape)
+            raise Exception(e)
 
         # project to the manifold and store projection distance for the regularization term
         # eta_samples = sample_orthonormal_vectors(x, hutchinson_samples)
@@ -264,7 +270,9 @@ def volume_change_surrogate_transformer(
 
             # from transformer encoding
             eta_samples = sample_orthonormal_vectors(v, hutchinson_samples).to(x.device)
-            eta_samples = eta_samples.reshape(B, n_patches, embed_dim, hutchinson_samples)
+            eta_samples = eta_samples.reshape(
+                B, n_patches, embed_dim, hutchinson_samples
+            )
 
         for k in range(hutchinson_samples):
             eta = eta_samples[..., k]

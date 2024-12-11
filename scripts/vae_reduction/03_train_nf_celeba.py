@@ -86,12 +86,15 @@ def data_loader(
     graph_type="chain",
     num_workers=4,
     batch_size=32,
+    image_size=64,
 ):
     # Define the image transformations
     image_transform = transforms.Compose(
         [
-            transforms.Resize((64, 64), antialias=True),  # Resize images to 128x128
-            transforms.CenterCrop(64),  # Ensure square crop
+            transforms.Resize(
+                (image_size, image_size), antialias=True
+            ),  # Resize images to 128x128
+            transforms.CenterCrop(image_size),  # Ensure square crop
             transforms.ToTensor(),  # Convert images to PyTorch tensors
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]
@@ -115,7 +118,9 @@ def data_loader(
     distr_labels = [x[1] for x in causal_celeba_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
+        raise ValueError(
+            f"Batch size must be at least {unique_distrs} for stratified sampling."
+        )
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
     # Define the DataLoader
@@ -218,8 +223,9 @@ if __name__ == "__main__":
     lr_scheduler = "cosine"
     max_norm = 1.0  # Threshold for gradient norm clipping
     debug = False
-    num_workers = 10
+    num_workers = 6
     graph_type = "chain"
+    image_size = 128
 
     torch.set_float32_matmul_precision("high")
 
@@ -231,14 +237,18 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfonvaereduction_batch1024_latentdim48_v2.pt"
+    model_fname = "celeba_nfon_resnetvaereduction_batch256_latentdim48_v1.pt"
 
     # checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
-    checkpoint_dir = root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split(".")[0]
+    checkpoint_dir = (
+        root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split(".")[0]
+    )
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    vae_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim48"
-    vae_model_fname = "model_epoch_100.pt"
+    # vae_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim48"
+    # vae_model_fname = "model_epoch_100.pt"
+    vae_model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
+    vae_dir = root / "CausalCelebA" / "vae_reduction" / vae_model_fname.split(".")[0]
     vae_model = VAE().to(device)
     model_path = vae_dir / vae_model_fname
     vae_model = load_model(vae_model, model_path, device)
@@ -254,7 +264,7 @@ if __name__ == "__main__":
 
     model = make_nf_model(debug=debug)
     model = model.to(device)
-    image_dim = 3 * 64 * 64
+    image_dim = 3 * image_size * image_size
 
     # compile the model
     model = torch.compile(model)
@@ -270,13 +280,16 @@ if __name__ == "__main__":
         optimizer, T_max=max_epochs, eta_min=lr_min
     )  # T_max = total epochs
 
-    top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
+    top_k_saver = TopKModelSaver(
+        checkpoint_dir, k=5
+    )  # Initialize the top-k model saver
 
     train_loader = data_loader(
         root_dir=root,
         graph_type=graph_type,
         num_workers=num_workers,
         batch_size=batch_size,
+        image_size=image_size,
     )
 
     # training loop
@@ -298,7 +311,9 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             # extract data from tensor to Parameterdict
-            loss = model.forward_kld(images, intervention_targets=targets, distr_idx=distr_idx)
+            loss = model.forward_kld(
+                images, intervention_targets=targets, distr_idx=distr_idx
+            )
 
             # backward pass
             loss.backward()
@@ -323,14 +338,18 @@ if __name__ == "__main__":
         # Log training and validation loss
         if debug or epoch % 10 == 0:
             print()
-            print(f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}")
+            print(
+                f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}"
+            )
 
             # sample images from normalizing flow
             for distr_idx in train_loader.dataset.distr_idx_list:
                 sample_embeddings, _ = model.sample(8, distr_idx=distr_idx)
 
                 # reconstruct images
-                reconstructed_images = vae_model.decode(sample_embeddings).reshape(-1, 3, 64, 64)
+                reconstructed_images = vae_model.decode(sample_embeddings).reshape(
+                    -1, 3, image_size, image_size
+                )
 
                 save_image(
                     reconstructed_images.cpu(),

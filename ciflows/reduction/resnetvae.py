@@ -9,7 +9,9 @@ from torchvision.models.resnet import ResNet18_Weights, ResNet50_Weights
 class ResNetEncoder(nn.Module):
     def __init__(self, latent_dim):
         super(ResNetEncoder, self).__init__()
-        resnet = models.resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)  # Using ResNet50
+        resnet = models.resnet18(
+            weights=ResNet18_Weights.IMAGENET1K_V1
+        )  # Using ResNet50
         self.resnet = nn.Sequential(
             *list(resnet.children())[:-1]
         )  # Remove the final classification layer
@@ -25,7 +27,19 @@ class ResNetEncoder(nn.Module):
         x = x.view(x.size(0), -1)  # Flatten the output
         mu = self.fc_mu(x)  # Mean vector of latent space
         logvar = self.fc_logvar(x)  # Log-variance vector of latent space
+        return self.reparameterize(mu, logvar)
+
+    def encode(self, x):
+        x = self.resnet(x)  # Forward pass through ResNet layers
+        x = x.view(x.size(0), -1)  # Flatten the output
+        mu = self.fc_mu(x)  # Mean vector of latent space
+        logvar = self.fc_logvar(x)  # Log-variance vector of latent space
         return mu, logvar
+
+    def reparameterize(self, mu, log_var):
+        std = torch.exp(0.5 * log_var)
+        eps = torch.randn_like(std)
+        return eps * std + mu
 
 
 class ResidualBlock(nn.Module):
@@ -47,7 +61,9 @@ class ResidualBlock(nn.Module):
         self.shortcut = nn.Sequential()
         if stride != 1 or in_channels != out_channels:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False),
+                nn.Conv2d(
+                    in_channels, out_channels, kernel_size=1, stride=stride, bias=False
+                ),
                 nn.BatchNorm2d(out_channels),
             )
 
@@ -72,7 +88,9 @@ class DeepResNetDecoder(nn.Module):
         self.stage3 = self._make_stage(128, 64, num_blocks_per_stage)  # 32x32 -> 64x64
         self.stage4 = self._make_stage(64, 32, num_blocks_per_stage)  # 64x64 -> 128x128
 
-        self.final_conv = nn.Conv2d(32, 3, kernel_size=3, stride=1, padding=1)  # Output RGB image
+        self.final_conv = nn.Conv2d(
+            32, 3, kernel_size=3, stride=1, padding=1
+        )  # Output RGB image
 
     def _make_stage(self, in_channels, out_channels, num_blocks):
         """
@@ -81,7 +99,9 @@ class DeepResNetDecoder(nn.Module):
         layers = []
         # Add an initial upsampling layer to increase spatial resolution
         layers.append(
-            nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1)
+            nn.ConvTranspose2d(
+                in_channels, out_channels, kernel_size=4, stride=2, padding=1
+            )
         )
         layers.append(nn.BatchNorm2d(out_channels))
         layers.append(nn.ReLU(inplace=True))
@@ -114,7 +134,7 @@ class DeepResNetVAE(nn.Module):
         self.decoder = DeepResNetDecoder(latent_dim, num_blocks_per_stage)
 
     def encode(self, x):
-        return self.encoder(x)
+        return self.encoder(x)[0]
 
     def decode(self, z):
         return self.decoder(z)

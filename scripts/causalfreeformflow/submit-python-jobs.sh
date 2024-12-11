@@ -22,18 +22,23 @@ TRAINING_SEED=0
 
 # Calculate the GPU index to use for this job
 # GPU_INDEX=$(((({TRAINING_SEED[$i]}) % $NUM_GPUS) + 1))
-GPU_INDEX=1
+# GPU_INDEX=2
+
+# Specify the GPUs to use
+GPU_INDICES="0,1,2,3"  # Adjust this as per available GPUs and your requirement
 
 # Set the environment variable for the GPU
 # export CUDA_VISIBLE_DEVICES=$GPU_INDEX,$((GPU_INDEX + 1))
-export CUDA_VISIBLE_DEVICES=$GPU_INDEX
+# export CUDA_VISIBLE_DEVICES=$GPU_INDEX
+export CUDA_VISIBLE_DEVICES=$GPU_INDICES
 
 # Construct the command to run the Python script with the current training seed
-CMD="python3 $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
+# CMD="python3 $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
+CMD="python3 -m torch.distributed.launch --nproc_per_node=$NUM_GPUS $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 
 # Optionally, you can use a job scheduler like `nohup` to run the command in the background
 # or `&` to run the command in the background
-LOG_FILE="celeba_fff_batch512_beta10_latentdim48_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
+LOG_FILE="celeba_fff_resnet_batch512_latentdim48_v1_${SCRIPT_NAME}_multigpu.log"
 nohup $CMD > $LOG_FILE 2>&1 &
 
 echo $TRAINING_SEED
