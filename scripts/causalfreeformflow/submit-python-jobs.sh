@@ -2,7 +2,7 @@
 
 # Directory containing the Python script
 SCRIPT_NAME="01_train_fff_celeba.py"
-
+SCRIPT_NAME="02_train_fff_ddp_celeba.py"
 
 LOG_DIR="/home/adam2392/projects/logs/"
 
@@ -44,3 +44,4 @@ nohup $CMD > $LOG_FILE 2>&1 &
 echo $TRAINING_SEED
 echo "GPU index is $CUDA_VISIBLE_DEVICES"
 echo "Submitted job for training seed: $TRAINING_SEED for script: $SCRIPT_NAME"
+echo $CMD
