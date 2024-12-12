@@ -17,6 +17,7 @@ from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.eval import load_model
 from ciflows.flows.model import CausalNormalizingFlow
 from ciflows.reduction.vae import VAE
+from ciflows.reduction.resnetvae import DeepResNetVAE
 
 
 class TopKModelSaver:
@@ -219,13 +220,15 @@ if __name__ == "__main__":
 
     max_epochs = 2000
     lr = 3e-4
-    lr_min = 1e-8
+    lr_min = 1e-6
     lr_scheduler = "cosine"
     max_norm = 1.0  # Threshold for gradient norm clipping
     debug = False
     num_workers = 6
     graph_type = "chain"
     image_size = 128
+    latent_dim = 48
+    num_blocks_per_stage = 3
 
     torch.set_float32_matmul_precision("high")
 
@@ -249,14 +252,15 @@ if __name__ == "__main__":
     # vae_model_fname = "model_epoch_100.pt"
     vae_model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
     vae_dir = root / "CausalCelebA" / "vae_reduction" / vae_model_fname.split(".")[0]
-    vae_model = VAE().to(device)
+    # vae_model = VAE().to(device)
+    vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
     model_path = vae_dir / vae_model_fname
     vae_model = load_model(vae_model, model_path, device)
     if debug:
         accelerator = "cpu"
         # device = 'cpu'
         max_epochs = 5
-        batch_size = 256
+        batch_size = 8
         check_samples_every_n_epoch = 1
         num_workers = 2
 
