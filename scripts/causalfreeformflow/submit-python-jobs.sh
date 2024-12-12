@@ -25,7 +25,7 @@ TRAINING_SEED=0
 # GPU_INDEX=2
 
 # Specify the GPUs to use
-GPU_INDICES="1,2,3"  # Adjust this as per available GPUs and your requirement
+GPU_INDICES="5,6,7"  # Adjust this as per available GPUs and your requirement
 
 # Set the environment variable for the GPU
 # export CUDA_VISIBLE_DEVICES=$GPU_INDEX,$((GPU_INDEX + 1))

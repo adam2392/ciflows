@@ -174,14 +174,10 @@ class CausalCelebAEmbedding(CausalCelebA):
         self,
         root,
         graph_type,
-        transform=None,
         img_size=64,
-        target_transform=None,
         fast_dev_run=False,
     ):
         self.root = root
-        self.transform = transform
-        self.target_transform = target_transform
         self.graph_type = graph_type
         self.img_size = img_size
 

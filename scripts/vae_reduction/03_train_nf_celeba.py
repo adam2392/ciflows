@@ -87,24 +87,10 @@ def data_loader(
     graph_type="chain",
     num_workers=4,
     batch_size=32,
-    image_size=64,
 ):
-    # Define the image transformations
-    image_transform = transforms.Compose(
-        [
-            transforms.Resize(
-                (image_size, image_size), antialias=True
-            ),  # Resize images to 128x128
-            transforms.CenterCrop(image_size),  # Ensure square crop
-            transforms.ToTensor(),  # Convert images to PyTorch tensors
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-        ]
-    )
-
     causal_celeba_dataset = CausalCelebAEmbedding(
         root=root_dir,
         graph_type=graph_type,
-        transform=image_transform,
         fast_dev_run=False,  # Set to True for debugging
     )
 
@@ -296,7 +282,6 @@ if __name__ == "__main__":
         graph_type=graph_type,
         num_workers=num_workers,
         batch_size=batch_size,
-        image_size=image_size,
     )
 
     # training loop
