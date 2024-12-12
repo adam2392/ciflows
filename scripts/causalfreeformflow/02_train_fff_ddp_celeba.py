@@ -196,7 +196,7 @@ def make_fff_model(num_blocks_per_stage=5, debug=False):
 
 
 if __name__ == "__main__":
-    debug = True
+    debug = False
     compile = False
 
     # System settings
