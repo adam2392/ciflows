@@ -7,7 +7,7 @@ SCRIPT_NAME="02_train_fff_ddp_celeba.py"
 LOG_DIR="/home/adam2392/projects/logs/"
 
 # Number of GPUs available
-NUM_GPUS=8
+NUM_GPUS=3
 
 # Change to the directory containing the script
 # cd "$SCRIPT_DIR"
