@@ -272,10 +272,11 @@ if __name__ == "__main__":
     if ddp:
         init_process_group(backend=backend)
         ddp_rank = int(os.environ["RANK"])
-        ddp_local_rank = int(os.environ["LOCAL_RANK"])
         ddp_world_size = int(os.environ["WORLD_SIZE"])
+        ddp_local_rank = int(os.environ["LOCAL_RANK"])
         if ddp_local_rank >= torch.cuda.device_count():
-            ddp_local_rank %= torch.cuda.device_count()
+            ddp_local_rank = ddp_world_size - ddp_local_rank
+            
         device = f"cuda:{ddp_local_rank}"
 
         print('Setting device to', device)
