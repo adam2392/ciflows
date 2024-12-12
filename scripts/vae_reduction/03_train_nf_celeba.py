@@ -256,6 +256,8 @@ if __name__ == "__main__":
     vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
     model_path = vae_dir / vae_model_fname
     vae_model = load_model(vae_model, model_path, device)
+    vae_model = vae_model.to(device)
+
     if debug:
         accelerator = "cpu"
         # device = 'cpu'
@@ -328,6 +330,9 @@ if __name__ == "__main__":
             optimizer.step()
 
             train_loss += loss.item()
+
+            if debug:
+                break
 
         # Step the scheduler at the end of the epoch
         scheduler.step()
