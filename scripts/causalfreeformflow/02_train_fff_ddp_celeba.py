@@ -274,10 +274,15 @@ if __name__ == "__main__":
         ddp_rank = int(os.environ["RANK"])
         ddp_local_rank = int(os.environ["LOCAL_RANK"])
         ddp_world_size = int(os.environ["WORLD_SIZE"])
+        if ddp_local_rank >= torch.cuda.device_count():
+            ddp_local_rank %= torch.cuda.device_count()
         device = f"cuda:{ddp_local_rank}"
 
         print('Setting device to', device)
-        print(ddp_rank, ddp, ddp_local_rank, ddp_world_size)
+        print('DDP rank: ', ddp_rank)
+        print('Local rank: ', ddp_local_rank)
+        print('World size: ', ddp_world_size)
+        
         torch.cuda.set_device(device)
         master_process = (
             ddp_rank == 0

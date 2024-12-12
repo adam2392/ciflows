@@ -34,7 +34,7 @@ export CUDA_VISIBLE_DEVICES=$GPU_INDICES
 
 # Construct the command to run the Python script with the current training seed
 # CMD="python3 $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
-CMD="python3 -m torch.distributed.run --nproc_per_node=$NUM_GPUS $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
+CMD="CUDA_VISIBLE_DEVICES=$GPU_INDICES torchrun --nproc_per_node=$NUM_GPUS $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 
 # Optionally, you can use a job scheduler like `nohup` to run the command in the background
 # or `&` to run the command in the background
