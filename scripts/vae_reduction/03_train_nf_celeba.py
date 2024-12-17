@@ -135,7 +135,7 @@ def make_nf_model(debug=False):
     else:
         K = 32
         net_hidden_layers = 3
-        net_hidden_dim = 64
+        net_hidden_dim = 128
 
     latent_dim = 48
 
