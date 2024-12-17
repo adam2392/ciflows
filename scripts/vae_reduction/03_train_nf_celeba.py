@@ -133,7 +133,8 @@ def make_nf_model(debug=False):
         net_hidden_layers = 2
         net_hidden_dim = 64
     else:
-        K = 32
+        K = 8  # v1
+        K = 32  # v2
         net_hidden_layers = 3
         net_hidden_dim = 128
 
@@ -204,7 +205,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    batch_size = 512
+    batch_size = 1024
 
     max_epochs = 2000
     lr = 3e-4
@@ -228,7 +229,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfon_resnetvaereduction_batch512_latentdim48_trainableedges_sep4and8_v1.pt"
+    model_fname = "celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
 
     # checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
     checkpoint_dir = (

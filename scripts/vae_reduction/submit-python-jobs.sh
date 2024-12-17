@@ -34,7 +34,7 @@ CMD="python3 $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 
 # Optionally, you can use a job scheduler like `nohup` to run the command in the background
 # or `&` to run the command in the background
-LOG_FILE="celeba_nfon_resnetvaereduction_batch512_latentdim48_trainableedges_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
+LOG_FILE="celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
 nohup $CMD > $LOG_FILE 2>&1 &
 
 echo $TRAINING_SEED
