@@ -163,8 +163,8 @@ def make_nf_model(debug=False):
         1: torch.ones(16),
         2: torch.ones(16),
     }
-    intervened_node_means = [{2: torch.ones(16) + 2}, {2: torch.ones(16) + 4}]
-    intervened_node_vars = [{2: torch.ones(16)}, {2: torch.ones(16) + 2}]
+    intervened_node_means = [{2: torch.ones(16) + 4}, {2: torch.ones(16) + 8}]
+    intervened_node_vars = [{2: torch.ones(16)}, {2: torch.ones(16)}]
 
     confounded_list = []
     # independent noise with causal prior
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfon_resnetvaereduction_batch512_latentdim48_trainableedges_v1.pt"
+    model_fname = "celeba_nfon_resnetvaereduction_batch512_latentdim48_trainableedges_sep4and8_v1.pt"
 
     # checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
     checkpoint_dir = (

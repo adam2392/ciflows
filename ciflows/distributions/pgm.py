@@ -89,8 +89,6 @@ class LinearGaussianDag(MultidistrCausalFlow):
             }
         )
 
-        self.edge_weights = self.register_buffer()
-
         # Create a topological ordering of nodes
         self.graph = nx.DiGraph(edge_list)
         for node in node_dimensions:
