@@ -176,6 +176,7 @@ def make_nf_model(debug=False):
         confounded_list=confounded_list,
         intervened_node_means=intervened_node_means,
         intervened_node_vars=intervened_node_vars,
+        trainable_edges=True,
     )
 
     # Construct flow model with the multiscale architecture
@@ -227,7 +228,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfon_resnetvaereduction_batch256_latentdim48_v2.pt"
+    model_fname = "celeba_nfon_resnetvaereduction_batch512_latentdim48_trainableedges_v1.pt"
 
     # checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
     checkpoint_dir = (

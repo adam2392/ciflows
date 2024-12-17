@@ -134,7 +134,7 @@ class DeepResNetVAE(nn.Module):
         self.decoder = DeepResNetDecoder(latent_dim, num_blocks_per_stage)
 
     def encode(self, x):
-        return self.encoder(x)[0]
+        return self.encoder(x)
 
     def decode(self, z):
         return self.decoder(z)

@@ -19,6 +19,7 @@ class LinearGaussianDag(MultidistrCausalFlow):
         confounded_list=None,
         intervened_node_means=None,
         intervened_node_vars=None,
+        trainable_edges=False,
     ):
         """
         Note, this class pre-specifies the list of interventions/domain changes that can occur.
@@ -40,6 +41,7 @@ class LinearGaussianDag(MultidistrCausalFlow):
                                 Each dictionary corresponds to a different distribution index.
             intervened_node_vars (list of dict): List of dictionaries mapping intervened node names to their noise variances.
                                 Each dictionary corresponds to a different distribution index.
+            trainable_edges (bool): Whether to make the edge weights trainable. By default, the edge weights are fixed.
         """
         super(LinearGaussianDag, self).__init__()
 
@@ -81,11 +83,13 @@ class LinearGaussianDag(MultidistrCausalFlow):
             {
                 f"{src}->{tgt}": nn.Parameter(
                     torch.randn(node_dimensions[src], node_dimensions[tgt]) + 1.0,
-                    requires_grad=False,
+                    requires_grad=trainable_edges,
                 )
                 for src, tgt in edge_list
             }
         )
+
+        self.edge_weights = self.register_buffer()
 
         # Create a topological ordering of nodes
         self.graph = nx.DiGraph(edge_list)
