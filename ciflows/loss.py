@@ -295,11 +295,11 @@ def volume_change_surrogate_transformer(
             # to a high-dimensional space
             with dual_level():
                 # pass in (f(x), eta) to compute eta^T * f'(x)
-                dual_v = make_dual(v, eta)
+                dual_v = make_dual(v, eta).to(dtype=x.dtype)
 
                 # map the latent representation, and the Hutchinson samples
                 # to the decoder high-dimensional manifold
-                dual_x1 = decoder(dual_v)
+                dual_x1 = decoder(dual_v).to(dtype=x.dtype)
 
                 # v1 = \eta^T f'(x) (VJP)
                 xhat, v1 = unpack_dual(dual_x1)
