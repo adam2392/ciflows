@@ -82,20 +82,27 @@ def estimate_loss():
     return out
 
 
+def get_model_attribute(model, attr):
+    return getattr(model.module if isinstance(model, DDP) else model, attr)
+
+
 def compute_loss(model: ResnetFreeformflow, x, distr_idx, beta, hutchinson_samples=2):
     # calculate volume change surrogate loss
     surrogate_loss, v_hat, x_hat = volume_change_surrogate(
-        images, model.encoder, model.decoder, hutchinson_samples=hutchinson_samples
+        images,
+        get_model_attribute(model, "encoder"),
+        get_model_attribute(model, "decoder"),
+        hutchinson_samples=hutchinson_samples,
     )
 
     # compute reconstruction loss
     loss_reconstruction = torch.nn.functional.mse_loss(x_hat, x)
 
     # get negative log likelihoood over the distributions
-    embed_dim = model.latent_dim
+    embed_dim = get_model_attribute(model, 'latent_dim')
     v_hat = v_hat.view(-1, embed_dim)
     loss_nll = (
-        -model.latent.log_prob(v_hat, distr_idx=distr_idx).mean() - surrogate_loss
+        -get_model_attribute(model, 'latent').log_prob(v_hat, distr_idx=distr_idx).mean() - surrogate_loss
     )
 
     loss = beta * loss_reconstruction + loss_nll
@@ -412,7 +419,7 @@ if __name__ == "__main__":
         # Reinitialize iterator when dataset is exhausted
         train_iterator = iter(train_loader)
         batch = next(train_iterator)
-    
+
     images, distr_idx, targets, meta_labels = batch
     images = images.to(device=device, dtype=ptdtype)
 
@@ -529,7 +536,7 @@ if __name__ == "__main__":
             # sample images from normalizing flow
             for idx in train_loader.dataset.distr_idx_list:
                 # reconstruct images
-                reconstructed_images, _ = model.sample(8, distr_idx=idx)
+                reconstructed_images, _ = raw_model.sample(8, distr_idx=idx)
 
                 # clamp images to show
                 reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
@@ -543,7 +550,7 @@ if __name__ == "__main__":
 
             # Track top 5 models based on validation loss
             # Optionally, remove worse models if there are more than k saved models
-            top_k_saver.save_model(model, optimizer, epoch, train_loss)
+            top_k_saver.save_model(raw_model, optimizer, epoch, train_loss)
 
         epoch += 1
         local_iter_epoch += 1
@@ -557,7 +564,7 @@ if __name__ == "__main__":
     # Save final model
     torch.save(
         {
-            "model_state_dict": model.state_dict(),
+            "model_state_dict": raw_model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
             "epoch": epoch,  # Optional: Save the current epoch
             "loss": loss,  # Optional: Save the last loss value
