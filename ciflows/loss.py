@@ -183,8 +183,9 @@ def volume_change_surrogate(
             )
             eta_samples = eta_samples.reshape(B, embed_dim, hutchinson_samples)
 
+        # XXX: not needed possibly, if we pass in amp autocast
         v = v.to(device=x.device, dtype=dtype)
-        
+
         for k in range(hutchinson_samples):
             eta = eta_samples[..., k]
 
