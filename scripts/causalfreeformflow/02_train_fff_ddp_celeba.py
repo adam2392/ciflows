@@ -87,6 +87,9 @@ def get_model_attribute(model, attr):
 
 
 def compute_loss(model: ResnetFreeformflow, x, distr_idx, beta, hutchinson_samples=2):
+    device = images.device
+    beta = beta.to(device)
+
     # calculate volume change surrogate loss
     surrogate_loss, v_hat, x_hat = volume_change_surrogate(
         images,
