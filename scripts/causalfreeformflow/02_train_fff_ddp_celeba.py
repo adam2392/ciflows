@@ -99,10 +99,13 @@ def compute_loss(model: ResnetFreeformflow, x, distr_idx, beta, hutchinson_sampl
     loss_reconstruction = torch.nn.functional.mse_loss(x_hat, x)
 
     # get negative log likelihoood over the distributions
-    embed_dim = get_model_attribute(model, 'latent_dim')
+    embed_dim = get_model_attribute(model, "latent_dim")
     v_hat = v_hat.view(-1, embed_dim)
     loss_nll = (
-        -get_model_attribute(model, 'latent').log_prob(v_hat, distr_idx=distr_idx).mean() - surrogate_loss
+        -get_model_attribute(model, "latent")
+        .log_prob(v_hat, distr_idx=distr_idx)
+        .mean()
+        - surrogate_loss
     )
 
     loss = beta * loss_reconstruction + loss_nll
@@ -283,7 +286,7 @@ if __name__ == "__main__":
 
     # for FreeformFlow's loss function
     hutchinson_samples = 2
-    beta = torch.tensor(10.0).to(device)
+    beta = torch.tensor(10.0).to(device=device, dtype=ptdtype)
 
     # various inits, derived attributes, I/O setup
     ddp = int(os.environ.get("RANK", -1)) != -1  # is this a ddp run?
@@ -448,6 +451,9 @@ if __name__ == "__main__":
 
             with ctx:
                 # forward pass
+                print(f"Images dtype: {images.dtype}")
+                print(f"Model dtype: {next(model.parameters()).dtype}")
+                print(f"beta dtype: {beta.dtype}")
                 # compute the loss
                 loss, loss_reconstruction, loss_nll, surrogate_loss = compute_loss(
                     model, images, distr_idx, beta
