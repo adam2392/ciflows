@@ -235,7 +235,7 @@ if __name__ == "__main__":
     gradient_accumulation_steps = 8 * 2  # used to simulate larger batch sizes
     img_size = 128
     graph_type = "chain"
-    num_workers = 6
+    num_workers = 4
 
     check_samples_every_n_epoch = 5
 
