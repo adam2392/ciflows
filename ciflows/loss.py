@@ -169,7 +169,7 @@ def volume_change_surrogate(
 
         # encode the data to get the latent representation
         try:
-            v = encoder(x).to(device=x.device, dtype=dtype)
+            v = encoder(x).to(device=x.device)
             B, embed_dim = v.shape
         except Exception as e:
             print(v.shape)
@@ -183,6 +183,8 @@ def volume_change_surrogate(
             )
             eta_samples = eta_samples.reshape(B, embed_dim, hutchinson_samples)
 
+        v = v.to(device=x.device, dtype=dtype)
+        
         for k in range(hutchinson_samples):
             eta = eta_samples[..., k]
 
