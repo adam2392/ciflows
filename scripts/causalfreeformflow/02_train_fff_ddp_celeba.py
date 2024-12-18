@@ -346,7 +346,7 @@ if __name__ == "__main__":
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     model = make_fff_model(num_blocks_per_stage=num_blocks_per_stage, debug=debug)
-    model = model.to(device)
+    model = model.to(ptdtype).to(device)
     image_dim = 3 * img_size * img_size
 
     # initialize a GradScaler. If enabled=False scaler is a no-op
@@ -415,6 +415,9 @@ if __name__ == "__main__":
     images, distr_idx, targets, meta_labels = batch
     images = images.to(device)
 
+    print(f"Images dtype: {images.dtype}")
+    print(f"Model dtype: {next(model.parameters()).dtype}")
+
     # Training loop
     for epoch in tqdm(range(1, max_epochs + 1), desc="outer", position=0):
         # Training phase
@@ -457,6 +460,9 @@ if __name__ == "__main__":
                 )
                 surrogate_loss = surrogate_loss.sum() / gradient_accumulation_steps
 
+            # backwards pass, with gradient scaling
+            scaler.scale(loss).backward()
+
             # Prefetch next batch asynchronously
             try:
                 batch = next(train_iterator)
@@ -464,9 +470,6 @@ if __name__ == "__main__":
                 # Reinitialize iterator when dataset is exhausted
                 train_iterator = iter(train_loader)
                 batch = next(train_iterator)
-
-            # backwards pass, with gradient scaling
-            scaler.scale(loss).backward()
 
             # extract the variables within the batch
             images, distr_idx, targets, meta_labels = batch
@@ -488,6 +491,7 @@ if __name__ == "__main__":
         # step optimizer and update
         scaler.step(optimizer)
         scaler.update()
+
         # flush gradients to release memory
         optimizer.zero_grad(set_to_none=True)
 
