@@ -232,7 +232,7 @@ if __name__ == "__main__":
 
     # Data settings
     batch_size = 512
-    gradient_accumulation_steps = 8 * 5  # used to simulate larger batch sizes
+    gradient_accumulation_steps = 8 * 2  # used to simulate larger batch sizes
     img_size = 128
     graph_type = "chain"
     num_workers = 6
@@ -331,7 +331,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_fff_resnet_batch512_latentdim48_v1.pt"
+    model_fname = "celeba_fff_resnet_batch512_gradaccum_latentdim48_v1.pt"
     checkpoint_dir = root / "CausalCelebA" / "fff" / model_fname.split(".")[0]
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
