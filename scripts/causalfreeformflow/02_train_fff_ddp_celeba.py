@@ -451,9 +451,9 @@ if __name__ == "__main__":
 
             with ctx:
                 # forward pass
-                print(f"Images dtype: {images.dtype}")
-                print(f"Model dtype: {next(model.parameters()).dtype}")
-                print(f"beta dtype: {beta.dtype}")
+                # print(f"Images dtype: {images.dtype}")
+                # print(f"Model dtype: {next(model.parameters()).dtype}")
+                # print(f"beta dtype: {beta.dtype}")
                 # compute the loss
                 loss, loss_reconstruction, loss_nll, surrogate_loss = compute_loss(
                     model, images, distr_idx, beta
