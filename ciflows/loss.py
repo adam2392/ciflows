@@ -88,9 +88,7 @@ def volume_change_surrogate_old_transformer(
 
             # from transformer encoding
             eta_samples = sample_orthonormal_vectors(v, hutchinson_samples).to(x.device)
-            eta_samples = eta_samples.reshape(
-                B, n_patches, embed_dim, hutchinson_samples
-            )
+            eta_samples = eta_samples.reshape(B, n_patches, embed_dim, hutchinson_samples)
 
         for k in range(hutchinson_samples):
             eta = eta_samples[..., k]
@@ -270,9 +268,7 @@ def volume_change_surrogate_transformer(
 
             # from transformer encoding
             eta_samples = sample_orthonormal_vectors(v, hutchinson_samples).to(x.device)
-            eta_samples = eta_samples.reshape(
-                B, n_patches, embed_dim, hutchinson_samples
-            )
+            eta_samples = eta_samples.reshape(B, n_patches, embed_dim, hutchinson_samples)
 
         for k in range(hutchinson_samples):
             eta = eta_samples[..., k]

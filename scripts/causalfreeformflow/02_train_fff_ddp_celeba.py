@@ -1,15 +1,16 @@
 import os
+import time
 from contextlib import nullcontext
 from pathlib import Path
-import time
+
 import lightning as pl
 import normflows as nf
 import numpy as np
 import torch
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.distributed import init_process_group
 import torch.distributed as dist
 from torch import nn
+from torch.distributed import init_process_group
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from torchvision import transforms
@@ -20,10 +21,10 @@ from ciflows.datasets.causalceleba import CausalCelebA
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.eval import load_model
+from ciflows.flows.freeform import ResnetFreeformflow
 from ciflows.loss import volume_change_surrogate
 from ciflows.resnet_celeba import ResNetCelebADecoder, ResNetCelebAEncoder
 from ciflows.training import TopKModelSaver
-from ciflows.flows.freeform import ResnetFreeformflow
 
 
 def configure_optimizers(
@@ -54,9 +55,7 @@ def configure_optimizers(
         f"num non-decayed parameter tensors: {len(nodecay_params)}, with {num_nodecay_params:,} parameters"
     )
     # Create AdamW optimizer and use the fused version if it is available
-    optimizer = torch.optim.AdamW(
-        optim_groups, lr=learning_rate, betas=betas, fused=True
-    )
+    optimizer = torch.optim.AdamW(optim_groups, lr=learning_rate, betas=betas, fused=True)
     print(f"using fused AdamW")
 
     return optimizer
@@ -91,9 +90,7 @@ def compute_loss(model: ResnetFreeformflow, x, distr_idx, beta, hutchinson_sampl
     # get negative log likelihoood over the distributions
     embed_dim = model.latent_dim
     v_hat = v_hat.view(-1, embed_dim)
-    loss_nll = (
-        -model.latent.log_prob(v_hat, distr_idx=distr_idx).mean() - surrogate_loss
-    )
+    loss_nll = -model.latent.log_prob(v_hat, distr_idx=distr_idx).mean() - surrogate_loss
 
     loss = beta * loss_reconstruction + loss_nll
     return loss, loss_reconstruction, loss_nll, surrogate_loss
@@ -135,9 +132,7 @@ def data_loader(
     distr_labels = [x[1] for x in causal_celeba_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(
-            f"Batch size must be at least {unique_distrs} for stratified sampling."
-        )
+        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
     # Define the DataLoader
@@ -212,9 +207,7 @@ if __name__ == "__main__":
         device = torch.device("cpu")
         accelerator = "cpu"
     dtype = (
-        "bfloat16"
-        if torch.cuda.is_available() and torch.cuda.is_bf16_supported()
-        else "float16"
+        "bfloat16" if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else "float16"
     )  # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
 
     # pytorch dtype
@@ -276,18 +269,16 @@ if __name__ == "__main__":
         ddp_local_rank = int(os.environ["LOCAL_RANK"])
         if ddp_local_rank >= torch.cuda.device_count():
             ddp_local_rank = ddp_world_size - ddp_local_rank
-            
+
         device = f"cuda:{ddp_local_rank}"
 
-        print('Setting device to', device)
-        print('DDP rank: ', ddp_rank)
-        print('Local rank: ', ddp_local_rank)
-        print('World size: ', ddp_world_size)
-        
+        print("Setting device to", device)
+        print("DDP rank: ", ddp_rank)
+        print("Local rank: ", ddp_local_rank)
+        print("World size: ", ddp_world_size)
+
         torch.cuda.set_device(device)
-        master_process = (
-            ddp_rank == 0
-        )  # this process will do logging, checkpointing etc.
+        master_process = ddp_rank == 0  # this process will do logging, checkpointing etc.
         seed_offset = ddp_rank  # each process gets a different seed
         # world_size number of processes will be training simultaneously, so we can scale
         # down the desired gradient accumulation iterations per process proportionally
@@ -311,9 +302,7 @@ if __name__ == "__main__":
     else:
         root = Path("/home/adam2392/projects/data/")
     ctx = (
-        nullcontext()
-        if device == "cpu"
-        else torch.autocast(device_type=accelerator, dtype=ptdtype)
+        nullcontext() if device == "cpu" else torch.autocast(device_type=accelerator, dtype=ptdtype)
     )
 
     # v1: K=32
@@ -359,9 +348,7 @@ if __name__ == "__main__":
         optimizer, T_max=max_epochs, eta_min=lr_min
     )  # T_max = total epochs
 
-    top_k_saver = TopKModelSaver(
-        checkpoint_dir, k=5
-    )  # Initialize the top-k model saver
+    top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
 
     train_loader = data_loader(
         root_dir=root,
@@ -410,9 +397,7 @@ if __name__ == "__main__":
         for micro_step in range(gradient_accumulation_steps):
             if ddp:
                 # DDP training requires syncing gradients at the last micro step
-                model.require_backward_grad_sync = (
-                    micro_step == gradient_accumulation_steps - 1
-                )
+                model.require_backward_grad_sync = micro_step == gradient_accumulation_steps - 1
 
             with ctx:
                 # forward pass
@@ -443,9 +428,7 @@ if __name__ == "__main__":
             scaler.scale(loss).backward()
 
             loss_nll = loss_nll.sum() / gradient_accumulation_steps
-            loss_reconstruction = (
-                loss_reconstruction.sum() / gradient_accumulation_steps
-            )
+            loss_reconstruction = loss_reconstruction.sum() / gradient_accumulation_steps
             surrogate_loss = surrogate_loss.sum() / gradient_accumulation_steps
 
             # DDP: accumulate loss terms
@@ -490,9 +473,7 @@ if __name__ == "__main__":
         # Validation phase
         if debug or epoch % check_samples_every_n_epoch == 0 and master_process:
             print()
-            print(
-                f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}"
-            )
+            print(f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}")
             model.eval()
 
             # sample images from normalizing flow

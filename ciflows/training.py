@@ -24,7 +24,7 @@ class TopKModelSaver:
             else:
                 return False
 
-    def save_model(self, model, epoch, loss):
+    def save_model(self, model, optimizer, epoch, loss):
         """Save the model if it's among the top-k based on the training loss."""
         # First, check if the model should be saved
         if self.check(loss):
@@ -39,16 +39,26 @@ class TopKModelSaver:
             self.best_models.sort(key=lambda x: x[0])  # Sort by loss (ascending)
 
             # Save the model
-            self._save_model(model, epoch, loss)
+            self._save_model(model, optimizer, epoch, loss)
 
             # Remove worse models if there are more than k models
             self.remove_worse_models()
 
-    def _save_model(self, model, epoch, loss):
+    def _save_model(self, model, optimizer, epoch, loss):
         """Helper function to save the model to disk."""
         filename = os.path.join(self.save_dir, f"model_epoch_{epoch}.pt")
         # Save the model state_dict
-        torch.save(model.state_dict(), filename)
+        # torch.save(model.state_dict(), filename)
+        # Save model and optimizer state
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "epoch": epoch,  # Optional: Save the current epoch
+                "loss": loss,  # Optional: Save the last loss value
+            },
+            filename,
+        )
         print(f"Saved model to {filename}")
 
     def remove_worse_models(self):

@@ -173,15 +173,15 @@ if __name__ == "__main__":
         root = Path("/home/adam2392/projects/data/")
 
     latent_dim = 48
-    batch_size = 512
-    model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
+    batch_size = 1024
+    model_fname = "celeba_vaeresnetreduction_batch1024_latentdim48_img128_v1.pt"
 
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     max_epochs = 1000
     lr = 3e-4
-    lr_min = 1e-8
+    lr_min = 1e-6
     lr_scheduler = "cosine"
     num_workers = 4
     graph_type = "chain"
@@ -282,36 +282,43 @@ if __name__ == "__main__":
         lr = scheduler.get_last_lr()[0]
         print(f"====> Epoch: {epoch} Average Train loss: {train_loss:.4f}, LR: {lr:.6f}")
 
-        # Validation phase
-        model.eval()
-
-        val_loss = 0.0
-        with torch.no_grad():
-            for batch_idx, (val_images, distr_idx, targets, meta_labels) in enumerate(val_loader):
-                val_images = val_images.to(device)
-                reconstructed, latent_mu, latent_logvar = model(val_images)  # Model forward pass
-
-                loss = loss_function(
-                    reconstructed,
-                    val_images,
-                    latent_mu,
-                    latent_logvar,
-                    image_dim=image_dim,
-                )  # Custom VAE loss function
-                val_loss += loss.item()
-
-                if debug:
-                    break
-        val_loss /= len(val_loader)
-        print(f"====> Epoch: {epoch} Average Val loss: {val_loss:.4f}")
-
         # Log training and validation loss
         if debug or epoch % 10 == 0:
             print()
             print(f"Saving images - Epoch [{epoch}/{max_epochs}], Train Loss: {train_loss:.4f}")
 
+            # Validation phase
+            model.eval()
+
+            val_loss = 0.0
+            with torch.no_grad():
+                for batch_idx, (
+                    val_images,
+                    distr_idx,
+                    targets,
+                    meta_labels,
+                ) in enumerate(val_loader):
+                    val_images = val_images.to(device)
+                    reconstructed, latent_mu, latent_logvar = model(
+                        val_images
+                    )  # Model forward pass
+
+                    loss = loss_function(
+                        reconstructed,
+                        val_images,
+                        latent_mu,
+                        latent_logvar,
+                        image_dim=image_dim,
+                    )  # Custom VAE loss function
+                    val_loss += loss.item()
+
+                    if debug:
+                        break
+            val_loss /= len(val_loader)
+            print(f"====> Epoch: {epoch} Average Val loss: {val_loss:.4f}")
+
             # Sample and save reconstructed images
-            sample_images = images[:8]  # Pick 8 images for sampling
+            sample_images = val_images[:8]  # Pick 8 images for sampling
             with torch.no_grad():
                 # VAE Unet
                 # mean_encoding, _, skips = model.encode(sample_images)
@@ -324,9 +331,27 @@ if __name__ == "__main__":
                 reconstructed_images = model.decode(mean_encoding).reshape(
                     -1, 3, img_size, img_size
                 )
-            sample_images = torch.cat((sample_images.cpu(), reconstructed_images.cpu()), dim=0)
+                reconstructed_images = torch.clamp(reconstructed_images, -1, 1)
+
+                # sample images from VAE
+                # 1. Sample latent variables from standard Gaussian
+                num_samples = 8  # Number of images to generate
+                z = torch.randn(num_samples, latent_dim).to(device)  # Sample z ~ N(0, I)
+
+                # 2. Pass the sampled z through the decoder
+                generated_images = model.decode(z)  # Shape: [num_samples, 3, 128, 128]
+
+                # clamp
+                generated_images = torch.clamp(generated_images, -1, 1)
+            sample_images = torch.cat(
+                (
+                    sample_images.cpu(),
+                    reconstructed_images.cpu(),
+                    generated_images.cpu(),
+                ),
+                dim=0,
+            )
             save_image(
-                # reconstructed_images.cpu(),
                 sample_images,
                 checkpoint_dir / f"epoch_{epoch}_samples.png",
                 nrow=4,

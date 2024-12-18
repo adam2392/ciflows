@@ -5,8 +5,8 @@ import PIL
 import torch
 from torchvision import transforms
 
-from ciflows.reduction.vae import VAE
 from ciflows.reduction.resnetvae import DeepResNetVAE
+from ciflows.reduction.vae import VAE
 
 
 # Encode images in a directory
@@ -77,9 +77,7 @@ if __name__ == "__main__":
 
     for directory in directories:
         print(f"Processing directory: {directory}")
-        latent_vectors = encode_images_in_directory(
-            directory, vae_model, transform, device
-        )
+        latent_vectors = encode_images_in_directory(directory, vae_model, transform, device)
         latent_vectors_per_directory[directory] = latent_vectors
 
         # Save the tensor

@@ -16,70 +16,9 @@ from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.eval import load_model
 from ciflows.flows.model import CausalNormalizingFlow
-from ciflows.reduction.vae import VAE
 from ciflows.reduction.resnetvae import DeepResNetVAE
-
-
-class TopKModelSaver:
-    def __init__(self, save_dir, k=5):
-        self.save_dir = save_dir
-        self.k = k
-        self.best_models = []  # List of tuples (loss, model_state_dict, epoch)
-
-        # Ensure the save directory exists
-        os.makedirs(save_dir, exist_ok=True)
-
-    def check(self, loss):
-        """Determine if the current model's loss is worth saving."""
-        # Check if the current model's loss should be saved
-        if len(self.best_models) < self.k:
-            return True  # If we have fewer than k models, always save the model
-        else:
-            # If the current loss is better than the worst model's loss, return True
-            if loss < self.best_models[-1][0]:
-                return True
-            else:
-                return False
-
-    def save_model(self, model, epoch, loss):
-        """Save the model if it's among the top-k based on the training loss."""
-        # First, check if the model should be saved
-        if self.check(loss):
-            # If we have fewer than k models, simply append the model
-            if len(self.best_models) < self.k:
-                self.best_models.append((loss, epoch))
-            else:
-                # If the current loss is better than the worst model, replace it
-                self.best_models.append((loss, epoch))
-
-            # Sort by loss (ascending order) and remove worse models if necessary
-            self.best_models.sort(key=lambda x: x[0])  # Sort by loss (ascending)
-
-            # Save the model
-            self._save_model(model, epoch, loss)
-
-            # Remove worse models if there are more than k models
-            self.remove_worse_models()
-
-    def _save_model(self, model, epoch, loss):
-        """Helper function to save the model to disk."""
-        filename = os.path.join(self.save_dir, f"model_epoch_{epoch}.pt")
-        # Save the model state_dict
-        torch.save(model.state_dict(), filename)
-        print(f"Saved model to {filename}")
-
-    def remove_worse_models(self):
-        """Remove the worse models if there are more than k models."""
-        # Ensure the list is sorted by the loss (ascending order)
-        self.best_models.sort(key=lambda x: x[0])  # Sort by loss (ascending)
-
-        # Remove models beyond the top-k
-        while len(self.best_models) > self.k:
-            loss, epoch = self.best_models.pop()
-            filename = os.path.join(self.save_dir, f"model_epoch_{epoch}.pt")
-            if os.path.exists(filename):
-                os.remove(filename)
-                print(f"Removed worse model {filename}")
+from ciflows.reduction.vae import VAE
+from ciflows.training import TopKModelSaver
 
 
 def data_loader(
@@ -105,9 +44,7 @@ def data_loader(
     distr_labels = [x[1] for x in causal_celeba_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(
-            f"Batch size must be at least {unique_distrs} for stratified sampling."
-        )
+        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
     # Define the DataLoader
@@ -129,9 +66,9 @@ def make_nf_model(debug=False):
     """Make normalizing flow model."""
     # Define list of flows
     if debug:
-        K = 2
-        net_hidden_layers = 2
-        net_hidden_dim = 64
+        K = 32
+        net_hidden_layers = 3
+        net_hidden_dim = 128
     else:
         K = 8  # v1
         K = 32  # v2
@@ -212,7 +149,8 @@ if __name__ == "__main__":
     lr_min = 1e-6
     lr_scheduler = "cosine"
     max_norm = 1.0  # Threshold for gradient norm clipping
-    debug = False
+    debug = True
+    load_from_checkpoint = True
     num_workers = 6
     graph_type = "chain"
     image_size = 128
@@ -229,12 +167,18 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
+    model_fname = (
+        "celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v2.pt"
+    )
+    checkpoint_model_fname = (
+        "celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
+    )
+    model_checkpoint_dir = (
+        root / "CausalCelebA" / "nf_on_vae_reduction" / checkpoint_model_fname.split(".")[0]
+    )
 
     # checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
-    checkpoint_dir = (
-        root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split(".")[0]
-    )
+    checkpoint_dir = root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     # vae_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim48"
@@ -259,10 +203,14 @@ if __name__ == "__main__":
 
     model = make_nf_model(debug=debug)
     model = model.to(device)
+
     image_dim = 3 * image_size * image_size
 
     # compile the model
     model = torch.compile(model)
+
+    if load_from_checkpoint:
+        model = load_model(model, model_checkpoint_dir / checkpoint_model_fname, device)
 
     # print the number of parameters in the model
     print(sum(p.numel() for p in model.parameters()) / 1e6, "M parameters")
@@ -275,9 +223,7 @@ if __name__ == "__main__":
         optimizer, T_max=max_epochs, eta_min=lr_min
     )  # T_max = total epochs
 
-    top_k_saver = TopKModelSaver(
-        checkpoint_dir, k=5
-    )  # Initialize the top-k model saver
+    top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
 
     train_loader = data_loader(
         root_dir=root,
@@ -305,9 +251,7 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             # extract data from tensor to Parameterdict
-            loss = model.forward_kld(
-                images, intervention_targets=targets, distr_idx=distr_idx
-            )
+            loss = model.forward_kld(images, intervention_targets=targets, distr_idx=distr_idx)
 
             # backward pass
             loss.backward()
@@ -335,9 +279,7 @@ if __name__ == "__main__":
         # Log training and validation loss
         if debug or epoch % 10 == 0:
             print()
-            print(
-                f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}"
-            )
+            print(f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}")
 
             # sample images from normalizing flow
             for distr_idx in train_loader.dataset.distr_idx_list:
@@ -358,7 +300,7 @@ if __name__ == "__main__":
         # Track top 5 models based on validation loss
         if epoch % 5 == 0:
             # Optionally, remove worse models if there are more than k saved models
-            top_k_saver.save_model(model, epoch, train_loss)
+            top_k_saver.save_model(model, optimizer, epoch, train_loss)
 
     # Save final model
     torch.save(model.state_dict(), checkpoint_dir / model_fname)
@@ -368,4 +310,4 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     nf_model = model.to(device)
     model_path = checkpoint_dir / model_fname
-    nf_model = load_model(nf_model, model_path, device)
+    nf_model = load_model(nf_model, model_path, device, optimizer=optimizer)
