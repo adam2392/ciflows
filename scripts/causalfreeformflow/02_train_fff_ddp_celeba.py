@@ -276,7 +276,7 @@ if __name__ == "__main__":
 
     # for FreeformFlow's loss function
     hutchinson_samples = 2
-    beta = torch.tensor(100.0).to(device)
+    beta = torch.tensor(10.0).to(device)
 
     # various inits, derived attributes, I/O setup
     ddp = int(os.environ.get("RANK", -1)) != -1  # is this a ddp run?
@@ -340,7 +340,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_fff_resnet_batch512_gradaccum_latentdim48_beta100_v1.pt"
+    model_fname = "celeba_fff_resnet_batch512_gradaccum_latentdim48_beta10_v1.pt"
     checkpoint_dir = root / "CausalCelebA" / "fff" / model_fname.split(".")[0]
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
