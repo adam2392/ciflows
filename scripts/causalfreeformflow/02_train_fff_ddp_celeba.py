@@ -250,7 +250,7 @@ if __name__ == "__main__":
 
     # Data settings
     batch_size = 128
-    gradient_accumulation_steps = 4  # 8 * 1  # used to simulate larger batch sizes
+    gradient_accumulation_steps = 8 * 3  # used to simulate larger batch sizes
     img_size = 128
     graph_type = "chain"
     num_workers = 4
