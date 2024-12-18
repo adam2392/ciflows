@@ -229,7 +229,7 @@ if __name__ == "__main__":
         if torch.cuda.is_available() and torch.cuda.is_bf16_supported()
         else "float16"
     )  # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
-    dtype = 'float32'
+    dtype = "float32"
 
     # pytorch dtype
     ptdtype = {
@@ -249,8 +249,8 @@ if __name__ == "__main__":
     print("NCCL backend available:", torch.distributed.is_nccl_available())
 
     # Data settings
-    batch_size = 256
-    gradient_accumulation_steps = 1 #8 * 1  # used to simulate larger batch sizes
+    batch_size = 128
+    gradient_accumulation_steps = 1  # 8 * 1  # used to simulate larger batch sizes
     img_size = 128
     graph_type = "chain"
     num_workers = 4
