@@ -194,11 +194,11 @@ def volume_change_surrogate(
             # it is assumed the decoder maps from a low-dimensional space
             # to a high-dimensional space
             with dual_level():
-                print(f"Images dtype: {x.dtype}")
-                print(f"Encoder dtype: {next(encoder.parameters()).dtype}")
-                print(f"Deocder dtype: {next(decoder.parameters()).dtype}")
-                print(f"v dtype: {v.dtype}")
-                print(f"eta dtype: {eta.dtype}")
+                # print(f"Images dtype: {x.dtype}")
+                # print(f"Encoder dtype: {next(encoder.parameters()).dtype}")
+                # print(f"Deocder dtype: {next(decoder.parameters()).dtype}")
+                # print(f"v dtype: {v.dtype}")
+                # print(f"eta dtype: {eta.dtype}")
 
                 # pass in (f(x), eta) to compute eta^T * f'(x)
                 dual_v = make_dual(v, eta)

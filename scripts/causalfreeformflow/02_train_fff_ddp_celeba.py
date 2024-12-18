@@ -269,7 +269,7 @@ if __name__ == "__main__":
     lr_scheduler = "cosine"
 
     # model settings
-    num_blocks_per_stage = 5
+    num_blocks_per_stage = 3
 
     if debug:
         accelerator = "cpu"

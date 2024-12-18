@@ -20,7 +20,7 @@ TRAINING_SEED=0
 
 # Calculate the GPU index to use for this job
 # GPU_INDEX=$(((({TRAINING_SEED[$i]}) % $NUM_GPUS) + 1))
-GPU_INDEX=1
+GPU_INDEX=2
 
 # Number of GPUs available
 NUM_GPUS=3
