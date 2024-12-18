@@ -517,6 +517,9 @@ if __name__ == "__main__":
                 # reconstruct images
                 reconstructed_images, _ = model.sample(8, distr_idx=idx)
 
+                # clamp images to show
+                reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
+
                 save_image(
                     reconstructed_images.cpu(),
                     checkpoint_dir / f"epoch_{epoch}_distr-{idx}_samples.png",
