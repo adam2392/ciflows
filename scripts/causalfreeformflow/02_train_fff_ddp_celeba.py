@@ -55,7 +55,9 @@ def configure_optimizers(
         f"num non-decayed parameter tensors: {len(nodecay_params)}, with {num_nodecay_params:,} parameters"
     )
     # Create AdamW optimizer and use the fused version if it is available
-    optimizer = torch.optim.AdamW(optim_groups, lr=learning_rate, betas=betas, fused=True)
+    optimizer = torch.optim.AdamW(
+        optim_groups, lr=learning_rate, betas=betas, fused=True
+    )
     print(f"using fused AdamW")
 
     return optimizer
@@ -90,7 +92,9 @@ def compute_loss(model: ResnetFreeformflow, x, distr_idx, beta, hutchinson_sampl
     # get negative log likelihoood over the distributions
     embed_dim = model.latent_dim
     v_hat = v_hat.view(-1, embed_dim)
-    loss_nll = -model.latent.log_prob(v_hat, distr_idx=distr_idx).mean() - surrogate_loss
+    loss_nll = (
+        -model.latent.log_prob(v_hat, distr_idx=distr_idx).mean() - surrogate_loss
+    )
 
     loss = beta * loss_reconstruction + loss_nll
     return loss, loss_reconstruction, loss_nll, surrogate_loss
@@ -132,7 +136,9 @@ def data_loader(
     distr_labels = [x[1] for x in causal_celeba_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
+        raise ValueError(
+            f"Batch size must be at least {unique_distrs} for stratified sampling."
+        )
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
     # Define the DataLoader
@@ -207,7 +213,9 @@ if __name__ == "__main__":
         device = torch.device("cpu")
         accelerator = "cpu"
     dtype = (
-        "bfloat16" if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else "float16"
+        "bfloat16"
+        if torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+        else "float16"
     )  # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
 
     # pytorch dtype
@@ -224,7 +232,7 @@ if __name__ == "__main__":
 
     # Data settings
     batch_size = 512
-    gradient_accumulation_steps = 8 * world_size  # used to simulate larger batch sizes
+    gradient_accumulation_steps = 8 * 5  # used to simulate larger batch sizes
     img_size = 128
     graph_type = "chain"
     num_workers = 6
@@ -254,6 +262,7 @@ if __name__ == "__main__":
         num_workers = 2
         num_blocks_per_stage = 1
 
+        gradient_accumulation_steps = 2
         fast_dev = True
 
     # for FreeformFlow's loss function
@@ -262,6 +271,9 @@ if __name__ == "__main__":
 
     # various inits, derived attributes, I/O setup
     ddp = int(os.environ.get("RANK", -1)) != -1  # is this a ddp run?
+    if debug:
+        ddp = 0
+
     if ddp:
         init_process_group(backend=backend)
         ddp_rank = int(os.environ["RANK"])
@@ -278,7 +290,9 @@ if __name__ == "__main__":
         print("World size: ", ddp_world_size)
 
         torch.cuda.set_device(device)
-        master_process = ddp_rank == 0  # this process will do logging, checkpointing etc.
+        master_process = (
+            ddp_rank == 0
+        )  # this process will do logging, checkpointing etc.
         seed_offset = ddp_rank  # each process gets a different seed
         # world_size number of processes will be training simultaneously, so we can scale
         # down the desired gradient accumulation iterations per process proportionally
@@ -289,6 +303,13 @@ if __name__ == "__main__":
         master_process = True
         seed_offset = 0
         ddp_world_size = 1
+
+    print(
+        f"Running training with {gradient_accumulation_steps} gradient accumulation steps per process"
+    )
+    print(
+        f"Over {max_epochs} epochs, with batch size {batch_size} and {num_workers} workers"
+    )
 
     # set seed
     seed = 1234
@@ -302,7 +323,9 @@ if __name__ == "__main__":
     else:
         root = Path("/home/adam2392/projects/data/")
     ctx = (
-        nullcontext() if device == "cpu" else torch.autocast(device_type=accelerator, dtype=ptdtype)
+        nullcontext()
+        if device == "cpu"
+        else torch.autocast(device_type=accelerator, dtype=ptdtype)
     )
 
     # v1: K=32
@@ -348,7 +371,9 @@ if __name__ == "__main__":
         optimizer, T_max=max_epochs, eta_min=lr_min
     )  # T_max = total epochs
 
-    top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
+    top_k_saver = TopKModelSaver(
+        checkpoint_dir, k=5
+    )  # Initialize the top-k model saver
 
     train_loader = data_loader(
         root_dir=root,
@@ -397,7 +422,9 @@ if __name__ == "__main__":
         for micro_step in range(gradient_accumulation_steps):
             if ddp:
                 # DDP training requires syncing gradients at the last micro step
-                model.require_backward_grad_sync = micro_step == gradient_accumulation_steps - 1
+                model.require_backward_grad_sync = (
+                    micro_step == gradient_accumulation_steps - 1
+                )
 
             with ctx:
                 # forward pass
@@ -412,6 +439,15 @@ if __name__ == "__main__":
                 # compute the average
                 loss = loss / gradient_accumulation_steps
 
+                # backwards pass, with gradient scaling
+                # scaler.scale(loss).backward()
+
+                loss_nll = loss_nll.sum() / gradient_accumulation_steps
+                loss_reconstruction = (
+                    loss_reconstruction.sum() / gradient_accumulation_steps
+                )
+                surrogate_loss = surrogate_loss.sum() / gradient_accumulation_steps
+
             # Prefetch next batch asynchronously
             try:
                 batch = next(train_iterator)
@@ -420,16 +456,12 @@ if __name__ == "__main__":
                 train_iterator = iter(train_loader)
                 batch = next(train_iterator)
 
-            # extract the variables within the batch
-            images, distr_idx, targets, meta_labels = batch
-            images = images.to(device)
-
             # backwards pass, with gradient scaling
             scaler.scale(loss).backward()
 
-            loss_nll = loss_nll.sum() / gradient_accumulation_steps
-            loss_reconstruction = loss_reconstruction.sum() / gradient_accumulation_steps
-            surrogate_loss = surrogate_loss.sum() / gradient_accumulation_steps
+            # extract the variables within the batch
+            images, distr_idx, targets, meta_labels = batch
+            images = images.to(device)
 
             # DDP: accumulate loss terms
             train_loss += loss.item()
@@ -439,7 +471,9 @@ if __name__ == "__main__":
 
         # clip the gradient
         if grad_clip != 0.0:
-            scaler.unscale_(optimizer)
+            if scaler.is_enabled():
+                scaler.unscale_(optimizer)
+
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
 
         # step optimizer and update
@@ -473,7 +507,9 @@ if __name__ == "__main__":
         # Validation phase
         if debug or epoch % check_samples_every_n_epoch == 0 and master_process:
             print()
-            print(f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}")
+            print(
+                f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}"
+            )
             model.eval()
 
             # sample images from normalizing flow
@@ -490,7 +526,7 @@ if __name__ == "__main__":
 
             # Track top 5 models based on validation loss
             # Optionally, remove worse models if there are more than k saved models
-            top_k_saver.save_model(model, epoch, train_loss)
+            top_k_saver.save_model(model, optimizer, epoch, train_loss)
 
         epoch += 1
         local_iter_epoch += 1
@@ -502,11 +538,19 @@ if __name__ == "__main__":
         dist.destroy_process_group()
 
     # Save final model
-    torch.save(model.state_dict(), checkpoint_dir / model_fname)
+    torch.save(
+        {
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "epoch": epoch,  # Optional: Save the current epoch
+            "loss": loss,  # Optional: Save the last loss value
+        },
+        checkpoint_dir / model_fname,
+    )
     print(f"Training complete. Models saved in {checkpoint_dir}.")
 
     # Load back the saved final model and verify that it loads
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     fff_model = model.to(device)
     model_path = checkpoint_dir / model_fname
-    fff_model = load_model(fff_model, model_path, device)
+    fff_model = load_model(fff_model, model_path, device, optimizer=optimizer)

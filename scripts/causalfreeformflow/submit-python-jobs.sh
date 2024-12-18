@@ -20,7 +20,7 @@ TRAINING_SEED=0
 
 # Calculate the GPU index to use for this job
 # GPU_INDEX=$(((({TRAINING_SEED[$i]}) % $NUM_GPUS) + 1))
-GPU_INDEX=2
+GPU_INDEX=1
 
 # Number of GPUs available
 NUM_GPUS=3
@@ -43,7 +43,7 @@ LOG_FILE="celeba_fff_resnet_batch512_latentdim48_v1_${SCRIPT_NAME}_multigpu.log"
 LOG_FILE="celeba_fff_resnet_batch512_latentdim48_v1_${SCRIPT_NAME}_gpuindex_${GPU_INDEX}.log"
 nohup $CMD > $LOG_FILE 2>&1 &
 
-echo $TRAINING_SEED
-echo "GPU index is $CUDA_VISIBLE_DEVICES"
-echo "Submitted job for training seed: $TRAINING_SEED for script: $SCRIPT_NAME"
+# echo $TRAINING_SEED
+echo "CUDA visible devices is $CUDA_VISIBLE_DEVICES"
+echo "Submitted job for GPU index: $GPU_INDEX for script: $SCRIPT_NAME"
 echo $CMD
