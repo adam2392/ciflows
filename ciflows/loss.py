@@ -169,7 +169,7 @@ def volume_change_surrogate(
 
         # encode the data to get the latent representation
         try:
-            v = encoder(x)
+            v = encoder(x).to(device=x.device, dtype=dtype)
             B, embed_dim = v.shape
         except Exception as e:
             print(v.shape)
