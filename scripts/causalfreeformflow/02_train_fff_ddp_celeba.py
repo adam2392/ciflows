@@ -10,9 +10,11 @@ import torch
 import torch.distributed as dist
 from torch import nn
 from torch.distributed import init_process_group
+import torch.distributed
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
+import torch.version
 from torchvision import transforms
 from torchvision.utils import save_image
 from tqdm import tqdm
@@ -229,10 +231,17 @@ if __name__ == "__main__":
 
     print(f"Using device: {device} with {world_size} GPUs")
     print(f"Using accelerator: {accelerator}")
+    # Check if NCCL backend is available
+    print("PyTorch version:", torch.__version__)
+    print("CUDA available:", torch.cuda.is_available())
+    print("CUDA version:", torch.version.cuda)
+    print("NCCL backend available:", torch.distributed.is_nccl_available())
 
     # Data settings
     batch_size = 512
-    gradient_accumulation_steps = 8 * 2  # used to simulate larger batch sizes
+    gradient_accumulation_steps = 8 * max(
+        1, world_size
+    )  # used to simulate larger batch sizes
     img_size = 128
     graph_type = "chain"
     num_workers = 4
