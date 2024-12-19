@@ -175,8 +175,8 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
-    checkpoint_model_fname = "celeba_nfon_resnetvaereduction_batch1024_latentdim48_hcdim4_trainableedges_sep4and8_v1.pt"
+    model_fname = "celeba_nfon_resnetvaereduction_batch1024_latentdim48_hcdim4_trainableedges_sep4and8_v1.pt"
+    checkpoint_model_fname = "celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
     model_checkpoint_dir = (
         root
         / "CausalCelebA"
