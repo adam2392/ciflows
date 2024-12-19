@@ -541,6 +541,44 @@ if __name__ == "__main__":
             )
             model.eval()
 
+            # now reconstruct images over a test batch
+            sample_images = images[:8]
+            with torch.no_grad():
+                # VAE Unet
+                # mean_encoding, _, skips = model.encode(sample_images)
+                # reconstructed_images = model.decode(mean_encoding, skips).reshape(
+                #     -1, 3, img_size, img_size
+                # )
+
+                # Standard VAE
+                encoding = raw_model.encode(sample_images)
+                reconstructed_images = raw_model.decode(encoding)
+                reconstructed_images = torch.clamp(reconstructed_images, -1, 1)
+
+                # now, perturb the latent space and generate new images
+                encoding[:, 32:48] = encoding[:, 32:48] + 2
+                
+                reconstructed_pert_images = raw_model.decode(encoding)
+                reconstructed_pert_images = torch.clamp(reconstructed_pert_images, -1, 1)
+
+                # clamp
+                reconstructed_pert_images = torch.clamp(reconstructed_pert_images, -1, 1)
+            
+            sample_images = torch.cat(
+                (
+                    sample_images.cpu(),
+                    reconstructed_images.cpu(),
+                    reconstructed_pert_images.cpu(),
+                ),
+                dim=0,
+            )
+            save_image(
+                sample_images,
+                checkpoint_dir / f"epoch_{epoch}_reconstruction_samples.png",
+                nrow=4,
+                normalize=True,
+            )
+
             # sample images from normalizing flow
             for idx in train_loader.dataset.distr_idx_list:
                 # reconstruct images

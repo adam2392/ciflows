@@ -88,23 +88,29 @@ def make_nf_model(debug=False):
         ]
 
     node_dimensions = {
-        0: 16,
-        1: 16,
-        2: 16,
+        0: 22,
+        1: 22,
+        2: 4,
     }
     edge_list = [(1, 2)]
     noise_means = {
-        0: torch.zeros(16),
-        1: torch.zeros(16),
-        2: torch.zeros(16),
+        0: torch.zeros(node_dimensions[0]),
+        1: torch.zeros(node_dimensions[1]),
+        2: torch.zeros(node_dimensions[2]),
     }
     noise_variances = {
-        0: torch.ones(16),
-        1: torch.ones(16),
-        2: torch.ones(16),
+        0: torch.ones(node_dimensions[0]),
+        1: torch.ones(node_dimensions[1]),
+        2: torch.ones(node_dimensions[2]),
     }
-    intervened_node_means = [{2: torch.ones(16) + 4}, {2: torch.ones(16) + 8}]
-    intervened_node_vars = [{2: torch.ones(16)}, {2: torch.ones(16)}]
+    intervened_node_means = [
+        {2: torch.ones(node_dimensions[2]) + 4},
+        {2: torch.ones(node_dimensions[2]) + 8},
+    ]
+    intervened_node_vars = [
+        {2: torch.ones(node_dimensions[2])},
+        {2: torch.ones(node_dimensions[2])},
+    ]
 
     confounded_list = []
     # independent noise with causal prior
@@ -146,13 +152,13 @@ if __name__ == "__main__":
 
     batch_size = 1024
 
-    max_epochs = 2000
+    max_epochs = 5000
     lr = 3e-4
     lr_min = 1e-6
     lr_scheduler = "cosine"
     max_norm = 1.0  # Threshold for gradient norm clipping
     debug = False
-    load_from_checkpoint = True
+    load_from_checkpoint = False
     num_workers = 6
     graph_type = "chain"
     image_size = 128
@@ -169,8 +175,8 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v2.pt"
-    checkpoint_model_fname = "celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
+    model_fname = "celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
+    checkpoint_model_fname = "celeba_nfon_resnetvaereduction_batch1024_latentdim48_hcdim4_trainableedges_sep4and8_v1.pt"
     model_checkpoint_dir = (
         root
         / "CausalCelebA"
