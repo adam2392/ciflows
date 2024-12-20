@@ -132,7 +132,7 @@ class DeepResNetVAE(nn.Module):
         return self.decoder(z)
 
     def forward(self, x):
-        mu, logvar = self.encoder(x)
+        mu, logvar = self.encoder.encode(x)
         z = self.reparameterize(mu, logvar)
         reconstructed_x = self.decoder(z)
         return reconstructed_x, mu, logvar

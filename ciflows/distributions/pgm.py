@@ -59,7 +59,9 @@ class LinearGaussianDag(MultidistrCausalFlow):
         if intervened_node_vars is None:
             intervened_node_vars = []
         if len(intervened_node_means) != len(intervened_node_vars):
-            raise ValueError("Intervened node means and variances must have the same length.")
+            raise ValueError(
+                "Intervened node means and variances must have the same length."
+            )
 
         self.node_dimensions = node_dimensions
         self.latent_dim = sum(node_dimensions.values())
@@ -97,7 +99,9 @@ class LinearGaussianDag(MultidistrCausalFlow):
         # Register buffers for node parameters (non-trainable)
         for node in node_dimensions:
             # For each node, register noise mean and variance as buffers
-            self.register_buffer(f"exog_mean_{node}_0", noise_means.get(node, torch.tensor(0.0)))
+            self.register_buffer(
+                f"exog_mean_{node}_0", noise_means.get(node, torch.tensor(0.0))
+            )
             self.register_buffer(
                 f"exog_variance_{node}_0", noise_variances.get(node, torch.tensor(1.0))
             )
@@ -105,8 +109,8 @@ class LinearGaussianDag(MultidistrCausalFlow):
         self.confounder_means = defaultdict(dict)
         self.confounder_variances = defaultdict(dict)
         for node_a, node_b in confounded_list:
-            confounder_mean = 0.0
-            confounder_var = 1.0
+            confounder_mean = torch.tensor(0.0)
+            confounder_var = torch.tensor(1.0)
             self.confounder_means[node_a][node_b] = confounder_mean
             self.confounder_means[node_b][node_a] = confounder_mean
 
@@ -128,7 +132,9 @@ class LinearGaussianDag(MultidistrCausalFlow):
             zip(intervened_node_means, intervened_node_vars)
         ):
             if not all(key in intervened_node_var for key in intervened_node_mean):
-                raise ValueError("Intervened node means and variances must have the same keys.")
+                raise ValueError(
+                    "Intervened node means and variances must have the same keys."
+                )
             idx += 1  # start indexing at 1, since 0 is reserved for observational exogenous noise
 
             self.distr_idx_map[idx] = set(intervened_node_mean.keys())
@@ -184,7 +190,9 @@ class LinearGaussianDag(MultidistrCausalFlow):
                 )  # self.noise_means.get(node, 0.0)
 
                 # Compute total noise variance (node-specific + confounders)
-                node_noise_var = getattr(self, f"exog_variance_{node}_0", torch.tensor(1.0))
+                node_noise_var = getattr(
+                    self, f"exog_variance_{node}_0", torch.tensor(1.0)
+                )
             else:
                 # Intervened noise mean and variance
                 noise_mean = getattr(self, f"exog_mean_{node}_{distr_idx}")
@@ -197,9 +205,18 @@ class LinearGaussianDag(MultidistrCausalFlow):
             for confounded_node in self.confounder_means.get(node, {}):
                 confounder_mean = self.confounder_means[node][confounded_node]
                 confounder_var = self.confounder_variances[node][confounded_node]
-                confounder_noise += confounder_mean + torch.randn(batch_size, node_dim).to(
-                    device
-                ) * torch.sqrt(torch.tensor(confounder_var))
+                print(
+                    confounder_mean.shape,
+                    confounder_var.shape,
+                    torch.randn(batch_size, node_dim).shape,
+                )
+                confounder_noise += torch.add(
+                    confounder_mean,
+                    torch.multiply(
+                        torch.randn(batch_size, node_dim).to(device),
+                        torch.sqrt(confounder_var),
+                    ),
+                )
 
             # exogenous noise
             noise = noise_mean + noise_std * torch.randn(batch_size, node_dim).to(
@@ -214,7 +231,9 @@ class LinearGaussianDag(MultidistrCausalFlow):
             samples = self._dict_to_tensor(samples)
             assert_array_equal(samples.shape, (batch_size, self.latent_dim))
 
-        log_p = self.log_prob(samples, distr_idx=torch.ones(batch_size, dtype=int) * distr_idx)
+        log_p = self.log_prob(
+            samples, distr_idx=torch.ones(batch_size, dtype=int) * distr_idx
+        )
         return samples, log_p
 
     def _dict_to_tensor(self, dataset):
@@ -270,13 +289,17 @@ class LinearGaussianDag(MultidistrCausalFlow):
         # if any(not isinstance(idx, int) for idx in distr_idx):
         #     raise RuntimeError(f'Distribution indices should be ints, not {type(distr_idx[0])}.')
         batch_size = len(distr_idx)
-        log_prob = torch.zeros(batch_size).to(device)  # Initialize batch-wise log-probability
+        log_prob = torch.zeros(batch_size).to(
+            device
+        )  # Initialize batch-wise log-probability
 
         means_dict = {
-            node: torch.zeros_like(dataset[node]).to(device) for node in self.topological_order
+            node: torch.zeros_like(dataset[node]).to(device)
+            for node in self.topological_order
         }
         log_vars_dict = {
-            node: torch.zeros_like(dataset[node]).to(device) for node in self.topological_order
+            node: torch.zeros_like(dataset[node]).to(device)
+            for node in self.topological_order
         }
 
         unique_distrs = set(distr_idx)
@@ -300,7 +323,9 @@ class LinearGaussianDag(MultidistrCausalFlow):
                 # Add contributions from confounders
                 confounder_contributions = torch.zeros_like(node_data).to(device)
                 if node in self.confounder_means:
-                    for confounder_nbr, confounder_mean in self.confounder_means[node].items():
+                    for confounder_nbr, confounder_mean in self.confounder_means[
+                        node
+                    ].items():
                         # Contribution of confounder to the node's mean
                         confounder_contributions += confounder_mean
 
@@ -318,11 +343,15 @@ class LinearGaussianDag(MultidistrCausalFlow):
 
                 node_noise_std = torch.sqrt(node_noise_var)
                 if node in self.confounder_means:
-                    for confounder_nbr, confounder_var in self.confounder_means[node].items():
+                    for confounder_nbr, confounder_var in self.confounder_means[
+                        node
+                    ].items():
                         node_noise_var += confounder_var
                 node_noise_std = torch.sqrt(node_noise_var)
                 # Combine all contributions to compute the node's conditional mean
-                conditional_mean = parent_contributions + confounder_contributions + noise_mean
+                conditional_mean = (
+                    parent_contributions + confounder_contributions + noise_mean
+                )
 
                 # Compute Gaussian log-probability for this node
                 residual = node_data - conditional_mean
@@ -389,7 +418,9 @@ if __name__ == "__main__":
 
     print(sampler.distr_idx_map)
 
-    log_probs = sampler.log_prob(samples, distr_idx=np.ones(batch_size, dtype=int) * distr_idx)
+    log_probs = sampler.log_prob(
+        samples, distr_idx=np.ones(batch_size, dtype=int) * distr_idx
+    )
     print(log_probs.shape)  # Should be (10,)
     # print(log_probs)  # Log-probabilities for each sample
     print(-log_probs.mean())

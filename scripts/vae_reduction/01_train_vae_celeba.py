@@ -96,18 +96,24 @@ def data_loader(
     train_len = total_len - val_len
 
     # Split the dataset into train and validation sets
-    train_dataset, val_dataset = random_split(causal_celeba_dataset, [train_len, val_len])
+    train_dataset, val_dataset = random_split(
+        causal_celeba_dataset, [train_len, val_len]
+    )
 
     distr_labels = [x[1] for x in train_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
+        raise ValueError(
+            f"Batch size must be at least {unique_distrs} for stratified sampling."
+        )
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
     distr_labels = [x[1] for x in val_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
+        raise ValueError(
+            f"Batch size must be at least {unique_distrs} for stratified sampling."
+        )
     val_sampler = StratifiedSampler(distr_labels, batch_size)
 
     # Define the DataLoader
@@ -221,9 +227,13 @@ if __name__ == "__main__":
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
     # Cosine Annealing Scheduler (adjust the T_max for the number of epochs)
-    scheduler = CosineAnnealingLR(optimizer, T_max=max_epochs, eta_min=1e-6)  # T_max = total epochs
+    scheduler = CosineAnnealingLR(
+        optimizer, T_max=max_epochs, eta_min=1e-6
+    )  # T_max = total epochs
 
-    top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
+    top_k_saver = TopKModelSaver(
+        checkpoint_dir, k=5
+    )  # Initialize the top-k model saver
 
     train_loader, val_loader = data_loader(
         root_dir=root,
@@ -252,7 +262,9 @@ if __name__ == "__main__":
         ):
             images = images.to(device)
             optimizer.zero_grad()
-            reconstructed, latent_mu, latent_logvar = model(images)  # Model forward pass
+            reconstructed, latent_mu, latent_logvar = model(
+                images
+            )  # Model forward pass
 
             # Clamp logvar to prevent numerical instability
             latent_logvar = torch.clamp_(latent_logvar, -10, 10)
@@ -277,12 +289,16 @@ if __name__ == "__main__":
 
         train_loss /= len(train_loader)
         lr = scheduler.get_last_lr()[0]
-        print(f"====> Epoch: {epoch} Average Train loss: {train_loss:.4f}, LR: {lr:.6f}")
+        print(
+            f"====> Epoch: {epoch} Average Train loss: {train_loss:.4f}, LR: {lr:.6f}"
+        )
 
         # Log training and validation loss
         if debug or epoch % 10 == 0:
             print()
-            print(f"Saving images - Epoch [{epoch}/{max_epochs}], Train Loss: {train_loss:.4f}")
+            print(
+                f"Saving images - Epoch [{epoch}/{max_epochs}], Train Loss: {train_loss:.4f}"
+            )
 
             # Validation phase
             model.eval()
@@ -324,8 +340,8 @@ if __name__ == "__main__":
                 # )
 
                 # Standard VAE
-                mean_encoding, _ = model.encode(sample_images)
-                reconstructed_images = model.decode(mean_encoding).reshape(
+                encoding = model.encode(sample_images)
+                reconstructed_images = model.decode(encoding).reshape(
                     -1, 3, img_size, img_size
                 )
                 reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
@@ -333,7 +349,9 @@ if __name__ == "__main__":
                 # sample images from VAE
                 # 1. Sample latent variables from standard Gaussian
                 num_samples = 8  # Number of images to generate
-                z = torch.randn(num_samples, latent_dim).to(device)  # Sample z ~ N(0, I)
+                z = torch.randn(num_samples, latent_dim).to(
+                    device
+                )  # Sample z ~ N(0, I)
 
                 # 2. Pass the sampled z through the decoder
                 generated_images = model.decode(z)  # Shape: [num_samples, 3, 128, 128]
@@ -358,7 +376,7 @@ if __name__ == "__main__":
         # Track top 5 models based on validation loss
         if epoch % 5 == 0:
             # Optionally, remove worse models if there are more than k saved models
-            top_k_saver.save_model(model, epoch, val_loss)
+            top_k_saver.save_model(model, optimizer, epoch, val_loss)
 
         # Check early stopping
         # early_stopping(val_loss, model)
@@ -367,7 +385,15 @@ if __name__ == "__main__":
         #     break
 
     # Save final model
-    torch.save(model.state_dict(), checkpoint_dir / model_fname)
+    torch.save(
+        {
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "epoch": epoch,  # Optional: Save the current epoch
+            "loss": loss,  # Optional: Save the last loss value
+        },
+        checkpoint_dir / model_fname,
+    )
     print(f"Training complete. Models saved in {checkpoint_dir}.")
 
     # Usage example:
@@ -376,6 +402,8 @@ if __name__ == "__main__":
     # vae_model = VAEUNet(
     #     in_channels=in_channels, out_channels=out_channels, latent_dim=latent_dim
     # ).to(device)
-    vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage).to(device)
+    vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage).to(
+        device
+    )
     model_path = checkpoint_dir / model_fname
-    vae_model = load_model(vae_model, model_path, device)
+    vae_model = load_model(vae_model, model_path, device, optimizer=optimizer)
