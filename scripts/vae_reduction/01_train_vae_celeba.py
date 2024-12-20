@@ -79,7 +79,6 @@ def data_loader(
             transforms.Resize((img_size, img_size)),  # Resize images to 128x128
             transforms.CenterCrop(img_size),  # Ensure square crop
             transforms.ToTensor(),  # Convert images to PyTorch tensors
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]
     )
 
@@ -172,7 +171,7 @@ if __name__ == "__main__":
 
     latent_dim = 48
     batch_size = 1024
-    model_fname = "celeba_vaeresnetreduction_batch1024_latentdim48_img128_v1.pt"
+    model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
 
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -329,7 +328,7 @@ if __name__ == "__main__":
                 reconstructed_images = model.decode(mean_encoding).reshape(
                     -1, 3, img_size, img_size
                 )
-                reconstructed_images = torch.clamp(reconstructed_images, -1, 1)
+                reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
 
                 # sample images from VAE
                 # 1. Sample latent variables from standard Gaussian
@@ -340,7 +339,7 @@ if __name__ == "__main__":
                 generated_images = model.decode(z)  # Shape: [num_samples, 3, 128, 128]
 
                 # clamp
-                generated_images = torch.clamp(generated_images, -1, 1)
+                generated_images = torch.clamp(generated_images, 0, 1)
             sample_images = torch.cat(
                 (
                     sample_images.cpu(),
