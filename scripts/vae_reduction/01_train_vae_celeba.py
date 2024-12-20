@@ -376,7 +376,7 @@ if __name__ == "__main__":
         # Track top 5 models based on validation loss
         if epoch % 5 == 0:
             # Optionally, remove worse models if there are more than k saved models
-            top_k_saver.save_model(model, optimizer, epoch, val_loss)
+            top_k_saver.save_model(model, optimizer, epoch, loss)
 
         # Check early stopping
         # early_stopping(val_loss, model)
