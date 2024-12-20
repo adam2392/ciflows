@@ -84,7 +84,7 @@ if __name__ == "__main__":
     lr_min = 1e-6
     lr_scheduler = "cosine"
     max_norm = 1.0  # Threshold for gradient norm clipping
-    debug = True
+    debug = False
     load_from_checkpoint = False
     num_workers = 6
     graph_type = "chain"

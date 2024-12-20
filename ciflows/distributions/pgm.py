@@ -120,11 +120,11 @@ class LinearGaussianDag(MultidistrCausalFlow):
             # For each pair of confounded variables, register a shared noise mean and variance
             self.register_buffer(
                 f"confounded_mean_{node_a}_{node_b}",
-                torch.tensor(self.confounder_means[node_a][node_b]),
+                self.confounder_means[node_a][node_b],
             ),
             self.register_buffer(
                 f"confounded_variance_{node_a}_{node_b}",
-                torch.tensor(self.confounder_variances[node_a][node_b]),
+                self.confounder_variances[node_a][node_b],
             )
 
         # Register intervened node means and variances as buffers
@@ -201,7 +201,7 @@ class LinearGaussianDag(MultidistrCausalFlow):
             noise_std = torch.sqrt(node_noise_var)  # Standard deviation of the noise
 
             # confounder noise
-            confounder_noise = torch.tensor(0.0).to(device)
+            confounder_noise = torch.zeros((batch_size, node_dim)).to(device)
             for confounded_node in self.confounder_means.get(node, {}):
                 confounder_mean = self.confounder_means[node][confounded_node]
                 confounder_var = self.confounder_variances[node][confounded_node]
@@ -209,6 +209,7 @@ class LinearGaussianDag(MultidistrCausalFlow):
                     confounder_mean.shape,
                     confounder_var.shape,
                     torch.randn(batch_size, node_dim).shape,
+                    noise_mean.shape,
                 )
                 confounder_noise += torch.add(
                     confounder_mean,
