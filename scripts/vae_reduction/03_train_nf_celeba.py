@@ -1,23 +1,18 @@
-import os
 from pathlib import Path
 
 import lightning as pl
-import normflows as nf
 import numpy as np
 import torch
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
-from torchvision import transforms
 from torchvision.utils import save_image
 from tqdm import tqdm
 
 from ciflows.datasets.causalceleba import CausalCelebAEmbedding
 from ciflows.datasets.multidistr import StratifiedSampler
-from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.eval import load_model
-from ciflows.flows.model import CausalNormalizingFlow
+from ciflows.reduction import make_nf_model
 from ciflows.reduction.resnetvae import DeepResNetVAE
-from ciflows.reduction.vae import VAE
 from ciflows.training import TopKModelSaver
 
 
@@ -44,9 +39,7 @@ def data_loader(
     distr_labels = [x[1] for x in causal_celeba_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(
-            f"Batch size must be at least {unique_distrs} for stratified sampling."
-        )
+        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
     # Define the DataLoader
@@ -62,72 +55,6 @@ def data_loader(
     )
 
     return train_loader
-
-
-def make_nf_model(debug=False):
-    """Make normalizing flow model."""
-    # Define list of flows
-    if debug:
-        K = 32
-        net_hidden_layers = 3
-        net_hidden_dim = 128
-    else:
-        K = 8  # v1
-        K = 32  # v2
-        net_hidden_layers = 3
-        net_hidden_dim = 128
-
-    latent_dim = 48
-
-    flows = []
-    for i in range(K):
-        flows += [
-            nf.flows.AutoregressiveRationalQuadraticSpline(
-                latent_dim, net_hidden_layers, net_hidden_dim
-            )
-        ]
-
-    node_dimensions = {
-        0: 22,
-        1: 22,
-        2: 4,
-    }
-    edge_list = [(1, 2)]
-    noise_means = {
-        0: torch.zeros(node_dimensions[0]),
-        1: torch.zeros(node_dimensions[1]),
-        2: torch.zeros(node_dimensions[2]),
-    }
-    noise_variances = {
-        0: torch.ones(node_dimensions[0]),
-        1: torch.ones(node_dimensions[1]),
-        2: torch.ones(node_dimensions[2]),
-    }
-    intervened_node_means = [
-        {2: torch.ones(node_dimensions[2]) + 4},
-        {2: torch.ones(node_dimensions[2]) + 8},
-    ]
-    intervened_node_vars = [
-        {2: torch.ones(node_dimensions[2])},
-        {2: torch.ones(node_dimensions[2])},
-    ]
-
-    confounded_list = []
-    # independent noise with causal prior
-    q0 = LinearGaussianDag(
-        node_dimensions=node_dimensions,
-        edge_list=edge_list,
-        noise_means=noise_means,
-        noise_variances=noise_variances,
-        confounded_list=confounded_list,
-        intervened_node_means=intervened_node_means,
-        intervened_node_vars=intervened_node_vars,
-        trainable_edges=True,
-    )
-
-    # Construct flow model with the multiscale architecture
-    model = CausalNormalizingFlow(q0, flows)
-    return model
 
 
 if __name__ == "__main__":
@@ -175,19 +102,18 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfon_resnetvaereduction_batch1024_latentdim48_hcdim4_trainableedges_sep4and8_v1.pt"
-    checkpoint_model_fname = "celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
+    model_fname = (
+        "celeba_nfon_resnetvaereduction_batch1024_latentdim48_hcdim4_confounded_trainableedges_sep4and8_v1.pt"
+    )
+    checkpoint_model_fname = (
+        "celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
+    )
     model_checkpoint_dir = (
-        root
-        / "CausalCelebA"
-        / "nf_on_vae_reduction"
-        / checkpoint_model_fname.split(".")[0]
+        root / "CausalCelebA" / "nf_on_vae_reduction" / checkpoint_model_fname.split(".")[0]
     )
 
     # checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
-    checkpoint_dir = (
-        root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split(".")[0]
-    )
+    checkpoint_dir = root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     # vae_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim48"
@@ -232,9 +158,7 @@ if __name__ == "__main__":
         optimizer, T_max=max_epochs, eta_min=lr_min
     )  # T_max = total epochs
 
-    top_k_saver = TopKModelSaver(
-        checkpoint_dir, k=5
-    )  # Initialize the top-k model saver
+    top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
 
     train_loader = data_loader(
         root_dir=root,
@@ -262,9 +186,7 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             # extract data from tensor to Parameterdict
-            loss = model.forward_kld(
-                images, intervention_targets=targets, distr_idx=distr_idx
-            )
+            loss = model.forward_kld(images, intervention_targets=targets, distr_idx=distr_idx)
 
             # backward pass
             loss.backward()
@@ -292,9 +214,7 @@ if __name__ == "__main__":
         # Log training and validation loss
         if debug or epoch % 10 == 0:
             print()
-            print(
-                f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}"
-            )
+            print(f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}")
 
             # sample images from normalizing flow
             for distr_idx in train_loader.dataset.distr_idx_list:
@@ -321,7 +241,15 @@ if __name__ == "__main__":
             top_k_saver.save_model(model, optimizer, epoch, train_loss)
 
     # Save final model
-    torch.save(model.state_dict(), checkpoint_dir / model_fname)
+    torch.save(
+        {
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "epoch": epoch,  # Optional: Save the current epoch
+            "loss": loss,  # Optional: Save the last loss value
+        },
+        checkpoint_dir / model_fname,
+    )
     print(f"Training complete. Models saved in {checkpoint_dir}.")
 
     # Usage example:

@@ -14,9 +14,7 @@ from tqdm import tqdm
 from ciflows.datasets.causalceleba import CausalCelebA
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
-from ciflows.reduction.better_vae import VAEUNet
 from ciflows.reduction.resnetvae import DeepResNetVAE
-from ciflows.reduction.vae import VAE
 from ciflows.training import TopKModelSaver
 
 

@@ -6,7 +6,6 @@ import torch
 from torchvision import transforms
 
 from ciflows.reduction.resnetvae import DeepResNetVAE
-from ciflows.reduction.vae import VAE
 
 
 # Encode images in a directory

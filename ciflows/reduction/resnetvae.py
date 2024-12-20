@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
-from torchvision.models.resnet import ResNet18_Weights, ResNet50_Weights
+from torchvision.models.resnet import ResNet18_Weights
 
 
 # ResNet-based Encoder (with VAE-specific output)

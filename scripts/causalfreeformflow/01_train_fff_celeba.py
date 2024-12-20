@@ -1,8 +1,6 @@
-import os
 from pathlib import Path
 
 import lightning as pl
-import normflows as nf
 import numpy as np
 import torch
 from torch import nn

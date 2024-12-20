@@ -236,7 +236,7 @@ class LinearGaussianDag(MultidistrCausalFlow):
             start = end
         return dataset
 
-    def log_prob(self, x, distr_idx=None):
+    def log_prob(self, x, distr_idx=None, return_means_log_vars=False):
         """
         Compute the log-probability of a given dataset.
 
@@ -249,8 +249,13 @@ class LinearGaussianDag(MultidistrCausalFlow):
             x : tensor of shape (batch_size, latent_dim)
                 This is transformed to a dataset dict.
             distr_idx (list): A list of distribution indices for each sample in the batch.
+            return_means_log_vars (bool): Whether to return the means and log-variances for each node.
         Returns:
             log_prob (torch.Tensor): A tensor of shape (batch_size,) containing the log-probabilities for each sample.
+            mean_arr (torch.Tensor): A tensor of shape (batch_size, latent_dim) containing the means for each node.
+                These are arranged in the same order as the input tensor. Only returned if return_means_log_vars=True.
+            log_var_arr (torch.Tensor): A tensor of shape (batch_size, latent_dim) containing the log-variances for each node.
+                These are arranged in the same order as the input tensor. Only returned if return_means_log_vars=True.
         """
         if isinstance(x, torch.Tensor):
             dataset = self._tensor_to_dict(x)
@@ -266,6 +271,13 @@ class LinearGaussianDag(MultidistrCausalFlow):
         #     raise RuntimeError(f'Distribution indices should be ints, not {type(distr_idx[0])}.')
         batch_size = len(distr_idx)
         log_prob = torch.zeros(batch_size).to(device)  # Initialize batch-wise log-probability
+
+        means_dict = {
+            node: torch.zeros_like(dataset[node]).to(device) for node in self.topological_order
+        }
+        log_vars_dict = {
+            node: torch.zeros_like(dataset[node]).to(device) for node in self.topological_order
+        }
 
         unique_distrs = set(distr_idx)
         for idx in unique_distrs:
@@ -330,6 +342,16 @@ class LinearGaussianDag(MultidistrCausalFlow):
 
                 node_log_prob = quadratic_term + normalization_term
                 log_prob[idx_mask] += node_log_prob  # Accumulate log-probability
+
+                # Store means and log variances
+                means_dict[node][idx_mask] = conditional_mean
+                log_var = torch.log(node_noise_var)
+                log_vars_dict[node][idx_mask] = log_var
+
+        if return_means_log_vars:
+            mean_arr = self._dict_to_tensor(means_dict)
+            log_var_arr = self._dict_to_tensor(log_vars_dict)
+            return log_prob, mean_arr, log_var_arr
 
         return log_prob
 
