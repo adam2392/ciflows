@@ -181,12 +181,12 @@ if __name__ == "__main__":
     batch_size = 1024
     model_fname = "celeba_vaeresnetreduction_batch1024_norm01_annealedkld1at1965_latentdim48_img128_v1.pt"
 
-    # checkpoint_model_fname = (
-    #     "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
-    # )
+    checkpoint_model_fdir = (
+        "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    )
     checkpoint_model_fname = 'model_epoch_1965.pt'
     model_checkpoint_dir = (
-        root / "CausalCelebA" / "vae_reduction" / checkpoint_model_fname.split(".")[0]
+        root / "CausalCelebA" / "vae_reduction" / checkpoint_model_fdir.split(".")[0]
     )
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
