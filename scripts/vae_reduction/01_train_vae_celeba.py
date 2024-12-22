@@ -179,7 +179,7 @@ if __name__ == "__main__":
 
     latent_dim = 48
     batch_size = 1024
-    model_fname = "celeba_vaeresnetreduction_batch1024_norm01_annealedkld05at1965_latentdim48_img128_v1.pt"
+    model_fname = "celeba_vaeresnetreduction_batch1024_norm01_annealedkld05at1965_latentdim48_img128_v2.pt"
 
     checkpoint_model_fdir = (
         "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
@@ -200,8 +200,8 @@ if __name__ == "__main__":
     max_norm = 2.0
 
     # for VAE
-    beta_max = 1.0
-    annealing_epochs = 10  # Number of epochs for full beta
+    beta_max = 0.5
+    annealing_epochs = 100  # Number of epochs for full beta
 
     torch.set_float32_matmul_precision("high")
     if debug:
@@ -277,6 +277,7 @@ if __name__ == "__main__":
 
     # Training loop
     max_epochs = start_epoch + max_epochs
+    annealing_epochs = annealing_epochs + start_epoch
     for epoch in tqdm(range(start_epoch, max_epochs), desc="outer", position=0):
         # Training phase
         model.train()
