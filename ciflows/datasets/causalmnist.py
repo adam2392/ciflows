@@ -80,13 +80,15 @@ class CausalDigitBarMNIST(Dataset):
             self.intervention_targets[index],
         )
 
-        # doing this so that it is consistent with all other datasets
-        # to return a PIL Image
-        img = PIL.Image.fromarray(img.numpy(), mode="RGB")
+        # get the distribution index
+        distr_idx = meta_label[-1]
+
         if self.transform is not None:
             img = self.transform(img)
-
-        return img, meta_label, target
+        # doing this so that it is consistent with all other datasets
+        # to return a PIL Image
+        # img = PIL.Image.fromarray(img.numpy(), mode="RGB")
+        return img, distr_idx, target, meta_label
 
     @property
     def meta_label_strs(self):

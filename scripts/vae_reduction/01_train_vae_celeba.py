@@ -169,7 +169,8 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    debug = False
+    debug = True
+    load_from_checkpoint = True
     if debug:
         root = Path("/Users/adam2392/pytorch_data/")
     else:
@@ -179,6 +180,12 @@ if __name__ == "__main__":
     batch_size = 1024
     model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
 
+    checkpoint_model_fname = (
+        "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    )
+    model_checkpoint_dir = (
+        root / "CausalCelebA" / "vae_reduction" / checkpoint_model_fname.split(".")[0]
+    )
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
@@ -226,6 +233,14 @@ if __name__ == "__main__":
     # create pytorch optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
+    if load_from_checkpoint:
+        model, start_epoch = load_model(
+            model,
+            model_checkpoint_dir / checkpoint_model_fname,
+            device,
+            optimizer=optimizer,
+        )
+
     # Cosine Annealing Scheduler (adjust the T_max for the number of epochs)
     scheduler = CosineAnnealingLR(
         optimizer, T_max=max_epochs, eta_min=1e-6
@@ -253,7 +268,8 @@ if __name__ == "__main__":
     # - save the model at the end of training
 
     # Training loop
-    for epoch in tqdm(range(1, max_epochs + 1), desc="outer", position=0):
+    max_epochs = start_epoch + max_epochs
+    for epoch in tqdm(range(start_epoch, max_epochs), desc="outer", position=0):
         # Training phase
         model.train()
         train_loss = 0.0

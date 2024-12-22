@@ -8,8 +8,11 @@ def load_model(model, model_path, device, optimizer=None):
     if optimizer is not None:
         optimizer.load_state_dict(state_dict["optimizer_state_dict"])
         model.load_state_dict(state_dict["model_state_dict"])
+        start_epoch = state_dict["epoch"]
     else:
         model.load_state_dict(state_dict)
+        start_epoch = 1
+        
     model.eval()  # Set to evaluation mode
     print(f"Model loaded from {model_path}")
-    return model
+    return model, start_epoch
