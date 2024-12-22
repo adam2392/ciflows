@@ -179,7 +179,7 @@ if __name__ == "__main__":
 
     latent_dim = 48
     batch_size = 1024
-    model_fname = "celeba_vaeresnetreduction_batch1024_norm01_annealedkld1@1965_latentdim48_img128_v1.pt"
+    model_fname = "celeba_vaeresnetreduction_batch1024_norm01_annealedkld1at1965_latentdim48_img128_v1.pt"
 
     # checkpoint_model_fname = (
     #     "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
