@@ -140,13 +140,13 @@ def data_loader(
 
 
 # Reconstruction + KL divergence losses summed over all elements and batch
-def loss_function(recon_x, x, mu, log_var, image_dim):
+def loss_function(recon_x, x, mu, log_var, beta=0.0025):
     # print(recon_x.shape, x.shape)
     MSE = F.mse_loss(recon_x, x)
     KLD = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
-    kld_weight = 0.00025
-    kld_weight = 1.0
-    loss = MSE + kld_weight * KLD
+    # beta = 0.00025
+    # beta = 
+    loss = MSE + beta * KLD
     return loss
 
 
@@ -179,12 +179,12 @@ if __name__ == "__main__":
 
     latent_dim = 48
     batch_size = 1024
-    model_fname = "celeba_vaeresnetreduction_batch1024_norm01_annealedkld1at1965_latentdim48_img128_v1.pt"
+    model_fname = "celeba_vaeresnetreduction_batch1024_norm01_annealedkld05at1965_latentdim48_img128_v1.pt"
 
     checkpoint_model_fdir = (
         "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     )
-    checkpoint_model_fname = 'model_epoch_1965.pt'
+    checkpoint_model_fname = "model_epoch_1965.pt"
     model_checkpoint_dir = (
         root / "CausalCelebA" / "vae_reduction" / checkpoint_model_fdir.split(".")[0]
     )
@@ -198,6 +198,10 @@ if __name__ == "__main__":
     num_workers = 4
     graph_type = "chain"
     max_norm = 2.0
+
+    # for VAE
+    beta_max = 1.0
+    annealing_epochs = 10  # Number of epochs for full beta
 
     torch.set_float32_matmul_precision("high")
     if debug:
@@ -247,7 +251,7 @@ if __name__ == "__main__":
 
     # Cosine Annealing Scheduler (adjust the T_max for the number of epochs)
     scheduler = CosineAnnealingLR(
-        optimizer, T_max=max_epochs+start_epoch, eta_min=1e-6
+        optimizer, T_max=max_epochs + start_epoch, eta_min=1e-6
     )  # T_max = total epochs
 
     top_k_saver = TopKModelSaver(
@@ -277,6 +281,10 @@ if __name__ == "__main__":
         # Training phase
         model.train()
         train_loss = 0.0
+
+        # Anneal beta
+        beta = min(beta_max, epoch / annealing_epochs * beta_max)
+
         for batch_idx, (images, distr_idx, targets, meta_labels) in tqdm(
             enumerate(train_loader), desc="step", position=1, leave=False
         ):
@@ -290,7 +298,7 @@ if __name__ == "__main__":
             latent_logvar = torch.clamp_(latent_logvar, -10, 10)
 
             loss = loss_function(
-                reconstructed, images, latent_mu, latent_logvar, image_dim=image_dim
+                reconstructed, images, latent_mu, latent_logvar, beta=beta
             )  # Custom VAE loss function
             loss.backward()
 
