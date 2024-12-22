@@ -189,7 +189,7 @@ if __name__ == "__main__":
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    max_epochs = 1000
+    max_epochs = 2000
     lr = 3e-4
     lr_min = 1e-6
     lr_scheduler = "cosine"
