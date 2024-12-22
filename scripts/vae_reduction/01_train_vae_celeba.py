@@ -169,7 +169,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    debug = True
+    debug = False
     load_from_checkpoint = True
     if debug:
         root = Path("/Users/adam2392/pytorch_data/")
@@ -348,6 +348,7 @@ if __name__ == "__main__":
 
             # Sample and save reconstructed images
             sample_images = val_images[:8]  # Pick 8 images for sampling
+            train_images = images[:8]
             with torch.no_grad():
                 # VAE Unet
                 # mean_encoding, _, skips = model.encode(sample_images)
@@ -374,11 +375,23 @@ if __name__ == "__main__":
 
                 # clamp
                 generated_images = torch.clamp(generated_images, 0, 1)
+
+                # now sample training images and then reconstruct
+                encoding = model.encode(train_images)
+                train_reconstructed_images = model.decode(encoding).reshape(
+                    -1, 3, img_size, img_size
+                )
+                train_reconstructed_images = torch.clamp(
+                    train_reconstructed_images, 0, 1
+                )
+
             sample_images = torch.cat(
                 (
                     sample_images.cpu(),
                     reconstructed_images.cpu(),
                     generated_images.cpu(),
+                    train_images.cpu(),
+                    train_reconstructed_images.cpu(),
                 ),
                 dim=0,
             )
