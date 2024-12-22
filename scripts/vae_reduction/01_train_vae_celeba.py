@@ -145,7 +145,7 @@ def loss_function(recon_x, x, mu, log_var, beta=0.0025):
     MSE = F.mse_loss(recon_x, x)
     KLD = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
     # beta = 0.00025
-    # beta = 
+    # beta =
     loss = MSE + beta * KLD
     return loss
 
@@ -349,7 +349,7 @@ if __name__ == "__main__":
                         val_images,
                         latent_mu,
                         latent_logvar,
-                        image_dim=image_dim,
+                        beta=beta,
                     )  # Custom VAE loss function
                     val_loss += loss.item()
 
