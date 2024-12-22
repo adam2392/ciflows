@@ -240,10 +240,12 @@ if __name__ == "__main__":
             device,
             optimizer=optimizer,
         )
+    else:
+        start_epoch = 1
 
     # Cosine Annealing Scheduler (adjust the T_max for the number of epochs)
     scheduler = CosineAnnealingLR(
-        optimizer, T_max=max_epochs, eta_min=1e-6
+        optimizer, T_max=max_epochs+start_epoch, eta_min=1e-6
     )  # T_max = total epochs
 
     top_k_saver = TopKModelSaver(
