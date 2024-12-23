@@ -140,7 +140,7 @@ def data_loader(
 
 
 # Reconstruction + KL divergence losses summed over all elements and batch
-def loss_function(recon_x, x, mu, log_var, beta=0.0025):
+def loss_function(recon_x, x, mu, log_var, beta=0.00025):
     # print(recon_x.shape, x.shape)
     MSE = F.mse_loss(recon_x, x)
     KLD = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
@@ -179,7 +179,7 @@ if __name__ == "__main__":
 
     latent_dim = 48
     batch_size = 1024
-    model_fname = "celeba_vaeresnetreduction_batch1024_norm01_annealedkld05at1965_latentdim48_img128_v2.pt"
+    model_fname = "celeba_vaeresnetreduction_batch1024_norm01_annealedkld005at1965_latentdim48_img128_v1.pt"
 
     checkpoint_model_fdir = (
         "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
@@ -200,8 +200,8 @@ if __name__ == "__main__":
     max_norm = 2.0
 
     # for VAE
-    beta_max = 0.5
-    annealing_epochs = 100  # Number of epochs for full beta
+    beta_max = 0.05
+    annealing_epochs = 1000  # Number of epochs for full beta
 
     torch.set_float32_matmul_precision("high")
     if debug:
