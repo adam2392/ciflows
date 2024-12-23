@@ -291,7 +291,7 @@ if __name__ == "__main__":
         # Anneal beta
         # beta = min(beta_max, epoch / annealing_epochs * beta_max)
         # Compute cyclic beta
-        global_step = epoch * len(data_loader) + step
+        global_step = epoch * len(train_loader) + step
         beta = cyclic_beta(global_step, cycle_length)
 
         for batch_idx, (images, distr_idx, targets, meta_labels) in tqdm(
