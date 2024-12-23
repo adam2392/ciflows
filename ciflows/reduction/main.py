@@ -53,7 +53,8 @@ def make_nf_model(debug=False):
         {2: torch.ones(node_dimensions[2])},
     ]
 
-    confounded_list = [(0, 1)]
+    # confounded_list = [(0, 1)]
+    confounded_list = []
 
     # independent noise with causal prior
     q0 = LinearGaussianDag(
