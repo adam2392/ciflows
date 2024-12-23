@@ -25,7 +25,7 @@ def encode_images_in_directory(
             latent_vector = model.reparameterize(mu, log_var)
             if idx == 0:
                 print(f"Latent vector shape: {latent_vector.shape}")
-        encodings.append(latent_vector.cpu())
+        encodings.append(mu.cpu())
     return torch.stack(encodings)
 
 
@@ -45,21 +45,34 @@ if __name__ == "__main__":
     print(f"Using accelerator: {accelerator}")
 
     graph_type = "chain"
+    debug = False
+    if debug:
+        root = Path("/Users/adam2392/pytorch_data/")
+    else:
+        root = Path("/home/adam2392/projects/data/")
 
-    root = Path("/Users/adam2392/pytorch_data/CausalCelebA/")
-    data_dir = root / graph_type / "dim128"
+    data_dir = root / "CausalCelebA" / graph_type / "dim128"
     directories = [data_dir / "obs", data_dir / "int_hair_0", data_dir / "int_hair_1"]
     latent_vectors_per_directory = {}
 
     model_fname = "model_epoch_100.pt"
     model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
-    vae_model_fpath = root / "vae_reduction" / model_fname.split(".")[0] / model_fname
+    model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    vae_model_fpath = (
+        root
+        / "CausalCelebA"
+        / "vae_reduction"
+        / model_fname.split(".")[0]
+        / model_fname
+    )
 
     # vae_model = VAE()  # Replace with loading logic
     latent_dim = 48
     num_blocks_per_stage = 3
     vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
-    vae_model.load_state_dict(torch.load(vae_model_fpath, map_location=device))
+    vae_model.load_state_dict(
+        torch.load(vae_model_fpath, map_location=device)["model_state_dict"]
+    )
     vae_model.eval()
 
     # Define preprocessing for images
@@ -69,18 +82,21 @@ if __name__ == "__main__":
             transforms.Resize((image_size, image_size)),  # Resize images to 128x128
             transforms.CenterCrop(image_size),  # Ensure square crop
             transforms.ToTensor(),  # Convert images to PyTorch tensors
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]
     )
     vae_model.to(device)
 
     for directory in directories:
+        directory.mkdir(parents=True, exist_ok=True)
+
         print(f"Processing directory: {directory}")
-        latent_vectors = encode_images_in_directory(directory, vae_model, transform, device)
+        latent_vectors = encode_images_in_directory(
+            directory, vae_model, transform, device
+        )
         latent_vectors_per_directory[directory] = latent_vectors
 
         # Save the tensor
-        output_path = f"{directory.name}_encodings.pt"
+        output_path = f"{directory.name}_nonorm_encodings.pt"
         torch.save(latent_vectors, directory / output_path)
         print(f"Saved encodings to: {output_path}")
         print("Encoding process completed.")
