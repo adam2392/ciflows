@@ -39,7 +39,9 @@ def data_loader(
     distr_labels = [x[1] for x in causal_celeba_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
+        raise ValueError(
+            f"Batch size must be at least {unique_distrs} for stratified sampling."
+        )
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
     # Define the DataLoader
@@ -103,26 +105,31 @@ if __name__ == "__main__":
     # v2: K=8
     # v3: K=8, batch higher
     model_fname = "celeba_nfon_nonorm_resnetvaereduction_batch1024_latentdim48_hcdim4_confounded_trainableedges_sep4and8_v1.pt"
-    checkpoint_model_fname = (
-        "celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
-    )
+    checkpoint_model_fname = "celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
     model_checkpoint_dir = (
-        root / "CausalCelebA" / "nf_on_vae_reduction" / checkpoint_model_fname.split(".")[0]
+        root
+        / "CausalCelebA"
+        / "nf_on_vae_reduction"
+        / checkpoint_model_fname.split(".")[0]
     )
 
     # checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
-    checkpoint_dir = root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split(".")[0]
+    checkpoint_dir = (
+        root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split(".")[0]
+    )
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     # vae_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim48"
     # vae_model_fname = "model_epoch_100.pt"
     vae_model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
-    vae_model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    vae_model_fname = (
+        "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    )
     vae_dir = root / "CausalCelebA" / "vae_reduction" / vae_model_fname.split(".")[0]
     # vae_model = VAE().to(device)
     vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
     model_path = vae_dir / vae_model_fname
-    vae_model, start_epoch = load_model(vae_model, model_path, device)
+    vae_model, _ = load_model(vae_model, model_path, device)
     vae_model = vae_model.to(device)
 
     if debug:
@@ -144,7 +151,11 @@ if __name__ == "__main__":
     model = torch.compile(model)
 
     if load_from_checkpoint:
-        model = load_model(model, model_checkpoint_dir / checkpoint_model_fname, device)
+        model, start_epoch = load_model(
+            model, model_checkpoint_dir / checkpoint_model_fname, device
+        )
+    else:
+        start_epoch = 1
 
     # print the number of parameters in the model
     print(sum(p.numel() for p in model.parameters()) / 1e6, "M parameters")
@@ -157,7 +168,9 @@ if __name__ == "__main__":
         optimizer, T_max=max_epochs, eta_min=lr_min
     )  # T_max = total epochs
 
-    top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
+    top_k_saver = TopKModelSaver(
+        checkpoint_dir, k=5
+    )  # Initialize the top-k model saver
 
     train_loader = data_loader(
         root_dir=root,
@@ -173,7 +186,8 @@ if __name__ == "__main__":
     # - save the model at the end of training
 
     # Training loop
-    for epoch in tqdm(range(1, max_epochs + 1), desc="outer", position=0):
+    max_epochs = max_epochs + start_epoch
+    for epoch in tqdm(range(start_epoch, max_epochs), desc="outer", position=0):
         # Training phase
         model.train()
         train_loss = 0.0
@@ -185,7 +199,9 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             # extract data from tensor to Parameterdict
-            loss = model.forward_kld(images, intervention_targets=targets, distr_idx=distr_idx)
+            loss = model.forward_kld(
+                images, intervention_targets=targets, distr_idx=distr_idx
+            )
 
             # backward pass
             loss.backward()
@@ -213,7 +229,9 @@ if __name__ == "__main__":
         # Log training and validation loss
         if debug or epoch % 10 == 0:
             print()
-            print(f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}")
+            print(
+                f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}"
+            )
 
             # sample images from normalizing flow
             for distr_idx in train_loader.dataset.distr_idx_list:
@@ -255,4 +273,4 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     nf_model = model.to(device)
     model_path = checkpoint_dir / model_fname
-    nf_model = load_model(nf_model, model_path, device, optimizer=optimizer)
+    nf_model, _ = load_model(nf_model, model_path, device, optimizer=optimizer)
