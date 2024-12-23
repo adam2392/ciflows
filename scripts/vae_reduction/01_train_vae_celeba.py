@@ -272,7 +272,7 @@ if __name__ == "__main__":
     patience = 50
     early_stopping = EarlyStopping(patience=patience, verbose=True)
 
-    cycle_length = len(data_loader) * 5  # Full cycle over 5 epochs
+    cycle_length = len(train_loader) * 5  # Full cycle over 5 epochs
 
     # training loop
     # - log the train and val loss every 10 epochs
