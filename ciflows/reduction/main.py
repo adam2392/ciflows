@@ -5,16 +5,16 @@ from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.flows.model import CausalNormalizingFlow
 
 
-def make_nf_model(debug=False):
+def make_nf_model(K=32, debug=False):
     """Make normalizing flow model."""
     # Define list of flows
     if debug:
-        K = 32
+        # K = 32
         net_hidden_layers = 3
         net_hidden_dim = 128
     else:
-        K = 8  # v1
-        K = 32  # v2
+        # K = 8  # v1
+        # K = 32  # v2
         net_hidden_layers = 3
         net_hidden_dim = 128
 

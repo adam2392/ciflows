@@ -96,6 +96,8 @@ if __name__ == "__main__":
     latent_dim = 48
     num_blocks_per_stage = 3
 
+    num_flows = 128
+
     torch.set_float32_matmul_precision("high")
 
     if debug:
@@ -106,7 +108,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfon_nonorm_resnetvaereduction_batch1024_latentdim48_hcdim4_trainableedges_sep4and8_v1.pt"
+    model_fname = "celeba_nfon_128flows_nonorm_resnetvaereduction_batch1024_latentdim48_hcdim4_trainableedges_sep4and8_v1.pt"
     checkpoint_model_fname = "celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
     model_checkpoint_dir = (
         root
@@ -144,7 +146,7 @@ if __name__ == "__main__":
 
         fast_dev = True
 
-    model = make_nf_model(debug=debug)
+    model = make_nf_model(K=num_flows, debug=debug)
     model = model.to(device)
 
     image_dim = 3 * image_size * image_size
