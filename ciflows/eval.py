@@ -12,7 +12,7 @@ def load_model(model, model_path, device, optimizer=None):
     else:
         # model.load_state_dict(state_dict)
         start_epoch = 1
-        
+
     model.eval()  # Set to evaluation mode
     print(f"Model loaded from {model_path}")
     return model, start_epoch

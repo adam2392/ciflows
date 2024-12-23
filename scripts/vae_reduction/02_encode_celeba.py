@@ -59,20 +59,14 @@ if __name__ == "__main__":
     model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
     model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     vae_model_fpath = (
-        root
-        / "CausalCelebA"
-        / "vae_reduction"
-        / model_fname.split(".")[0]
-        / model_fname
+        root / "CausalCelebA" / "vae_reduction" / model_fname.split(".")[0] / model_fname
     )
 
     # vae_model = VAE()  # Replace with loading logic
     latent_dim = 48
     num_blocks_per_stage = 3
     vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
-    vae_model.load_state_dict(
-        torch.load(vae_model_fpath, map_location=device)["model_state_dict"]
-    )
+    vae_model.load_state_dict(torch.load(vae_model_fpath, map_location=device)["model_state_dict"])
     vae_model.eval()
 
     # Define preprocessing for images
@@ -90,9 +84,7 @@ if __name__ == "__main__":
         directory.mkdir(parents=True, exist_ok=True)
 
         print(f"Processing directory: {directory}")
-        latent_vectors = encode_images_in_directory(
-            directory, vae_model, transform, device
-        )
+        latent_vectors = encode_images_in_directory(directory, vae_model, transform, device)
         latent_vectors_per_directory[directory] = latent_vectors
 
         # Save the tensor

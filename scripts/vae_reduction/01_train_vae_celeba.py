@@ -1,5 +1,5 @@
 from pathlib import Path
-
+import math
 import lightning as pl
 import numpy as np
 import torch
@@ -99,24 +99,18 @@ def data_loader(
     train_len = total_len - val_len
 
     # Split the dataset into train and validation sets
-    train_dataset, val_dataset = random_split(
-        causal_celeba_dataset, [train_len, val_len]
-    )
+    train_dataset, val_dataset = random_split(causal_celeba_dataset, [train_len, val_len])
 
     distr_labels = [x[1] for x in train_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(
-            f"Batch size must be at least {unique_distrs} for stratified sampling."
-        )
+        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
     distr_labels = [x[1] for x in val_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(
-            f"Batch size must be at least {unique_distrs} for stratified sampling."
-        )
+        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
     val_sampler = StratifiedSampler(distr_labels, batch_size)
 
     # Define the DataLoader
@@ -153,6 +147,14 @@ def loss_function(recon_x, x, mu, log_var, beta=0.00025):
     return loss
 
 
+# Beta annealing function (cyclic)
+def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=1.0):
+    """Cyclic annealing for beta."""
+    cycle_position = step % cycle_length
+    fraction = cycle_position / cycle_length
+    return beta_min + (beta_max - beta_min) * (1 - math.cos(math.pi * fraction)) / 2
+
+
 if __name__ == "__main__":
     seed = 1234
 
@@ -182,11 +184,11 @@ if __name__ == "__main__":
 
     latent_dim = 48
     batch_size = 1024
-    model_fname = "celeba_annealedkld15_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
-
-    checkpoint_model_fdir = (
-        "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    model_fname = (
+        "celeba_cyclicbeta_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     )
+
+    checkpoint_model_fdir = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     checkpoint_model_fname = "model_epoch_1965.pt"
     model_checkpoint_dir = (
         root / "CausalCelebA" / "vae_reduction" / checkpoint_model_fdir.split(".")[0]
@@ -257,9 +259,7 @@ if __name__ == "__main__":
         optimizer, T_max=max_epochs + start_epoch, eta_min=1e-6
     )  # T_max = total epochs
 
-    top_k_saver = TopKModelSaver(
-        checkpoint_dir, k=5
-    )  # Initialize the top-k model saver
+    top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
 
     train_loader, val_loader = data_loader(
         root_dir=root,
@@ -272,6 +272,8 @@ if __name__ == "__main__":
     patience = 50
     early_stopping = EarlyStopping(patience=patience, verbose=True)
 
+    cycle_length = len(data_loader) * 5  # Full cycle over 5 epochs
+
     # training loop
     # - log the train and val loss every 10 epochs
     # - sample from the model every 10 epochs, and save the images
@@ -281,22 +283,23 @@ if __name__ == "__main__":
     # Training loop
     max_epochs = start_epoch + max_epochs
     annealing_epochs = annealing_epochs + start_epoch
-    for epoch in tqdm(range(start_epoch, max_epochs), desc="outer", position=0):
+    for step, epoch in tqdm(enumerate(start_epoch, max_epochs), desc="outer", position=0):
         # Training phase
         model.train()
         train_loss = 0.0
 
         # Anneal beta
-        beta = min(beta_max, epoch / annealing_epochs * beta_max)
+        # beta = min(beta_max, epoch / annealing_epochs * beta_max)
+        # Compute cyclic beta
+        global_step = epoch * len(data_loader) + step
+        beta = cyclic_beta(global_step, cycle_length)
 
         for batch_idx, (images, distr_idx, targets, meta_labels) in tqdm(
             enumerate(train_loader), desc="step", position=1, leave=False
         ):
             images = images.to(device)
             optimizer.zero_grad()
-            reconstructed, latent_mu, latent_logvar = model(
-                images
-            )  # Model forward pass
+            reconstructed, latent_mu, latent_logvar = model(images)  # Model forward pass
 
             # Clamp logvar to prevent numerical instability
             latent_logvar = torch.clamp_(latent_logvar, -10, 10)
@@ -321,16 +324,12 @@ if __name__ == "__main__":
 
         train_loss /= len(train_loader)
         lr = scheduler.get_last_lr()[0]
-        print(
-            f"====> Epoch: {epoch} Average Train loss: {train_loss:.4f}, LR: {lr:.6f}"
-        )
+        print(f"====> Epoch: {epoch} Average Train loss: {train_loss:.4f}, LR: {lr:.6f}")
 
         # Log training and validation loss
         if debug or epoch % 10 == 0:
             print()
-            print(
-                f"Saving images - Epoch [{epoch}/{max_epochs}], Train Loss: {train_loss:.4f}"
-            )
+            print(f"Saving images - Epoch [{epoch}/{max_epochs}], Train Loss: {train_loss:.4f}")
 
             # Validation phase
             model.eval()
@@ -374,17 +373,13 @@ if __name__ == "__main__":
 
                 # Standard VAE
                 encoding = model.encode(sample_images)
-                reconstructed_images = model.decode(encoding).reshape(
-                    -1, 3, img_size, img_size
-                )
+                reconstructed_images = model.decode(encoding).reshape(-1, 3, img_size, img_size)
                 reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
 
                 # sample images from VAE
                 # 1. Sample latent variables from standard Gaussian
                 num_samples = 8  # Number of images to generate
-                z = torch.randn(num_samples, latent_dim).to(
-                    device
-                )  # Sample z ~ N(0, I)
+                z = torch.randn(num_samples, latent_dim).to(device)  # Sample z ~ N(0, I)
 
                 # 2. Pass the sampled z through the decoder
                 generated_images = model.decode(z)  # Shape: [num_samples, 3, 128, 128]
@@ -397,9 +392,7 @@ if __name__ == "__main__":
                 train_reconstructed_images = model.decode(encoding).reshape(
                     -1, 3, img_size, img_size
                 )
-                train_reconstructed_images = torch.clamp(
-                    train_reconstructed_images, 0, 1
-                )
+                train_reconstructed_images = torch.clamp(train_reconstructed_images, 0, 1)
 
             sample_images = torch.cat(
                 (
@@ -447,8 +440,6 @@ if __name__ == "__main__":
     # vae_model = VAEUNet(
     #     in_channels=in_channels, out_channels=out_channels, latent_dim=latent_dim
     # ).to(device)
-    vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage).to(
-        device
-    )
+    vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage).to(device)
     model_path = checkpoint_dir / model_fname
     vae_model = load_model(vae_model, model_path, device, optimizer=optimizer)
