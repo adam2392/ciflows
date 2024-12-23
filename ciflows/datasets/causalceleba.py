@@ -185,9 +185,9 @@ class CausalCelebAEmbedding(CausalCelebA):
 
         # load attrs
         encoding_fnames = {
-            "obs": "obs_encodings.pt",
-            "int_hair_0": "int_hair_0_encodings.pt",
-            "int_hair_1": "int_hair_1_encodings.pt",
+            "obs": "obs_nonorm_encodings.pt",
+            "int_hair_0": "int_hair_0_nonorm_encodings.pt",
+            "int_hair_1": "int_hair_1_nonorm_encodings.pt",
         }
         distr_types_list = ["obs", "int_hair_0", "int_hair_1"]
         self.causal_distr_dfs = dict()
