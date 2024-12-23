@@ -246,7 +246,7 @@ if __name__ == "__main__":
                 )
 
                 # clamp said images
-                reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
+                # reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
 
                 save_image(
                     reconstructed_images.cpu(),
