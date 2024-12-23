@@ -21,10 +21,12 @@ def data_loader(
     graph_type="chain",
     num_workers=4,
     batch_size=32,
+    img_size=128,
 ):
     causal_celeba_dataset = CausalCelebAEmbedding(
         root=root_dir,
         graph_type=graph_type,
+        img_size=img_size,
         fast_dev_run=False,  # Set to True for debugging
     )
 
@@ -177,6 +179,7 @@ if __name__ == "__main__":
         graph_type=graph_type,
         num_workers=num_workers,
         batch_size=batch_size,
+        img_size=image_size,
     )
 
     # training loop
