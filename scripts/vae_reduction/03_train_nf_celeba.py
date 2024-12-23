@@ -122,7 +122,7 @@ if __name__ == "__main__":
     # vae_model = VAE().to(device)
     vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
     model_path = vae_dir / vae_model_fname
-    vae_model = load_model(vae_model, model_path, device)
+    vae_model, start_epoch = load_model(vae_model, model_path, device)
     vae_model = vae_model.to(device)
 
     if debug:
