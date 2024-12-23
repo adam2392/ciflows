@@ -283,7 +283,7 @@ if __name__ == "__main__":
     # Training loop
     max_epochs = start_epoch + max_epochs
     annealing_epochs = annealing_epochs + start_epoch
-    for step, epoch in tqdm(enumerate(start_epoch, max_epochs), desc="outer", position=0):
+    for step, epoch in tqdm(enumerate(range(start_epoch, max_epochs)), desc="outer", position=0):
         # Training phase
         model.train()
         train_loss = 0.0
