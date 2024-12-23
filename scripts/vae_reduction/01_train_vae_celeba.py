@@ -78,6 +78,9 @@ def data_loader(
         [
             transforms.Resize((img_size, img_size)),  # Resize images to 128x128
             transforms.CenterCrop(img_size),  # Ensure square crop
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomResizedCrop(size=128, scale=(0.8, 1.0)),
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
             transforms.ToTensor(),  # Convert images to PyTorch tensors
         ]
     )
@@ -171,7 +174,7 @@ if __name__ == "__main__":
     print(f"Using accelerator: {accelerator}")
 
     debug = False
-    load_from_checkpoint = True
+    load_from_checkpoint = False
     if debug:
         root = Path("/Users/adam2392/pytorch_data/")
     else:
@@ -179,7 +182,7 @@ if __name__ == "__main__":
 
     latent_dim = 48
     batch_size = 1024
-    model_fname = "celeba_vaeresnetreduction_batch1024_norm01_annealedkld005at1965_latentdim48_img128_v1.pt"
+    model_fname = "celeba_annealedkld15_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
 
     checkpoint_model_fdir = (
         "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
@@ -200,7 +203,7 @@ if __name__ == "__main__":
     max_norm = 2.0
 
     # for VAE
-    beta_max = 0.05
+    beta_max = 1.5
     annealing_epochs = 1000  # Number of epochs for full beta
 
     torch.set_float32_matmul_precision("high")
@@ -416,7 +419,7 @@ if __name__ == "__main__":
             )
 
         # Track top 5 models based on validation loss
-        if epoch % 5 == 0:
+        if epoch % 10 == 0:
             # Optionally, remove worse models if there are more than k saved models
             top_k_saver.save_model(model, optimizer, epoch, loss)
 
