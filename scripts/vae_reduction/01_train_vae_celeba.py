@@ -148,7 +148,7 @@ def loss_function(recon_x, x, mu, log_var, beta=0.00025):
 
 
 # Beta annealing function (cyclic)
-def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=1.0):
+def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=0.05):
     """Cyclic annealing for beta."""
     cycle_position = step % cycle_length
     fraction = cycle_position / cycle_length
@@ -185,7 +185,7 @@ if __name__ == "__main__":
     latent_dim = 48
     batch_size = 1024
     model_fname = (
-        "celeba_cyclicbeta_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+        "celeba_cyclicbeta_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v2.pt"
     )
 
     checkpoint_model_fdir = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
@@ -293,6 +293,7 @@ if __name__ == "__main__":
         # Compute cyclic beta
         global_step = epoch * len(train_loader) + step
         beta = cyclic_beta(global_step, cycle_length)
+        print(f"Epoch: {epoch}, Step: {step}, Beta: {beta:.6f}")
 
         for batch_idx, (images, distr_idx, targets, meta_labels) in tqdm(
             enumerate(train_loader), desc="step", position=1, leave=False
