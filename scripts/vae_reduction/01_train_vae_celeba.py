@@ -137,13 +137,16 @@ def data_loader(
 
 
 # Reconstruction + KL divergence losses summed over all elements and batch
-def loss_function(recon_x, x, mu, log_var, beta=0.00025):
+def loss_function(recon_x, x, mu, log_var, capacity=0.0, beta=0.00025):
     # print(recon_x.shape, x.shape)
     MSE = F.mse_loss(recon_x, x)
     KLD = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
     # beta = 0.00025
     # beta =
-    loss = MSE + beta * KLD
+    # Latent Capacity Control
+    kl_loss_controlled = torch.max(KLD - capacity, torch.tensor(0.0).cuda())
+    
+    loss = MSE + beta * kl_loss_controlled
     return loss
 
 
@@ -185,7 +188,7 @@ if __name__ == "__main__":
     latent_dim = 48
     batch_size = 1024
     model_fname = (
-        "celeba_cyclicbeta_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v2.pt"
+        "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     )
 
     checkpoint_model_fdir = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
@@ -272,6 +275,13 @@ if __name__ == "__main__":
     patience = 50
     early_stopping = EarlyStopping(patience=patience, verbose=True)
 
+
+    # Initialize Capacity and Scheduler
+    initial_capacity = 0.0
+    max_capacity = 25.0
+    capacity_increment = 0.1  # Increment per epoch
+    current_capacity = initial_capacity
+
     cycle_length = len(train_loader) * 5  # Full cycle over 5 epochs
 
     # training loop
@@ -306,7 +316,7 @@ if __name__ == "__main__":
             latent_logvar = torch.clamp_(latent_logvar, -10, 10)
 
             loss = loss_function(
-                reconstructed, images, latent_mu, latent_logvar, beta=beta
+                reconstructed, images, latent_mu, latent_logvar, capacity=current_capacity, beta=beta
             )  # Custom VAE loss function
             loss.backward()
 
@@ -353,6 +363,7 @@ if __name__ == "__main__":
                         val_images,
                         latent_mu,
                         latent_logvar,
+                        capacity=current_capacity,
                         beta=beta,
                     )  # Custom VAE loss function
                     val_loss += loss.item()
@@ -417,6 +428,8 @@ if __name__ == "__main__":
             # Optionally, remove worse models if there are more than k saved models
             top_k_saver.save_model(model, optimizer, epoch, loss)
 
+        current_capacity = min(max_capacity, current_capacity + capacity_increment)
+    
         # Check early stopping
         # early_stopping(val_loss, model)
         # if early_stopping.early_stop:
