@@ -25,7 +25,8 @@ def encode_images_in_directory(
             latent_vector = model.reparameterize(mu, log_var)
             if idx == 0:
                 print(f"Latent vector shape: {latent_vector.shape}")
-        encodings.append(mu.cpu())
+        encodings.append(latent_vector.cpu())
+        # encodings.append(mu.cpu())
     return torch.stack(encodings)
 
 

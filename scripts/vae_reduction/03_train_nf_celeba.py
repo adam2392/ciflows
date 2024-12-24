@@ -94,7 +94,7 @@ if __name__ == "__main__":
     latent_dim = 48
     num_blocks_per_stage = 3
 
-    num_flows = 128
+    num_flows = 32
 
     torch.set_float32_matmul_precision("high")
 
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfon_128flows_nonorm_resnetvaereduction_batch1024_latentdim48_hcdim4_trainableedges_sep4and8_v1.pt"
+    model_fname = "celeba_nfon_32flows_nonorm_resnetvaereduction_batch1024_latentdim48_hcdim4_trainableedges_sep4and8_v1.pt"
     checkpoint_model_fname = (
         "celeba_nfon_resnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
     )
@@ -120,7 +120,7 @@ if __name__ == "__main__":
 
     # vae_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim48"
     # vae_model_fname = "model_epoch_100.pt"
-    vae_model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
+    # vae_model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
     vae_model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     vae_dir = root / "CausalCelebA" / "vae_reduction" / vae_model_fname.split(".")[0]
     # vae_model = VAE().to(device)
@@ -235,7 +235,7 @@ if __name__ == "__main__":
                 )
 
                 # clamp said images
-                # reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
+                reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
 
                 save_image(
                     reconstructed_images.cpu(),
@@ -243,6 +243,26 @@ if __name__ == "__main__":
                     nrow=4,
                     normalize=True,
                 )
+
+            # reconstruct images using VAE
+            images = images[:8]
+            
+            # forward/inverse of flow model
+            recon_embedding = model.forward(model.inverse(images))
+
+            # reconstruct images
+            reconstructed_images = vae_model.decode(recon_embedding).reshape(-1, 3, image_size, image_size)
+
+            # clamp said images
+            reconstructed_images = torch.cat([images, reconstructed_images], dim=0)
+            reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
+
+            save_image(
+                reconstructed_images.cpu(),
+                checkpoint_dir / f"epoch_{epoch}_reconstructed_samples.png",
+                nrow=4,
+                normalize=True,
+            )
 
         # Track top 5 models based on validation loss
         if epoch % 5 == 0:
