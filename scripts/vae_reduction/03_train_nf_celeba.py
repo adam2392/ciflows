@@ -245,7 +245,7 @@ if __name__ == "__main__":
                 )
 
             # reconstruct images using VAE
-            images = images[:8]
+            images = vae_model.decode(images[:8]).reshape(-1, 3, image_size, image_size)
             
             # forward/inverse of flow model
             recon_embedding = model.forward(model.inverse(images))
