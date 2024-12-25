@@ -17,11 +17,13 @@ from ciflows.eval import load_model
 from ciflows.reduction.resnetvae import DeepResNetVAE
 from ciflows.training import TopKModelSaver, delete_old_checkpoints
 
+
 def softclip(tensor, min):
-    """ Clips the tensor values at the minimum value min in a softway. Taken from Handful of Trials """
+    """Clips the tensor values at the minimum value min in a softway. Taken from Handful of Trials"""
     result_tensor = min + F.softplus(tensor - min)
 
     return result_tensor
+
 
 def weights_init(m):
     if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
@@ -149,24 +151,20 @@ def data_loader(
     return train_loader, val_loader
 
 
-def gaussian_nll(recon_x, mu, log_sigma, x):
-    first_term =  0.5 * torch.pow((x - recon_x) / log_sigma.exp(), 2)
-    print(first_term.shape)
-    return (
-        first_term
-        + log_sigma
-        + 0.5 * np.log(2 * np.pi)
-    )
+def gaussian_nll(recon_x, log_sigma, x):
+    first_term = 0.5 * torch.pow((x - recon_x) / log_sigma.exp(), 2)
+    # print(first_term.shape)
+    return first_term + log_sigma + 0.5 * np.log(2 * np.pi)
 
 
 # Reconstruction + KL divergence losses summed over all elements and batch
 def loss_function(recon_x, x, mu, log_var, log_sigma_x, capacity=0.0, beta=0.00025):
     # print(recon_x.shape, x.shape)
     # MSE = F.mse_loss(recon_x, x)
-    print(recon_x.shape, x.shape, mu.shape, log_var.shape)
+    # print(recon_x.shape, x.shape, mu.shape, log_var.shape)
 
-    rec_loss = gaussian_nll(recon_x, mu, log_sigma_x, x).sum()
-    
+    rec_loss = gaussian_nll(recon_x, log_sigma_x, x).sum()
+
     KLD = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
     # beta = 0.00025
     # beta =
@@ -217,7 +215,9 @@ if __name__ == "__main__":
 
     latent_dim = 48
     batch_size = 1024
-    model_fname = "celeba_sigmavaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    model_fname = (
+        "celeba_sigmavaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    )
 
     checkpoint_model_fdir = (
         "celeba_sigmavaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
