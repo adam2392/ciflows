@@ -26,6 +26,57 @@ from ciflows.flows.freeform import ResnetFreeformflow
 from ciflows.loss import volume_change_surrogate
 from ciflows.training import TopKModelSaver, delete_old_checkpoints
 
+from fff.fif import FreeFormInjectiveFlow, FreeFormInjectiveFlowHParams
+
+def make_fff_model():
+    config = {
+        "model": "fff.FreeFormInjectiveFlow",
+        "noise": 0.01,
+        "data_set": {
+            "name": "celeba",
+            "root": "data",
+            "load_to_memory": True,  # Set to False if your RAM is not big enough
+        },
+        "skip_val_nll": 1,  # Skip NLL validation after the first batch
+        "loss_weights": {
+            "nll": 1,
+            "noisy_reconstruction": 10,
+        },
+        "max_epochs": 200,  # For the benchmark, stop the process after 5 hours
+        "models": [
+            {
+                "name": "fff.model.ConvolutionalNeuralNetwork",
+                "batch_norm": True,
+                "latent_dim": 64,
+                "ch_factor": 128,
+                "decoder_spec": [
+                    [8, 8],
+                    # Channels, kernel size, stride, padding, output padding
+                    [4, 5, 2, 2],
+                    [2, 5, 2, 1],
+                    [1, 5, 2, 2, 1],
+                    [3, 5, 1, 1],
+                ],
+            },
+            {
+                "name": "fff.model.ResNet",
+                "latent_dim": 64,
+                "layers_spec": [
+                    [256, 256],
+                    [256, 256],
+                    [256, 256],
+                    [256, 256],
+                ],
+            },
+        ],
+        "optimizer": {
+            "name": "adam",
+            "lr": 0.001,
+        },
+        "batch_size": 256,
+    }
+
+    model = FreeFormInjectiveFlow()
 
 def configure_optimizers(
     model,
@@ -61,23 +112,6 @@ def configure_optimizers(
     print("using fused AdamW")
 
     return optimizer
-
-
-# helps estimate an arbitrarily accurate loss over either split using many batches
-@torch.no_grad()
-def estimate_loss():
-    out = {}
-    model.eval()
-    for split in ["train", "val"]:
-        losses = torch.zeros(eval_iters)
-        for k in range(eval_iters):
-            X, Y = get_batch(split)
-            with ctx:
-                logits, loss = model(X, Y)
-            losses[k] = loss.item()
-        out[split] = losses.mean()
-    model.train()
-    return out
 
 
 # Beta annealing function (cyclic)
@@ -117,7 +151,8 @@ def compute_loss(model: ResnetFreeformflow, x, distr_idx, beta, hutchinson_sampl
         - surrogate_loss
     )
 
-    loss = beta * loss_reconstruction.sum() + loss_nll.sum()
+    # loss = beta * loss_reconstruction.sum() + loss_nll.sum()
+    loss = loss_reconstruction.sum()
     return loss, loss_reconstruction, loss_nll, surrogate_loss
 
 
@@ -272,7 +307,7 @@ if __name__ == "__main__":
     check_samples_every_n_epoch = 5
 
     # adamw optimizer settings
-    max_epochs = 2000
+    max_epochs = 20
     lr = 3e-4
     lr_min = 6e-5
     beta1 = 0.9
@@ -363,7 +398,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_fff_resnet_batch512_gradaccum_latentdim48_cyclicbeta100to10k_v1_.pt"
+    model_fname = "test_celeba_fff_resnet_batch128_gradaccum_latentdim48_cyclicbeta100to10k_v1_.pt"
     checkpoint_dir = root / "CausalCelebA" / "fff" / model_fname.split(".")[0]
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
