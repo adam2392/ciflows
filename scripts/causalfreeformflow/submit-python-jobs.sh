@@ -26,7 +26,7 @@ GPU_INDEX=2
 NUM_GPUS=3
 
 # Specify the GPUs to use
-GPU_INDICES="5,6,7"  # Adjust this as per available GPUs and your requirement
+GPU_INDICES="2,3,4"  # Adjust this as per available GPUs and your requirement
 
 # Set the environment variable for the GPU
 # export CUDA_VISIBLE_DEVICES=$GPU_INDEX,$((GPU_INDEX + 1))
@@ -39,7 +39,7 @@ LOG_FILE="celeba_fff_resnet_batch512_gradaccum_latentdim48_beta10_v1_${SCRIPT_NA
 # or `&` to run the command in the background
 export CUDA_VISIBLE_DEVICES=$GPU_INDICES
 CMD="torchrun --nproc_per_node=$NUM_GPUS $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
-LOG_FILE="celeba_fff_resnet_batch512_gradaccum_latentdim48_cyclicbeta_v1_${SCRIPT_NAME}_multigpu.log"
+LOG_FILE="celeba_fff_resnet_batch512_gradaccum_latentdim48_cyclicbeta100to10k_v1_${SCRIPT_NAME}_multigpu.log"
 nohup $CMD > $LOG_FILE 2>&1 &
 
 # echo $TRAINING_SEED

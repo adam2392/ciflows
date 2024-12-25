@@ -81,7 +81,7 @@ def estimate_loss():
 
 
 # Beta annealing function (cyclic)
-def cyclic_beta(step, cycle_length, beta_min=1.0, beta_max=1000.):
+def cyclic_beta(step, cycle_length, beta_min=100.0, beta_max=10000.0):
     """Cyclic annealing for beta."""
     cycle_position = step % cycle_length
     fraction = cycle_position / cycle_length
@@ -299,7 +299,7 @@ if __name__ == "__main__":
 
     # for FreeformFlow's loss function
     hutchinson_samples = 2
-    beta = 10.0# torch.tensor(10.0).to(device=device, dtype=ptdtype)
+    beta = 10.0  # torch.tensor(10.0).to(device=device, dtype=ptdtype)
 
     # various inits, derived attributes, I/O setup
     ddp = int(os.environ.get("RANK", -1)) != -1  # is this a ddp run?
@@ -363,7 +363,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_fff_resnet_batch512_gradaccum_latentdim48_cyclicbeta_v1.pt"
+    model_fname = "celeba_fff_resnet_batch512_gradaccum_latentdim48_cyclicbeta100to10k_v1_.pt"
     checkpoint_dir = root / "CausalCelebA" / "fff" / model_fname.split(".")[0]
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -461,7 +461,9 @@ if __name__ == "__main__":
 
         # Compute cyclic beta
         global_step = epoch * len(train_loader) + step
-        beta = cyclic_beta(global_step, cycle_length)#).to(device=device, dtype=ptdtype)
+        beta = cyclic_beta(
+            global_step, cycle_length
+        )  # ).to(device=device, dtype=ptdtype)
         if master_process:
             print(f"Epoch: {epoch}, Step: {step}, Beta: {beta:.6f}")
 
@@ -480,7 +482,10 @@ if __name__ == "__main__":
                 # print(f"beta dtype: {beta.dtype}")
                 # compute the loss
                 loss, loss_reconstruction, loss_nll, surrogate_loss = compute_loss(
-                    model, images, distr_idx, beta=beta,
+                    model,
+                    images,
+                    distr_idx,
+                    beta=beta,
                 )
 
                 # sum up the loss
@@ -581,14 +586,10 @@ if __name__ == "__main__":
                 encoding[:, 32:48] = encoding[:, 32:48] + 2
 
                 reconstructed_pert_images = raw_model.decode(encoding)
-                reconstructed_pert_images = torch.clamp(
-                    reconstructed_pert_images, 0, 1
-                )
+                reconstructed_pert_images = torch.clamp(reconstructed_pert_images, 0, 1)
 
                 # clamp
-                reconstructed_pert_images = torch.clamp(
-                    reconstructed_pert_images, 0, 1
-                )
+                reconstructed_pert_images = torch.clamp(reconstructed_pert_images, 0, 1)
 
             sample_images = torch.cat(
                 (
