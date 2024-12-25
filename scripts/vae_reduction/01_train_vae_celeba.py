@@ -208,7 +208,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    debug = True
+    debug = False
     load_from_checkpoint = False
     if debug:
         root = Path("/Users/adam2392/pytorch_data/")
