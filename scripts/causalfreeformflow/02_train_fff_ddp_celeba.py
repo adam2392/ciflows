@@ -456,7 +456,7 @@ if __name__ == "__main__":
 
         # Compute cyclic beta
         global_step = epoch * len(train_loader) + step
-        beta = cyclic_beta(global_step, cycle_length).to(device=device, dtype=ptdtype)
+        beta = torch.tensor(cyclic_beta(global_step, cycle_length)).to(device=device, dtype=ptdtype)
         if master_process:
             print(f"Epoch: {epoch}, Step: {step}, Beta: {beta:.6f}")
 
