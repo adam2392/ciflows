@@ -15,7 +15,7 @@ from ciflows.datasets.causalceleba import CausalCelebA
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
 from ciflows.reduction.resnetvae import DeepResNetVAE
-from ciflows.training import TopKModelSaver
+from ciflows.training import TopKModelSaver, delete_old_checkpoints
 
 
 def weights_init(m):
@@ -30,20 +30,6 @@ def weights_init(m):
     elif isinstance(m, nn.BatchNorm2d):
         nn.init.constant_(m.weight, 1)
         nn.init.constant_(m.bias, 0)
-
-
-import os
-import glob
-
-
-def delete_old_checkpoints(checkpoint_dir, keep_top_k=3):
-    checkpoint_paths = glob.glob(os.path.join(checkpoint_dir, "*.pt"))
-    checkpoint_paths.sort(
-        key=os.path.getmtime, reverse=True
-    )  # Sort by modification time (newest first)
-
-    for path in checkpoint_paths[keep_top_k:]:
-        os.remove(path)
 
 
 class EarlyStopping:

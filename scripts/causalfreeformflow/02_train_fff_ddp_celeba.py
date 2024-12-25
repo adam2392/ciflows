@@ -24,7 +24,7 @@ from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.eval import load_model
 from ciflows.flows.freeform import ResnetFreeformflow
 from ciflows.loss import volume_change_surrogate
-from ciflows.training import TopKModelSaver
+from ciflows.training import TopKModelSaver, delete_old_checkpoints
 
 
 def configure_optimizers(
@@ -623,6 +623,7 @@ if __name__ == "__main__":
             # Track top 5 models based on validation loss
             # Optionally, remove worse models if there are more than k saved models
             top_k_saver.save_model(raw_model, optimizer, epoch, train_loss)
+            delete_old_checkpoints(checkpoint_dir, keep_top_k=5)
 
         epoch += 1
         local_iter_epoch += 1

@@ -3,6 +3,20 @@ import os
 import torch
 
 
+import os
+import glob
+
+
+def delete_old_checkpoints(checkpoint_dir, keep_top_k=3):
+    checkpoint_paths = glob.glob(os.path.join(checkpoint_dir, "*.pt"))
+    checkpoint_paths.sort(
+        key=os.path.getmtime, reverse=True
+    )  # Sort by modification time (newest first)
+
+    for path in checkpoint_paths[keep_top_k:]:
+        os.remove(path)
+
+
 class TopKModelSaver:
     def __init__(self, save_dir, k=5):
         self.save_dir = save_dir
