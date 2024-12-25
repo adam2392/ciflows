@@ -470,7 +470,7 @@ if __name__ == "__main__":
             # Optionally, remove worse models if there are more than k saved models
             top_k_saver.save_model(model, optimizer, epoch, loss)
             delete_old_checkpoints(checkpoint_dir, keep_top_k=5)
-            
+
         current_capacity = min(max_capacity, current_capacity + capacity_increment)
 
         # Check early stopping

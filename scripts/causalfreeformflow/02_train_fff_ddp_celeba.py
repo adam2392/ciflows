@@ -1,3 +1,4 @@
+import math
 import os
 import time
 from contextlib import nullcontext
@@ -54,7 +55,9 @@ def configure_optimizers(
         f"num non-decayed parameter tensors: {len(nodecay_params)}, with {num_nodecay_params:,} parameters"
     )
     # Create AdamW optimizer and use the fused version if it is available
-    optimizer = torch.optim.AdamW(optim_groups, lr=learning_rate, betas=betas, fused=True)
+    optimizer = torch.optim.AdamW(
+        optim_groups, lr=learning_rate, betas=betas, fused=True
+    )
     print("using fused AdamW")
 
     return optimizer
@@ -75,6 +78,14 @@ def estimate_loss():
         out[split] = losses.mean()
     model.train()
     return out
+
+
+# Beta annealing function (cyclic)
+def cyclic_beta(step, cycle_length, beta_min=1.0, beta_max=100.):
+    """Cyclic annealing for beta."""
+    cycle_position = step % cycle_length
+    fraction = cycle_position / cycle_length
+    return beta_min + (beta_max - beta_min) * (1 - math.cos(math.pi * fraction)) / 2
 
 
 def get_model_attribute(model, attr):
@@ -100,7 +111,9 @@ def compute_loss(model: ResnetFreeformflow, x, distr_idx, beta, hutchinson_sampl
     embed_dim = get_model_attribute(model, "latent_dim")
     v_hat = v_hat.view(-1, embed_dim)
     loss_nll = (
-        -get_model_attribute(model, "latent").log_prob(v_hat, distr_idx=distr_idx).mean()
+        -get_model_attribute(model, "latent")
+        .log_prob(v_hat, distr_idx=distr_idx)
+        .mean()
         - surrogate_loss
     )
 
@@ -121,7 +134,7 @@ def data_loader(
             transforms.Resize((img_size, img_size)),  # Resize images to 128x128
             transforms.CenterCrop(img_size),  # Ensure square crop
             transforms.ToTensor(),  # Convert images to PyTorch tensors
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+            # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]
     )
 
@@ -144,7 +157,9 @@ def data_loader(
     distr_labels = [x[1] for x in causal_celeba_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
+        raise ValueError(
+            f"Batch size must be at least {unique_distrs} for stratified sampling."
+        )
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
     # Define the DataLoader
@@ -219,7 +234,9 @@ if __name__ == "__main__":
         device = torch.device("cpu")
         accelerator = "cpu"
     dtype = (
-        "bfloat16" if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else "float16"
+        "bfloat16"
+        if torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+        else "float16"
     )  # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
     dtype = "float32"
 
@@ -300,7 +317,9 @@ if __name__ == "__main__":
         print("World size: ", ddp_world_size)
 
         torch.cuda.set_device(device)
-        master_process = ddp_rank == 0  # this process will do logging, checkpointing etc.
+        master_process = (
+            ddp_rank == 0
+        )  # this process will do logging, checkpointing etc.
         seed_offset = ddp_rank  # each process gets a different seed
         # world_size number of processes will be training simultaneously, so we can scale
         # down the desired gradient accumulation iterations per process proportionally
@@ -315,7 +334,9 @@ if __name__ == "__main__":
     print(
         f"Running training with {gradient_accumulation_steps} gradient accumulation steps per process"
     )
-    print(f"Over {max_epochs} epochs, with batch size {batch_size} and {num_workers} workers")
+    print(
+        f"Over {max_epochs} epochs, with batch size {batch_size} and {num_workers} workers"
+    )
 
     # set seed
     seed = 1234
@@ -329,13 +350,15 @@ if __name__ == "__main__":
     else:
         root = Path("/home/adam2392/projects/data/")
     ctx = (
-        nullcontext() if device == "cpu" else torch.autocast(device_type=accelerator, dtype=ptdtype)
+        nullcontext()
+        if device == "cpu"
+        else torch.autocast(device_type=accelerator, dtype=ptdtype)
     )
 
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_fff_resnet_batch512_gradaccum_latentdim48_beta10_v1.pt"
+    model_fname = "celeba_fff_resnet_batch512_gradaccum_latentdim48_cyclicbeta_v1.pt"
     checkpoint_dir = root / "CausalCelebA" / "fff" / model_fname.split(".")[0]
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -375,7 +398,9 @@ if __name__ == "__main__":
         optimizer, T_max=max_epochs, eta_min=lr_min
     )  # T_max = total epochs
 
-    top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
+    top_k_saver = TopKModelSaver(
+        checkpoint_dir, k=5
+    )  # Initialize the top-k model saver
 
     train_loader = data_loader(
         root_dir=root,
@@ -412,8 +437,13 @@ if __name__ == "__main__":
     print(f"Images dtype: {images.dtype}")
     print(f"Model dtype: {next(model.parameters()).dtype}")
 
+    # Initialize Capacity and Scheduler
+    cycle_length = len(train_loader) * 5  # Full cycle over 5 epochs
+
     # Training loop
-    for epoch in tqdm(range(1, max_epochs + 1), desc="outer", position=0):
+    for step, epoch in tqdm(
+        enumerate(range(1, max_epochs + 1)), desc="outer", position=0
+    ):
         # Training phase
         model.train()
         train_loss = 0.0
@@ -424,11 +454,19 @@ if __name__ == "__main__":
         # Create an iterator for the DataLoader
         train_iterator = iter(train_loader)
 
+        # Compute cyclic beta
+        global_step = epoch * len(train_loader) + step
+        beta = cyclic_beta(global_step, cycle_length)
+        if master_process:
+            print(f"Epoch: {epoch}, Step: {step}, Beta: {beta:.6f}")
+
         # forward update with optional gradient accumulation
         for micro_step in range(gradient_accumulation_steps):
             if ddp:
                 # DDP training requires syncing gradients at the last micro step
-                model.require_backward_grad_sync = micro_step == gradient_accumulation_steps - 1
+                model.require_backward_grad_sync = (
+                    micro_step == gradient_accumulation_steps - 1
+                )
 
             with ctx:
                 # forward pass
@@ -437,7 +475,7 @@ if __name__ == "__main__":
                 # print(f"beta dtype: {beta.dtype}")
                 # compute the loss
                 loss, loss_reconstruction, loss_nll, surrogate_loss = compute_loss(
-                    model, images, distr_idx, beta
+                    model, images, distr_idx, beta=beta,
                 )
 
                 # sum up the loss
@@ -450,7 +488,9 @@ if __name__ == "__main__":
                 # scaler.scale(loss).backward()
 
                 loss_nll = loss_nll.sum() / gradient_accumulation_steps
-                loss_reconstruction = loss_reconstruction.sum() / gradient_accumulation_steps
+                loss_reconstruction = (
+                    loss_reconstruction.sum() / gradient_accumulation_steps
+                )
                 surrogate_loss = surrogate_loss.sum() / gradient_accumulation_steps
 
             # backwards pass, with gradient scaling
@@ -513,7 +553,9 @@ if __name__ == "__main__":
         # Validation phase
         if debug or epoch % check_samples_every_n_epoch == 0 and master_process:
             print()
-            print(f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}")
+            print(
+                f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}"
+            )
             model.eval()
 
             # now reconstruct images over a test batch
@@ -534,10 +576,14 @@ if __name__ == "__main__":
                 encoding[:, 32:48] = encoding[:, 32:48] + 2
 
                 reconstructed_pert_images = raw_model.decode(encoding)
-                reconstructed_pert_images = torch.clamp(reconstructed_pert_images, -1, 1)
+                reconstructed_pert_images = torch.clamp(
+                    reconstructed_pert_images, -1, 1
+                )
 
                 # clamp
-                reconstructed_pert_images = torch.clamp(reconstructed_pert_images, -1, 1)
+                reconstructed_pert_images = torch.clamp(
+                    reconstructed_pert_images, -1, 1
+                )
 
             sample_images = torch.cat(
                 (
