@@ -81,7 +81,7 @@ def estimate_loss():
 
 
 # Beta annealing function (cyclic)
-def cyclic_beta(step, cycle_length, beta_min=1.0, beta_max=100.):
+def cyclic_beta(step, cycle_length, beta_min=1.0, beta_max=1000.):
     """Cyclic annealing for beta."""
     cycle_position = step % cycle_length
     fraction = cycle_position / cycle_length
@@ -179,24 +179,29 @@ def data_loader(
 
 def make_fff_model(num_blocks_per_stage=5, debug=False):
     node_dimensions = {
-        0: 16,
-        1: 16,
-        2: 16,
+        0: 22,
+        1: 22,
+        2: 4,
     }
     edge_list = [(1, 2)]
     noise_means = {
-        0: torch.zeros(16),
-        1: torch.zeros(16),
-        2: torch.zeros(16),
+        0: torch.zeros(node_dimensions[0]),
+        1: torch.zeros(node_dimensions[1]),
+        2: torch.zeros(node_dimensions[2]),
     }
     noise_variances = {
-        0: torch.ones(16),
-        1: torch.ones(16),
-        2: torch.ones(16),
+        0: torch.ones(node_dimensions[0]),
+        1: torch.ones(node_dimensions[1]),
+        2: torch.ones(node_dimensions[2]),
     }
-    intervened_node_means = [{2: torch.ones(16) + 2}, {2: torch.ones(16) + 4}]
-    intervened_node_vars = [{2: torch.ones(16)}, {2: torch.ones(16) + 2}]
-
+    intervened_node_means = [
+        {2: torch.ones(node_dimensions[2]) + 4},
+        {2: torch.ones(node_dimensions[2]) + 8},
+    ]
+    intervened_node_vars = [
+        {2: torch.ones(node_dimensions[2])},
+        {2: torch.ones(node_dimensions[2])},
+    ]
     latent_dim = 48
 
     confounded_list = []
@@ -570,19 +575,19 @@ if __name__ == "__main__":
                 # Standard VAE
                 encoding = raw_model.encode(sample_images)
                 reconstructed_images = raw_model.decode(encoding)
-                reconstructed_images = torch.clamp(reconstructed_images, -1, 1)
+                reconstructed_images = torch.clamp(reconstructed_images, , 1)
 
                 # now, perturb the latent space and generate new images
                 encoding[:, 32:48] = encoding[:, 32:48] + 2
 
                 reconstructed_pert_images = raw_model.decode(encoding)
                 reconstructed_pert_images = torch.clamp(
-                    reconstructed_pert_images, -1, 1
+                    reconstructed_pert_images, 0, 1
                 )
 
                 # clamp
                 reconstructed_pert_images = torch.clamp(
-                    reconstructed_pert_images, -1, 1
+                    reconstructed_pert_images, 0, 1
                 )
 
             sample_images = torch.cat(
