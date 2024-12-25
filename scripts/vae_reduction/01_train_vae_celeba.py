@@ -144,17 +144,23 @@ def data_loader(
     return train_loader, val_loader
 
 
+def gaussian_nll(recon_x, mu, log_sigma, x):
+    return 0.5 * torch.pow((x - recon_x) / log_sigma.exp(), 2) + log_sigma + 0.5 * np.log(2 * np.pi)
+
+
 # Reconstruction + KL divergence losses summed over all elements and batch
 def loss_function(recon_x, x, mu, log_var, capacity=0.0, beta=0.00025):
     # print(recon_x.shape, x.shape)
-    MSE = F.mse_loss(recon_x, x)
+    # MSE = F.mse_loss(recon_x, x)
+    rec_loss = gaussian_nll(recon_x, mu, log_var, x).sum()
+    
     KLD = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
     # beta = 0.00025
     # beta =
     # Latent Capacity Control
     kl_loss_controlled = torch.max(KLD - capacity, torch.tensor(0.0).cuda())
 
-    loss = MSE + beta * kl_loss_controlled
+    loss = rec_loss + beta * kl_loss_controlled
     return loss
 
 
@@ -195,10 +201,10 @@ if __name__ == "__main__":
 
     latent_dim = 48
     batch_size = 1024
-    model_fname = "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    model_fname = "celeba_cyclicbetawithcapacity_sigmavaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
 
     checkpoint_model_fdir = (
-        "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+        "celeba_sigmavaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     )
     checkpoint_model_fname = "model_epoch_1965.pt"
     model_checkpoint_dir = (

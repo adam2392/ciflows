@@ -23,7 +23,7 @@ TRAINING_SEED=0
 
 # Calculate the GPU index to use for this job
 # GPU_INDEX=$(((({TRAINING_SEED[$i]}) % $NUM_GPUS) + 1))
-GPU_INDEX=0
+GPU_INDEX=1
 
 # Set the environment variable for the GPU
 # export CUDA_VISIBLE_DEVICES=$GPU_INDEX,$((GPU_INDEX + 1))
@@ -35,7 +35,7 @@ CMD="python3 $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 # Optionally, you can use a job scheduler like `nohup` to run the command in the background
 # or `&` to run the command in the background
 LOG_FILE="celeba_nfon_32flows_nonorm_resnetvaereduction_batch1024_latentdim48_hcdim4_trainableedges_sep4and8_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
-LOG_FILE="celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
+LOG_FILE="celeba_cyclicbetawithcapacity_sigmavaeresnetreduction_batch1024_norm01_latentdim48_img128_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
 # LOG_FILE="encodings_celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
 
 # LOG_FILE="celeba_vaeresnetreduction_batch1024_latentdim48_img128_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
