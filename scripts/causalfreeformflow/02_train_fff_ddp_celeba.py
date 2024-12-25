@@ -28,6 +28,7 @@ from ciflows.training import TopKModelSaver, delete_old_checkpoints
 
 # from fff.fif import FreeFormInjectiveFlow, FreeFormInjectiveFlowHParams
 
+
 def make_fff_model():
     config = {
         "model": "fff.FreeFormInjectiveFlow",
@@ -78,6 +79,7 @@ def make_fff_model():
 
     # model = FreeFormInjectiveFlow()
 
+
 def configure_optimizers(
     model,
     learning_rate,
@@ -126,7 +128,7 @@ def get_model_attribute(model, attr):
     return getattr(model.module if isinstance(model, DDP) else model, attr)
 
 
-def compute_loss(model: ResnetFreeformflow, x, distr_idx, beta, hutchinson_samples=2):
+def compute_loss(model: DDP, x, distr_idx, beta, hutchinson_samples=2):
     device = x.device
     # beta = beta.to(device)
 
@@ -139,7 +141,7 @@ def compute_loss(model: ResnetFreeformflow, x, distr_idx, beta, hutchinson_sampl
     )
 
     # compute reconstruction loss
-    x_hat_from_encoder = model.decode(model.encode(x))
+    x_hat_from_encoder = model.module.decode(model.module.encode(x))
     loss_reconstruction = torch.nn.functional.mse_loss(x_hat_from_encoder, x)
 
     # get negative log likelihoood over the distributions
