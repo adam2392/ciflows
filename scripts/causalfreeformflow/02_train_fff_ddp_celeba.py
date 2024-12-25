@@ -94,7 +94,7 @@ def get_model_attribute(model, attr):
 
 def compute_loss(model: ResnetFreeformflow, x, distr_idx, beta, hutchinson_samples=2):
     device = images.device
-    beta = beta.to(device)
+    # beta = beta.to(device)
 
     # calculate volume change surrogate loss
     surrogate_loss, v_hat, x_hat = volume_change_surrogate(
@@ -299,7 +299,7 @@ if __name__ == "__main__":
 
     # for FreeformFlow's loss function
     hutchinson_samples = 2
-    beta = torch.tensor(10.0).to(device=device, dtype=ptdtype)
+    beta = 10.0# torch.tensor(10.0).to(device=device, dtype=ptdtype)
 
     # various inits, derived attributes, I/O setup
     ddp = int(os.environ.get("RANK", -1)) != -1  # is this a ddp run?
