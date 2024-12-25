@@ -89,7 +89,8 @@ if __name__ == "__main__":
         latent_vectors_per_directory[directory] = latent_vectors
 
         # Save the tensor
-        output_path = f"{directory.name}_nonorm_encodings.pt"
+        # v2 nonorm encodings = sample from latent, rather than the mean
+        output_path = f"{directory.name}_nonorm_encodings_v2.pt"
         torch.save(latent_vectors, directory / output_path)
         print(f"Saved encodings to: {output_path}")
         print("Encoding process completed.")
