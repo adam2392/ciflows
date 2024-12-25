@@ -117,7 +117,7 @@ def compute_loss(model: ResnetFreeformflow, x, distr_idx, beta, hutchinson_sampl
         - surrogate_loss
     )
 
-    loss = beta * loss_reconstruction + loss_nll
+    loss = beta * loss_reconstruction.sum() + loss_nll.sum()
     return loss, loss_reconstruction, loss_nll, surrogate_loss
 
 
@@ -575,7 +575,7 @@ if __name__ == "__main__":
                 # Standard VAE
                 encoding = raw_model.encode(sample_images)
                 reconstructed_images = raw_model.decode(encoding)
-                reconstructed_images = torch.clamp(reconstructed_images, , 1)
+                reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
 
                 # now, perturb the latent space and generate new images
                 encoding[:, 32:48] = encoding[:, 32:48] + 2
