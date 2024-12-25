@@ -17,6 +17,11 @@ from ciflows.eval import load_model
 from ciflows.reduction.resnetvae import DeepResNetVAE
 from ciflows.training import TopKModelSaver, delete_old_checkpoints
 
+def softclip(tensor, min):
+    """ Clips the tensor values at the minimum value min in a softway. Taken from Handful of Trials """
+    result_tensor = min + F.softplus(tensor - min)
+
+    return result_tensor
 
 def weights_init(m):
     if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
@@ -79,10 +84,10 @@ def data_loader(
             transforms.Resize((img_size, img_size)),  # Resize images to 128x128
             transforms.CenterCrop(img_size),  # Ensure square crop
             transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomResizedCrop(size=128, scale=(0.8, 1.0)),
-            transforms.ColorJitter(
-                brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
-            ),
+            # transforms.RandomResizedCrop(size=128, scale=(0.8, 1.0)),
+            # transforms.ColorJitter(
+            #     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
+            # ),
             transforms.ToTensor(),  # Convert images to PyTorch tensors
         ]
     )
@@ -145,20 +150,31 @@ def data_loader(
 
 
 def gaussian_nll(recon_x, mu, log_sigma, x):
-    return 0.5 * torch.pow((x - recon_x) / log_sigma.exp(), 2) + log_sigma + 0.5 * np.log(2 * np.pi)
+    first_term =  0.5 * torch.pow((x - recon_x) / log_sigma.exp(), 2)
+    print(first_term.shape)
+    return (
+        first_term
+        + log_sigma
+        + 0.5 * np.log(2 * np.pi)
+    )
 
 
 # Reconstruction + KL divergence losses summed over all elements and batch
-def loss_function(recon_x, x, mu, log_var, capacity=0.0, beta=0.00025):
+def loss_function(recon_x, x, mu, log_var, log_sigma_x, capacity=0.0, beta=0.00025):
     # print(recon_x.shape, x.shape)
     # MSE = F.mse_loss(recon_x, x)
-    rec_loss = gaussian_nll(recon_x, mu, log_var, x).sum()
+    print(recon_x.shape, x.shape, mu.shape, log_var.shape)
+
+    rec_loss = gaussian_nll(recon_x, mu, log_sigma_x, x).sum()
     
     KLD = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
     # beta = 0.00025
     # beta =
     # Latent Capacity Control
-    kl_loss_controlled = torch.max(KLD - capacity, torch.tensor(0.0).cuda())
+    if capacity == 0:
+        kl_loss_controlled = KLD
+    else:
+        kl_loss_controlled = torch.max(KLD - capacity, torch.tensor(0.0).cuda())
 
     loss = rec_loss + beta * kl_loss_controlled
     return loss
@@ -192,7 +208,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    debug = False
+    debug = True
     load_from_checkpoint = False
     if debug:
         root = Path("/Users/adam2392/pytorch_data/")
@@ -201,7 +217,7 @@ if __name__ == "__main__":
 
     latent_dim = 48
     batch_size = 1024
-    model_fname = "celeba_cyclicbetawithcapacity_sigmavaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    model_fname = "celeba_sigmavaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
 
     checkpoint_model_fdir = (
         "celeba_sigmavaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
@@ -296,8 +312,11 @@ if __name__ == "__main__":
     max_capacity = 25.0
     capacity_increment = 0.1  # Increment per epoch
     current_capacity = initial_capacity
-
+    increment_capacity = False
     cycle_length = len(train_loader) * 5  # Full cycle over 5 epochs
+
+    # default beta for sigma-VAE is 1.0
+    beta = 1.0
 
     # training loop
     # - log the train and val loss every 10 epochs
@@ -318,9 +337,9 @@ if __name__ == "__main__":
         # Anneal beta
         # beta = min(beta_max, epoch / annealing_epochs * beta_max)
         # Compute cyclic beta
-        global_step = epoch * len(train_loader) + step
-        beta = cyclic_beta(global_step, cycle_length)
-        print(f"Epoch: {epoch}, Step: {step}, Beta: {beta:.6f}")
+        # global_step = epoch * len(train_loader) + step
+        # beta = cyclic_beta(global_step, cycle_length)
+        # print(f"Epoch: {epoch}, Step: {step}, Beta: {beta:.6f}")
 
         for batch_idx, (images, distr_idx, targets, meta_labels) in tqdm(
             enumerate(train_loader), desc="step", position=1, leave=False
@@ -334,11 +353,19 @@ if __name__ == "__main__":
             # Clamp logvar to prevent numerical instability
             latent_logvar = torch.clamp_(latent_logvar, -10, 10)
 
+            # Compute log_sigma_x
+            log_sigma_x = model.log_sigma_x
+
+            # Learning the variance can become unstable in some cases.
+            # Softly limiting log_sigma to a minimum of -6 ensures stable training.
+            log_sigma_x = softclip(log_sigma_x, -6)
+
             loss = loss_function(
                 reconstructed,
                 images,
                 latent_mu,
                 latent_logvar,
+                log_sigma_x=log_sigma_x,
                 capacity=current_capacity,
                 beta=beta,
             )  # Custom VAE loss function
@@ -375,6 +402,8 @@ if __name__ == "__main__":
 
             val_loss = 0.0
             with torch.no_grad():
+                log_sigma_x = model.log_sigma_x
+
                 for batch_idx, (
                     val_images,
                     distr_idx,
@@ -391,6 +420,7 @@ if __name__ == "__main__":
                         val_images,
                         latent_mu,
                         latent_logvar,
+                        log_sigma_x=log_sigma_x,
                         capacity=current_capacity,
                         beta=beta,
                     )  # Custom VAE loss function
@@ -463,7 +493,8 @@ if __name__ == "__main__":
             top_k_saver.save_model(model, optimizer, epoch, loss)
             delete_old_checkpoints(checkpoint_dir, keep_top_k=5)
 
-        current_capacity = min(max_capacity, current_capacity + capacity_increment)
+        if increment_capacity:
+            current_capacity = min(max_capacity, current_capacity + capacity_increment)
 
         # Check early stopping
         # early_stopping(val_loss, model)

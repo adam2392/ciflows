@@ -120,10 +120,15 @@ class DeepResNetDecoder(nn.Module):
 
 # VAE model combining Encoder and Decoder
 class DeepResNetVAE(nn.Module):
-    def __init__(self, latent_dim, num_blocks_per_stage=5):
+    def __init__(self, latent_dim, num_blocks_per_stage=5, learn_sigma_x=False):
         super(DeepResNetVAE, self).__init__()
         self.encoder = ResNetEncoder(latent_dim)  # Same encoder as before
         self.decoder = DeepResNetDecoder(latent_dim, num_blocks_per_stage)
+        if learn_sigma_x:
+            self.log_sigma_x = nn.Parameter(torch.full((1,), 0)[0], requires_grad=True)
+        else:
+            self.log_sigma_x = torch.tensor(0, requires_grad=False, dtype=torch.float32)
+        
 
     def encode(self, x):
         return self.encoder(x)
