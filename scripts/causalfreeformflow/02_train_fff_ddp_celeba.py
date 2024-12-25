@@ -26,7 +26,7 @@ from ciflows.flows.freeform import ResnetFreeformflow
 from ciflows.loss import volume_change_surrogate
 from ciflows.training import TopKModelSaver, delete_old_checkpoints
 
-from fff.fif import FreeFormInjectiveFlow, FreeFormInjectiveFlowHParams
+# from fff.fif import FreeFormInjectiveFlow, FreeFormInjectiveFlowHParams
 
 def make_fff_model():
     config = {
@@ -76,7 +76,7 @@ def make_fff_model():
         "batch_size": 256,
     }
 
-    model = FreeFormInjectiveFlow()
+    # model = FreeFormInjectiveFlow()
 
 def configure_optimizers(
     model,
