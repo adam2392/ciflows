@@ -307,7 +307,7 @@ if __name__ == "__main__":
     check_samples_every_n_epoch = 5
 
     # adamw optimizer settings
-    max_epochs = 20
+    max_epochs = 50
     lr = 3e-4
     lr_min = 6e-5
     beta1 = 0.9
