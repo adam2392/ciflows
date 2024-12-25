@@ -160,10 +160,10 @@ def gaussian_nll(recon_x, log_sigma, x):
 # Reconstruction + KL divergence losses summed over all elements and batch
 def loss_function(recon_x, x, mu, log_var, log_sigma_x, capacity=0.0, beta=0.00025):
     # print(recon_x.shape, x.shape)
-    # MSE = F.mse_loss(recon_x, x)
+    rec_loss = F.mse_loss(recon_x, x)
     # print(recon_x.shape, x.shape, mu.shape, log_var.shape)
 
-    rec_loss = gaussian_nll(recon_x, log_sigma_x, x).sum()
+    # rec_loss = gaussian_nll(recon_x, log_sigma_x, x).sum()
 
     KLD = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
     # beta = 0.00025
@@ -216,7 +216,7 @@ if __name__ == "__main__":
     latent_dim = 48
     batch_size = 1024
     model_fname = (
-        "celeba_sigmavaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+        "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     )
 
     checkpoint_model_fdir = (
@@ -316,7 +316,7 @@ if __name__ == "__main__":
     cycle_length = len(train_loader) * 5  # Full cycle over 5 epochs
 
     # default beta for sigma-VAE is 1.0
-    beta = 1.0
+    # beta = 1.0
 
     # training loop
     # - log the train and val loss every 10 epochs
@@ -337,8 +337,8 @@ if __name__ == "__main__":
         # Anneal beta
         # beta = min(beta_max, epoch / annealing_epochs * beta_max)
         # Compute cyclic beta
-        # global_step = epoch * len(train_loader) + step
-        # beta = cyclic_beta(global_step, cycle_length)
+        global_step = epoch * len(train_loader) + step
+        beta = cyclic_beta(global_step, cycle_length)
         # print(f"Epoch: {epoch}, Step: {step}, Beta: {beta:.6f}")
 
         for batch_idx, (images, distr_idx, targets, meta_labels) in tqdm(
