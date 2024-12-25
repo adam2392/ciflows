@@ -127,19 +127,20 @@ def get_model_attribute(model, attr):
 
 
 def compute_loss(model: ResnetFreeformflow, x, distr_idx, beta, hutchinson_samples=2):
-    device = images.device
+    device = x.device
     # beta = beta.to(device)
 
     # calculate volume change surrogate loss
     surrogate_loss, v_hat, x_hat = volume_change_surrogate(
-        images,
+        x,
         get_model_attribute(model, "encoder"),
         get_model_attribute(model, "decoder"),
         hutchinson_samples=hutchinson_samples,
     )
 
     # compute reconstruction loss
-    loss_reconstruction = torch.nn.functional.mse_loss(x_hat, x)
+    x_hat_from_encoder = model.decode(model.encode(x))
+    loss_reconstruction = torch.nn.functional.mse_loss(x_hat_from_encoder, x)
 
     # get negative log likelihoood over the distributions
     embed_dim = get_model_attribute(model, "latent_dim")
