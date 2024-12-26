@@ -5,13 +5,14 @@ def load_model(model, model_path, device, optimizer=None, compiled=False):
     """Load a model's weights from a saved file with device compatibility."""
     # Map to the desired device (CPU or GPU)
     state_dict = torch.load(model_path, map_location=device)
-    if not compiled:
+    if compiled:
         model_state_dict = state_dict["model_state_dict"]
         try:
             model_state_dict = {
                 k.replace("_orig_mod.", ""): v for k, v in model_state_dict.items()
             }
         except Exception as e:
+            print("loading uncompiled weights...")
             model.load_state_dict(model_state_dict)
     else:
         model.load_state_dict(state_dict["model_state_dict"])

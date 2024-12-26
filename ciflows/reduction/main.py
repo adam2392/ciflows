@@ -54,7 +54,7 @@ def make_nf_model(K=32, debug=False):
     ]
 
     confounded_list = [(0, 1)]
-    # confounded_list = []
+    confounded_list = []
 
     # independent noise with causal prior
     q0 = LinearGaussianDag(
