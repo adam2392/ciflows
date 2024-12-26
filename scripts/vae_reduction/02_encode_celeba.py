@@ -21,12 +21,12 @@ def encode_images_in_directory(
         img_tensor = transform(image).unsqueeze(0).to(device)  # Add batch dimension
 
         with torch.no_grad():
-            mu, log_var = model.encoder.encode(img_tensor)
-            latent_vector = model.reparameterize(mu, log_var)
+            embedding = model.encode(img_tensor)
+            # latent_vector = model.reparameterize(mu, log_var)
             if idx == 0:
-                print(f"Latent vector shape: {latent_vector.shape}")
-        encodings.append(latent_vector.cpu())
-        # encodings.append(mu.cpu())
+                print(f"Latent vector shape: {embedding.shape}")
+        # encodings.append(latent_vector.cpu())
+        encodings.append(embedding.cpu())
     return torch.stack(encodings)
 
 
@@ -56,8 +56,8 @@ if __name__ == "__main__":
     directories = [data_dir / "obs", data_dir / "int_hair_0", data_dir / "int_hair_1"]
     latent_vectors_per_directory = {}
 
-    model_fname = "model_epoch_1960.pt"
-    model_dir = 'celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt'
+    model_fname = "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    model_dir = "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     # model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
     # model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     vae_model_fpath = (
@@ -68,7 +68,9 @@ if __name__ == "__main__":
     latent_dim = 48
     num_blocks_per_stage = 3
     vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
-    vae_model.load_state_dict(torch.load(vae_model_fpath, map_location=device)["model_state_dict"])
+    vae_model.load_state_dict(
+        torch.load(vae_model_fpath, map_location=device)["model_state_dict"]
+    )
     vae_model.eval()
 
     # Define preprocessing for images
@@ -86,12 +88,15 @@ if __name__ == "__main__":
         directory.mkdir(parents=True, exist_ok=True)
 
         print(f"Processing directory: {directory}")
-        latent_vectors = encode_images_in_directory(directory, vae_model, transform, device)
+        latent_vectors = encode_images_in_directory(
+            directory, vae_model, transform, device
+        )
         latent_vectors_per_directory[directory] = latent_vectors
 
         # Save the tensor
         # v2 nonorm encodings = sample from latent, rather than the mean
         output_path = f"{directory.name}_cyclicbeta_encodings.pt"
+        # output_path = f"{directory.name}_nonorm_encodings.pt"
         torch.save(latent_vectors, directory / output_path)
         print(f"Saved encodings to: {output_path}")
         print("Encoding process completed.")

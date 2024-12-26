@@ -238,7 +238,7 @@ if __name__ == "__main__":
                 )
 
                 # clamp said images
-                reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
+                # reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
 
                 save_image(
                     reconstructed_images.cpu(),
@@ -249,17 +249,17 @@ if __name__ == "__main__":
 
             # reconstruct images using VAE
             embeddings = images[:8]
-            images = vae_model.decode(embeddings).reshape(-1, 3, image_size, image_size)
+            images = vae_model.decoder(embeddings).reshape(-1, 3, image_size, image_size)
             
             # forward/inverse of flow model
             recon_embedding = model.forward(model.inverse(embeddings))
 
             # reconstruct images
-            reconstructed_images = vae_model.decode(recon_embedding).reshape(-1, 3, image_size, image_size)
+            reconstructed_images = vae_model.decoder(recon_embedding).reshape(-1, 3, image_size, image_size)
 
             # clamp said images
             reconstructed_images = torch.cat([images, reconstructed_images], dim=0)
-            reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
+            # reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
 
             save_image(
                 reconstructed_images.cpu(),
