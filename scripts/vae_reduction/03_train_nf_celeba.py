@@ -148,7 +148,7 @@ if __name__ == "__main__":
     image_dim = 3 * image_size * image_size
 
     # compile the model
-    model = torch.compile(model)
+    # model = torch.compile(model)
 
     if load_from_checkpoint:
         model, start_epoch = load_model(
