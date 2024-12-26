@@ -56,7 +56,7 @@ if __name__ == "__main__":
     directories = [data_dir / "obs", data_dir / "int_hair_0", data_dir / "int_hair_1"]
     latent_vectors_per_directory = {}
 
-    model_fname = "model_epoch_1640.pt"
+    model_fname = "model_epoch_1960.pt"
     model_dir = 'celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt'
     # model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
     # model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
