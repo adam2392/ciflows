@@ -56,11 +56,12 @@ if __name__ == "__main__":
     directories = [data_dir / "obs", data_dir / "int_hair_0", data_dir / "int_hair_1"]
     latent_vectors_per_directory = {}
 
-    model_fname = "model_epoch_100.pt"
-    model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
-    model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    model_fname = "model_epoch_1640.pt"
+    model_dir = 'celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt'
+    # model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
+    # model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     vae_model_fpath = (
-        root / "CausalCelebA" / "vae_reduction" / model_fname.split(".")[0] / model_fname
+        root / "CausalCelebA" / "vae_reduction" / model_dir.split(".")[0] / model_fname
     )
 
     # vae_model = VAE()  # Replace with loading logic
@@ -90,7 +91,7 @@ if __name__ == "__main__":
 
         # Save the tensor
         # v2 nonorm encodings = sample from latent, rather than the mean
-        output_path = f"{directory.name}_nonorm_encodings_v2.pt"
+        output_path = f"{directory.name}_cyclicbeta_encodings.pt"
         torch.save(latent_vectors, directory / output_path)
         print(f"Saved encodings to: {output_path}")
         print("Encoding process completed.")
