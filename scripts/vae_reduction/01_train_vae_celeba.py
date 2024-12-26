@@ -112,6 +112,14 @@ def data_loader(
         causal_celeba_dataset, [train_len, val_len]
     )
 
+    distr_labels = [x[1] for x in causal_celeba_dataset]
+    unique_distrs = len(np.unique(distr_labels))
+    if batch_size < unique_distrs:
+        raise ValueError(
+            f"Batch size must be at least {unique_distrs} for stratified sampling."
+        )
+    sampler = StratifiedSampler(distr_labels, batch_size)
+
     distr_labels = [x[1] for x in train_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
@@ -130,9 +138,9 @@ def data_loader(
 
     # Define the DataLoader
     train_loader = DataLoader(
-        dataset=train_dataset,
+        dataset=causal_celeba_dataset,
         batch_size=batch_size,
-        sampler=train_sampler,
+        sampler=sampler,
         drop_last=True,
         # shuffle=True,  # Shuffle data during training
         num_workers=num_workers,
@@ -216,7 +224,7 @@ if __name__ == "__main__":
     latent_dim = 48
     batch_size = 1024
     model_fname = (
-        "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+        "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     )
 
     checkpoint_model_fdir = (
