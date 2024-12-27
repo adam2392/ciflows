@@ -24,12 +24,13 @@ class ResnetFreeformflow(nn.Module):
         eps = torch.randn_like(std)
         return mu + eps * std
 
-
     def forward(self, x, distr_idx=None):
         z = self.encoder(x)
-        
+
         # treated like a VAE
-        _, log_means, log_vars = self.latent.log_prob(z, distr_idx=distr_idx.cpu(), return_means_log_vars=True)
+        _, log_means, log_vars = self.latent.log_prob(
+            z, distr_idx=distr_idx.cpu(), return_means_log_vars=True
+        )
         embeddings = self.reparameterize(log_means, log_vars)
         recon_x = self.decoder(embeddings)
 
@@ -52,7 +53,11 @@ class ResnetFreeformflow(nn.Module):
         # distr_idx = distr_idx.cpu()
         # log_prob, log_means, log_vars = self.latent.log_prob(z, distr_idx=distr_idx, return_means_log_vars=True)
 
-        return recon_x, log_means, log_vars # surrogate_loss, loss_nll  # log_prob, log_means, log_vars
+        return (
+            recon_x,
+            log_means,
+            log_vars,
+        )  # surrogate_loss, loss_nll  # log_prob, log_means, log_vars
 
     def encode(self, x):
         return self.encoder(x)

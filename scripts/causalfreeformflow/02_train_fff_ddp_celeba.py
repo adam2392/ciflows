@@ -297,7 +297,7 @@ def make_fff_model(num_blocks_per_stage=5, debug=False):
 
 
 if __name__ == "__main__":
-    debug = False
+    debug = True
     compile = False
     load_from_checkpoint = True
 
@@ -338,7 +338,7 @@ if __name__ == "__main__":
 
     # Data settings
     batch_size = 128
-    gradient_accumulation_steps = 8 * 2  # used to simulate larger batch sizes
+    gradient_accumulation_steps = 8 * 3  # used to simulate larger batch sizes
     img_size = 128
     graph_type = "chain"
     num_workers = 4
@@ -366,7 +366,7 @@ if __name__ == "__main__":
         batch_size = 8
         check_samples_every_n_epoch = 1
         num_workers = 2
-        num_blocks_per_stage = 1
+        num_blocks_per_stage = 3
 
         gradient_accumulation_steps = 2
         fast_dev = True
@@ -760,16 +760,18 @@ if __name__ == "__main__":
         dist.destroy_process_group()
 
     # Save final model
-    torch.save(
-        {
-            "model_state_dict": raw_model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "epoch": epoch,  # Optional: Save the current epoch
-            "loss": loss,  # Optional: Save the last loss value
-        },
-        checkpoint_dir / model_fname,
-    )
-    print(f"Training complete. Models saved in {checkpoint_dir}.")
+    if dist.get_rank() == 0:
+        torch.save(
+            {
+                "model_state_dict": raw_model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "epoch": epoch,  # Optional: Save the current epoch
+                "loss": loss,  # Optional: Save the last loss value
+            },
+            checkpoint_dir / model_fname,
+        )
+        print(f"Training complete. Models saved in {checkpoint_dir}.")
+    dist.barrier()
 
     # Load back the saved final model and verify that it loads
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

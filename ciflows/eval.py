@@ -18,7 +18,8 @@ def load_model(model, model_path, device, optimizer=None, compiled=False):
         model.load_state_dict(state_dict["model_state_dict"])
     if optimizer is not None:
         start_epoch = state_dict["epoch"]
-        optimizer.load_state_dict(state_dict["optimizer_state_dict"])
+        # print(state_dict["optimizer_state_dict"].keys())
+        # optimizer.load_state_dict(state_dict["optimizer_state_dict"])
     else:
         # model.load_state_dict(state_dict)
         start_epoch = 1
