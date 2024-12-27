@@ -668,7 +668,7 @@ if __name__ == "__main__":
                 reconstructed_images, _ = raw_model.sample(8, distr_idx=idx)
 
                 # clamp images to show
-                reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
+                # reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
 
                 save_image(
                     reconstructed_images.cpu(),
