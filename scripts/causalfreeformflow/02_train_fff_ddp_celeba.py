@@ -148,7 +148,7 @@ def compute_vae_loss(model: DDP, x, distr_idx, beta):
     loss_reconstruction = torch.nn.functional.mse_loss(recon_x, x)
 
     kld = -0.5 * torch.sum(1 + log_vars - log_means.pow(2) - log_vars.exp())
-    loss = beta * loss_reconstruction.sum() + kld.sum()
+    loss = beta * loss_reconstruction.mean() + kld.mean()
     return loss, loss_reconstruction, kld
 
 
@@ -188,7 +188,7 @@ def compute_loss(model: DDP, x, distr_idx, beta, hutchinson_samples=2):
     loss_nll = loss_nll.mean()
     # print(f"Mean loss NLL: {loss_nll}")
     # loss_nll = torch.clamp(loss_nll, -1e8, 6)
-    loss = beta * loss_reconstruction + loss_nll
+    loss = loss_reconstruction + beta * loss_nll
 
     # loss = loss_reconstruction.sum() + beta * kld.sum()
     return loss, loss_reconstruction, loss_nll, surrogate_loss
@@ -544,11 +544,11 @@ if __name__ == "__main__":
         train_iterator = iter(train_loader)
 
         # Compute cyclic beta
-        # global_step = epoch * len(train_loader) + step
-        # beta = cyclic_beta(
-        #     global_step, cycle_length
-        # )  # ).to(device=device, dtype=ptdtype)
-        beta = 1000.0
+        global_step = epoch * len(train_loader) + step
+        beta = cyclic_beta(
+            global_step, cycle_length
+        )  # ).to(device=device, dtype=ptdtype)
+
         if master_process:
             print(f"Epoch: {epoch}, Step: {step}, Beta: {beta:.6f}")
 
@@ -651,8 +651,9 @@ if __name__ == "__main__":
         print(
             f"====> Epoch: {epoch} in time {dt*1000:.2f}ms \n"
             f"Average loss: {train_loss:.4f}, LR: {lr:.6f} "
-            f"Reconstruction Loss: {train_reconstruction_loss:.4f}, NLL Loss: {train_nll_loss:.4f}, Surrogate Loss: {train_surrogate_loss:.4f}"
         )
+        print(f"Reconstruction Loss: {train_reconstruction_loss:.4f}, KLD Loss: {train_kld_loss:.4f}")
+        # print(f"Reconstruction Loss: {train_reconstruction_loss:.4f}, NLL Loss: {train_nll_loss:.4f}, Surrogate Loss: {train_surrogate_loss:.4f}")
 
         # Validation phase
         if debug or epoch % check_samples_every_n_epoch == 0 and master_process:
