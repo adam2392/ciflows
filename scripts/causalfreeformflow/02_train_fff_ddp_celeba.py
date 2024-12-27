@@ -299,6 +299,7 @@ def make_fff_model(num_blocks_per_stage=5, debug=False):
 if __name__ == "__main__":
     debug = False
     compile = False
+    load_from_checkpoint = True
 
     # System settings
     world_size = torch.cuda.device_count()
@@ -444,6 +445,11 @@ if __name__ == "__main__":
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
+    # where to find the checkpoint models
+    checkpoint_model_fdir = 'celeba_vae_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt'
+    model_checkpoint_dir = root / "CausalCelebA" / "fff" / checkpoint_model_fdir.split(".")[0]
+    checkpoint_model_fname = 'celeba_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt'
+
     model = make_fff_model(num_blocks_per_stage=num_blocks_per_stage, debug=debug)
     model = model.to(ptdtype).to(device)
     image_dim = 3 * img_size * img_size
@@ -463,6 +469,17 @@ if __name__ == "__main__":
     # compile the model
     if compile:
         model = torch.compile(model)
+
+    # load weights from checkpoint + optimizer state
+    if load_from_checkpoint:
+        model, start_epoch = load_model(
+            model,
+            model_checkpoint_dir / checkpoint_model_fname,
+            device,
+            optimizer=optimizer,
+        )
+    else:
+        start_epoch = 1
 
     # Wrap model for distributed training
     if ddp:
