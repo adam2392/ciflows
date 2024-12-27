@@ -2,7 +2,7 @@ from torch import nn
 
 from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.reduction.resnetvae import DeepResNetDecoder, ResNetEncoder
-
+from ciflows.loss import volume_change_surrogate
 
 class ResnetFreeformflow(nn.Module):
     def __init__(
@@ -22,11 +22,30 @@ class ResnetFreeformflow(nn.Module):
         z = self.encoder(x)
         recon_x = self.decoder(z)
 
-        # compute the log-likelihood of the data
-        distr_idx = distr_idx.cpu()
-        log_prob, log_means, log_vars = self.latent.log_prob(z, distr_idx=distr_idx, return_means_log_vars=True)
+        hutchinson_samples = 2
+        surrogate_loss, v_hat, x_hat = volume_change_surrogate(
+            x,
+            self.encoder,
+            self.decoder,
+            hutchinson_samples=hutchinson_samples,
+        )
 
-        return recon_x, log_prob, log_means, log_vars
+        # get negative log likelihoood over the distributions
+        embed_dim = self.latent_dim
+        v_hat = v_hat.view(-1, embed_dim)
+        loss_nll = (
+            -self.latent
+            .log_prob(v_hat, distr_idx=distr_idx)
+            .mean()
+            - surrogate_loss
+        )
+
+
+        # compute the log-likelihood of the data
+        # distr_idx = distr_idx.cpu()
+        # log_prob, log_means, log_vars = self.latent.log_prob(z, distr_idx=distr_idx, return_means_log_vars=True)
+
+        return recon_x, surrogate_loss, loss_nll #log_prob, log_means, log_vars
 
     def encode(self, x):
         return self.encoder(x)

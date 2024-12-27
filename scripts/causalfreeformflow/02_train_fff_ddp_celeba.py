@@ -133,31 +133,31 @@ def compute_loss(model: DDP, x, distr_idx, beta, hutchinson_samples=2):
     # beta = beta.to(device)
 
     # calculate volume change surrogate loss
-    surrogate_loss, v_hat, x_hat = volume_change_surrogate(
-        x,
-        get_model_attribute(model, "encoder"),
-        get_model_attribute(model, "decoder"),
-        hutchinson_samples=hutchinson_samples,
-    )
+    # surrogate_loss, v_hat, x_hat = volume_change_surrogate(
+    #     x,
+    #     get_model_attribute(model, "encoder"),
+    #     get_model_attribute(model, "decoder"),
+    #     hutchinson_samples=hutchinson_samples,
+    # )
 
     # # compute reconstruction loss
     # x_hat_from_encoder = model.module.decode(model.module.encode(x))
     # loss_reconstruction = torch.nn.functional.mse_loss(x_hat_from_encoder, x)
 
-    recon_x, log_prob, log_means, log_vars = model(x, distr_idx=distr_idx)
+    recon_x, surrogate_loss, loss_nll = model(x, distr_idx=distr_idx)
     loss_reconstruction = torch.nn.functional.mse_loss(recon_x, x)
 
     # kld = -0.5 * torch.sum(1 + log_vars - log_means.pow(2) - log_vars.exp())
 
     # get negative log likelihoood over the distributions
-    embed_dim = get_model_attribute(model, "latent_dim")
-    v_hat = v_hat.view(-1, embed_dim)
-    loss_nll = (
-        -get_model_attribute(model, "latent")
-        .log_prob(v_hat, distr_idx=distr_idx)
-        .mean()
-        - surrogate_loss
-    )
+    # embed_dim = get_model_attribute(model, "latent_dim")
+    # v_hat = v_hat.view(-1, embed_dim)
+    # loss_nll = (
+    #     -get_model_attribute(model, "latent")
+    #     .log_prob(v_hat, distr_idx=distr_idx)
+    #     .mean()
+    #     - surrogate_loss
+    # )
 
     loss = beta * loss_reconstruction.sum() + loss_nll.sum()
     # loss = loss_reconstruction.sum() + beta * kld.sum()
@@ -491,7 +491,7 @@ if __name__ == "__main__":
     # XXX: remove when not doing FFF-VAE
     loss_nll = torch.tensor(0.0)
     surrogate_loss = torch.tensor(0.0)
-    
+
     # Training loop
     for step, epoch in tqdm(
         enumerate(range(1, max_epochs + 1)), desc="outer", position=0
