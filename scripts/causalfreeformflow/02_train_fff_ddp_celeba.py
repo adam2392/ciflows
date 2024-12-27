@@ -128,6 +128,30 @@ def get_model_attribute(model, attr):
     return getattr(model.module if isinstance(model, DDP) else model, attr)
 
 
+def compute_vae_loss(model: DDP, x, distr_idx, beta):
+    # device = x.device
+    # beta = beta.to(device)
+
+    # calculate volume change surrogate loss
+    # surrogate_loss, v_hat, x_hat = volume_change_surrogate(
+    #     x,
+    #     get_model_attribute(model, "encoder"),
+    #     get_model_attribute(model, "decoder"),
+    #     hutchinson_samples=hutchinson_samples,
+    # )
+
+    # # compute reconstruction loss
+    # x_hat_from_encoder = model.module.decode(model.module.encode(x))
+    # loss_reconstruction = torch.nn.functional.mse_loss(x_hat_from_encoder, x)
+
+    recon_x, log_means, log_vars = model(x, distr_idx=distr_idx)
+    loss_reconstruction = torch.nn.functional.mse_loss(recon_x, x)
+
+    kld = -0.5 * torch.sum(1 + log_vars - log_means.pow(2) - log_vars.exp())
+    loss = beta * loss_reconstruction.sum() + kld.sum()
+    return loss, loss_reconstruction, kld
+
+
 def compute_loss(model: DDP, x, distr_idx, beta, hutchinson_samples=2):
     device = x.device
     # beta = beta.to(device)
@@ -159,7 +183,7 @@ def compute_loss(model: DDP, x, distr_idx, beta, hutchinson_samples=2):
     #     - surrogate_loss
     # )
     
-    print(surrogate_loss.shape, loss_nll.shape)
+    # print(surrogate_loss.shape, loss_nll.shape)
     # loss nll can be unstable, so we clip it
     loss_nll = loss_nll.mean()
     # print(f"Mean loss NLL: {loss_nll}")
@@ -313,7 +337,7 @@ if __name__ == "__main__":
 
     # Data settings
     batch_size = 128
-    gradient_accumulation_steps = 8 * 3  # used to simulate larger batch sizes
+    gradient_accumulation_steps = 8 * 2  # used to simulate larger batch sizes
     img_size = 128
     graph_type = "chain"
     num_workers = 4
@@ -415,7 +439,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt"
+    model_fname = "celeba_vae_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt"
     checkpoint_dir = root / "CausalCelebA" / "fff" / model_fname.split(".")[0]
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -513,6 +537,8 @@ if __name__ == "__main__":
         train_reconstruction_loss = 0.0
         train_nll_loss = 0.0
         train_surrogate_loss = 0.0
+        
+        train_kld_loss = 0.0
 
         # Create an iterator for the DataLoader
         train_iterator = iter(train_loader)
@@ -541,11 +567,15 @@ if __name__ == "__main__":
                 # print(f"beta dtype: {beta.dtype}")
                 # compute the loss
                 # , loss_nll, surrogate_loss
-                loss, loss_reconstruction, loss_nll, surrogate_loss = compute_loss(
-                    model,
-                    images,
-                    distr_idx,
-                    beta=beta,
+                # loss, loss_reconstruction, loss_nll, surrogate_loss = compute_loss(
+                #     model,
+                #     images,
+                #     distr_idx,
+                #     beta=beta,
+                # )
+
+                loss, loss_reconstruction, kld = compute_vae_loss(
+                    model, images, distr_idx, beta
                 )
 
                 # sum up the loss
@@ -557,11 +587,12 @@ if __name__ == "__main__":
                 # backwards pass, with gradient scaling
                 # scaler.scale(loss).backward()
 
-                loss_nll = loss_nll.sum() / gradient_accumulation_steps
+                # loss_nll = loss_nll.sum() / gradient_accumulation_steps
+                loss_kld = kld.sum() / gradient_accumulation_steps
                 loss_reconstruction = (
                     loss_reconstruction.sum() / gradient_accumulation_steps
                 )
-                surrogate_loss = surrogate_loss.sum() / gradient_accumulation_steps
+                # surrogate_loss = surrogate_loss.sum() / gradient_accumulation_steps
 
             # backwards pass, with gradient scaling
             scaler.scale(loss).backward()
@@ -582,8 +613,9 @@ if __name__ == "__main__":
             # DDP: accumulate loss terms
             train_loss += loss.item()
             train_reconstruction_loss += loss_reconstruction.item()
-            train_nll_loss += loss_nll.item()
-            train_surrogate_loss += surrogate_loss.item()
+            # train_nll_loss += loss_nll.item()
+            # train_surrogate_loss += surrogate_loss.item()
+            train_kld_loss += loss_kld.item()
 
         # clip the gradient
         if grad_clip != 0.0:
