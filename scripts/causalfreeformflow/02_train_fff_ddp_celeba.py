@@ -117,7 +117,7 @@ def configure_optimizers(
 
 
 # Beta annealing function (cyclic)
-def cyclic_beta(step, cycle_length, beta_min=100.0, beta_max=10000.0):
+def cyclic_beta(step, cycle_length, beta_min=5.0, beta_max=1000.0):
     """Cyclic annealing for beta."""
     cycle_position = step % cycle_length
     fraction = cycle_position / cycle_length
