@@ -108,7 +108,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfon_64flows_nonorm_imgauged_cyclicresnetvaereduction_batch1024_latentdim48_hcdim4_trainableedges_sep4and8_v1.pt"
+    model_fname = "celeba_nfon_64flows_nonorm_noimgauged_cyclicresnetvaereduction_batch1024_latentdim48_hcdim4_trainableedges_sep4and8_v1.pt"
     checkpoint_model_fname = "celeba_nfon_cyclicbetaresnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
     model_checkpoint_dir = (
         root
@@ -128,8 +128,13 @@ if __name__ == "__main__":
     # vae_model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
     # vae_model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
 
+    # still with color augmentation
     vae_model_fname = "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     vae_model_dir = "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+
+    # no image aumgentation
+    vae_model_dir = "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    vae_model_fname = "model_epoch_970.pt"
 
     vae_dir = root / "CausalCelebA" / "vae_reduction" / vae_model_dir.split(".")[0]
     # vae_model = VAE().to(device)
