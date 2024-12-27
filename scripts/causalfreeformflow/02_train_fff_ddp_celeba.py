@@ -633,20 +633,20 @@ if __name__ == "__main__":
                 # Standard VAE
                 encoding = raw_model.encode(sample_images)
                 reconstructed_images = raw_model.decode(encoding)
-                reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
 
                 # now, perturb the latent space and generate new images
                 encoding[:, 32:48] = encoding[:, 32:48] + 2
 
-                reconstructed_pert_images = raw_model.decode(encoding)
-                reconstructed_pert_images = torch.clamp(reconstructed_pert_images, 0, 1)
-
-                # clamp
-                reconstructed_pert_images = torch.clamp(reconstructed_pert_images, 0, 1)
-
                 mse_loss = torch.nn.functional.mse_loss(
                     sample_images, reconstructed_images
                 )
+                reconstructed_pert_images = raw_model.decode(encoding)
+                
+                # clamp
+                reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
+                reconstructed_pert_images = torch.clamp(reconstructed_pert_images, 0, 1)
+
+
             sample_images = torch.cat(
                 (
                     sample_images.cpu(),
