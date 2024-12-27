@@ -644,6 +644,9 @@ if __name__ == "__main__":
                 # clamp
                 reconstructed_pert_images = torch.clamp(reconstructed_pert_images, 0, 1)
 
+                mse_loss = torch.nn.functional.mse_loss(
+                    sample_images, reconstructed_images
+                )
             sample_images = torch.cat(
                 (
                     sample_images.cpu(),
@@ -654,7 +657,7 @@ if __name__ == "__main__":
             )
             save_image(
                 sample_images,
-                checkpoint_dir / f"epoch_{epoch}_reconstruction_samples.png",
+                checkpoint_dir / f"epoch_{epoch}_reconstruction_samples_{mse_loss:.4f}.png",
                 nrow=4,
                 normalize=True,
             )
