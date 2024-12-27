@@ -145,7 +145,7 @@ def compute_loss(model: DDP, x, distr_idx, beta, hutchinson_samples=2):
     # loss_reconstruction = torch.nn.functional.mse_loss(x_hat_from_encoder, x)
 
     recon_x, surrogate_loss, loss_nll = model(x, distr_idx=distr_idx)
-    loss_reconstruction = torch.nn.functional.mse_loss(recon_x, x)
+    loss_reconstruction = torch.nn.functional.mse_loss(recon_x, x).sum()
 
     # kld = -0.5 * torch.sum(1 + log_vars - log_means.pow(2) - log_vars.exp())
 
@@ -160,9 +160,11 @@ def compute_loss(model: DDP, x, distr_idx, beta, hutchinson_samples=2):
     # )
 
     # loss nll can be unstable, so we clip it
+    loss_nll = loss_nll.mean()
+    print(f"Mean loss NLL: {loss_nll}")
     loss_nll = torch.clamp(loss_nll, -1e8, 6)
+    loss = beta * loss_reconstruction + loss_nll
 
-    loss = beta * loss_reconstruction.sum() + loss_nll.sum()
     # loss = loss_reconstruction.sum() + beta * kld.sum()
     return loss, loss_reconstruction, loss_nll, surrogate_loss
 
