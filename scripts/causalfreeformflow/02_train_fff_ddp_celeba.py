@@ -117,7 +117,7 @@ def configure_optimizers(
 
 
 # Beta annealing function (cyclic)
-def cyclic_beta(step, cycle_length, beta_min=5.0, beta_max=1000.0):
+def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=0.01):
     """Cyclic annealing for beta."""
     cycle_position = step % cycle_length
     fraction = cycle_position / cycle_length
@@ -346,7 +346,7 @@ if __name__ == "__main__":
     check_samples_every_n_epoch = 5
 
     # adamw optimizer settings
-    max_epochs = 1000
+    max_epochs = 5000
     lr = 3e-4
     lr_min = 6e-5
     beta1 = 0.9
