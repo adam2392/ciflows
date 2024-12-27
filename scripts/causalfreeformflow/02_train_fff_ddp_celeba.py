@@ -347,7 +347,7 @@ if __name__ == "__main__":
 
     # for FreeformFlow's loss function
     hutchinson_samples = 2
-    beta = 10.0  # torch.tensor(10.0).to(device=device, dtype=ptdtype)
+    # beta = 10.0  # torch.tensor(10.0).to(device=device, dtype=ptdtype)
 
     # various inits, derived attributes, I/O setup
     ddp = int(os.environ.get("RANK", -1)) != -1  # is this a ddp run?
