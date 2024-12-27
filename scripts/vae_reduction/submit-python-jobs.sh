@@ -3,7 +3,7 @@
 # Directory containing the Python script
 SCRIPT_NAME="01_train_vae_celeba.py"
 SCRIPT_NAME="02_encode_celeba.py"
-# SCRIPT_NAME="03_train_nf_celeba.py"
+SCRIPT_NAME="03_train_nf_celeba.py"
 
 LOG_DIR="/home/adam2392/projects/logs/"
 
