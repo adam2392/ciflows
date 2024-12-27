@@ -522,7 +522,7 @@ if __name__ == "__main__":
         # beta = cyclic_beta(
         #     global_step, cycle_length
         # )  # ).to(device=device, dtype=ptdtype)
-        beta = 100.0
+        beta = 1000.0
         if master_process:
             print(f"Epoch: {epoch}, Step: {step}, Beta: {beta:.6f}")
 
