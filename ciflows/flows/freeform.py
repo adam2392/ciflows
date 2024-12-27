@@ -35,8 +35,8 @@ class ResnetFreeformflow(nn.Module):
         embed_dim = self.latent_dim
         v_hat = v_hat.view(-1, embed_dim)
         loss_nll = (
-            -self.latent.log_prob(v_hat, distr_idx=distr_idx.cpu()) - surrogate_loss
-        ).mean()
+            -self.latent.log_prob(v_hat, distr_idx=distr_idx.cpu()) - surrogate_loss.mean()
+        )
 
         # compute the log-likelihood of the data
         # distr_idx = distr_idx.cpu()
