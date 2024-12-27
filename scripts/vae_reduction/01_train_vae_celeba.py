@@ -215,7 +215,7 @@ if __name__ == "__main__":
     print(f"Using accelerator: {accelerator}")
 
     debug = False
-    load_from_checkpoint = False
+    load_from_checkpoint = True
     if debug:
         root = Path("/Users/adam2392/pytorch_data/")
     else:
@@ -224,13 +224,13 @@ if __name__ == "__main__":
     latent_dim = 48
     batch_size = 1024
     model_fname = (
-        "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+        "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     )
 
     checkpoint_model_fdir = (
-        "celeba_sigmavaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+        "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     )
-    checkpoint_model_fname = "model_epoch_1965.pt"
+    checkpoint_model_fname = "model_epoch_930.pt"
     model_checkpoint_dir = (
         root / "CausalCelebA" / "vae_reduction" / checkpoint_model_fdir.split(".")[0]
     )
