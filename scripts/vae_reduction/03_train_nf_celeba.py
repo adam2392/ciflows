@@ -103,7 +103,8 @@ if __name__ == "__main__":
     if debug:
         root = Path("/Users/adam2392/pytorch_data/")
     else:
-        root = Path("/home/adam2392/projects/data/")
+        # root = Path("/home/adam2392/projects/data/")
+        root = Path("/local/eb/adam2392/")
 
     # v1: K=32
     # v2: K=8

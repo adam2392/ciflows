@@ -145,7 +145,7 @@ def compute_loss(model: DDP, x, distr_idx, beta, hutchinson_samples=2):
     # loss_reconstruction = torch.nn.functional.mse_loss(x_hat_from_encoder, x)
 
     recon_x, surrogate_loss, loss_nll = model(x, distr_idx=distr_idx)
-    loss_reconstruction = torch.nn.functional.mse_loss(recon_x, x).sum()
+    loss_reconstruction = torch.nn.functional.mse_loss(recon_x, x)
 
     # kld = -0.5 * torch.sum(1 + log_vars - log_means.pow(2) - log_vars.exp())
 
@@ -497,6 +497,8 @@ if __name__ == "__main__":
     # XXX: remove when not doing FFF-VAE
     # loss_nll = torch.tensor(0.0)
     # surrogate_loss = torch.tensor(0.0)
+    effective_batch_size = batch_size * gradient_accumulation_steps * ddp_world_size
+    print(f"Effective batch size: {effective_batch_size}")
 
     # Training loop
     for step, epoch in tqdm(
