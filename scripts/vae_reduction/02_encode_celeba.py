@@ -58,6 +58,9 @@ if __name__ == "__main__":
 
     model_fname = "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     model_dir = "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+
+    model_dir = "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    model_fname = 'model_epoch_970.pt'
     # model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
     # model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     vae_model_fpath = (
@@ -95,7 +98,7 @@ if __name__ == "__main__":
 
         # Save the tensor
         # v2 nonorm encodings = sample from latent, rather than the mean
-        output_path = f"{directory.name}_cyclicbeta_encodings.pt"
+        output_path = f"{directory.name}_cyclicbeta_noimgaug_encodings.pt"
         # output_path = f"{directory.name}_nonorm_encodings.pt"
         torch.save(latent_vectors, directory / output_path)
         print(f"Saved encodings to: {output_path}")
