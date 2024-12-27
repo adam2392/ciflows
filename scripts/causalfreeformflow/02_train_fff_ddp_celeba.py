@@ -321,7 +321,7 @@ if __name__ == "__main__":
     check_samples_every_n_epoch = 5
 
     # adamw optimizer settings
-    max_epochs = 100
+    max_epochs = 1000
     lr = 3e-4
     lr_min = 6e-5
     beta1 = 0.9
@@ -415,7 +415,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "test_celeba_fff_resnet_batch128_gradaccum_latentdim48_cyclicbeta100to10k_v1_.pt"
+    model_fname = "celeba_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt"
     checkpoint_dir = root / "CausalCelebA" / "fff" / model_fname.split(".")[0]
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
