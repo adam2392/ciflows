@@ -159,6 +159,9 @@ def compute_loss(model: DDP, x, distr_idx, beta, hutchinson_samples=2):
     #     - surrogate_loss
     # )
 
+    # loss nll can be unstable, so we clip it
+    loss_nll = torch.clamp(loss_nll, -1e8, 6)
+
     loss = beta * loss_reconstruction.sum() + loss_nll.sum()
     # loss = loss_reconstruction.sum() + beta * kld.sum()
     return loss, loss_reconstruction, loss_nll, surrogate_loss
