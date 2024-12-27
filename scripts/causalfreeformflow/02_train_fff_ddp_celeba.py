@@ -161,8 +161,8 @@ def compute_loss(model: DDP, x, distr_idx, beta, hutchinson_samples=2):
 
     # loss nll can be unstable, so we clip it
     loss_nll = loss_nll.mean()
-    print(f"Mean loss NLL: {loss_nll}")
-    loss_nll = torch.clamp(loss_nll, -1e8, 6)
+    # print(f"Mean loss NLL: {loss_nll}")
+    # loss_nll = torch.clamp(loss_nll, -1e8, 6)
     loss = beta * loss_reconstruction + loss_nll
 
     # loss = loss_reconstruction.sum() + beta * kld.sum()
