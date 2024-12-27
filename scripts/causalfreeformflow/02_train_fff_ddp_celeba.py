@@ -407,6 +407,7 @@ if __name__ == "__main__":
         if device == "cpu"
         else torch.autocast(device_type=accelerator, dtype=ptdtype)
     )
+    ctx = nullcontext()
 
     # v1: K=32
     # v2: K=8
@@ -494,8 +495,8 @@ if __name__ == "__main__":
     cycle_length = len(train_loader) * 5  # Full cycle over 5 epochs
 
     # XXX: remove when not doing FFF-VAE
-    loss_nll = torch.tensor(0.0)
-    surrogate_loss = torch.tensor(0.0)
+    # loss_nll = torch.tensor(0.0)
+    # surrogate_loss = torch.tensor(0.0)
 
     # Training loop
     for step, epoch in tqdm(
@@ -512,10 +513,11 @@ if __name__ == "__main__":
         train_iterator = iter(train_loader)
 
         # Compute cyclic beta
-        global_step = epoch * len(train_loader) + step
-        beta = cyclic_beta(
-            global_step, cycle_length
-        )  # ).to(device=device, dtype=ptdtype)
+        # global_step = epoch * len(train_loader) + step
+        # beta = cyclic_beta(
+        #     global_step, cycle_length
+        # )  # ).to(device=device, dtype=ptdtype)
+        beta = 100.0
         if master_process:
             print(f"Epoch: {epoch}, Step: {step}, Beta: {beta:.6f}")
 
@@ -557,7 +559,8 @@ if __name__ == "__main__":
                 surrogate_loss = surrogate_loss.sum() / gradient_accumulation_steps
 
             # backwards pass, with gradient scaling
-            scaler.scale(loss).backward()
+            # scaler.scale(loss).backward()
+            loss.backward()
 
             # Prefetch next batch asynchronously
             try:
@@ -579,14 +582,15 @@ if __name__ == "__main__":
 
         # clip the gradient
         if grad_clip != 0.0:
-            if scaler.is_enabled():
-                scaler.unscale_(optimizer)
+            # if scaler.is_enabled():
+            #     scaler.unscale_(optimizer)
 
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
 
         # step optimizer and update
-        scaler.step(optimizer)
-        scaler.update()
+        # scaler.step(optimizer)
+        # scaler.update()
+        optimizer.step()
 
         # flush gradients to release memory
         optimizer.zero_grad(set_to_none=True)
