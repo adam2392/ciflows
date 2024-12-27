@@ -403,6 +403,8 @@ if __name__ == "__main__":
         root = Path("/Users/adam2392/pytorch_data/")
     else:
         root = Path("/home/adam2392/projects/data/")
+        root = Path("/local/eb/adam2392/")
+
     ctx = (
         nullcontext()
         if device == "cpu"
@@ -562,8 +564,8 @@ if __name__ == "__main__":
                 surrogate_loss = surrogate_loss.sum() / gradient_accumulation_steps
 
             # backwards pass, with gradient scaling
-            # scaler.scale(loss).backward()
-            loss.backward()
+            scaler.scale(loss).backward()
+            # loss.backward()
 
             # Prefetch next batch asynchronously
             try:
@@ -591,9 +593,9 @@ if __name__ == "__main__":
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
 
         # step optimizer and update
-        # scaler.step(optimizer)
-        # scaler.update()
-        optimizer.step()
+        scaler.step(optimizer)
+        scaler.update()
+        # optimizer.step()
 
         # flush gradients to release memory
         optimizer.zero_grad(set_to_none=True)
