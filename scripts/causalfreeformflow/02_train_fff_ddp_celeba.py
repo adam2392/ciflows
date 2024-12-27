@@ -133,12 +133,12 @@ def compute_loss(model: DDP, x, distr_idx, beta, hutchinson_samples=2):
     # beta = beta.to(device)
 
     # calculate volume change surrogate loss
-    # surrogate_loss, v_hat, x_hat = volume_change_surrogate(
-    #     x,
-    #     get_model_attribute(model, "encoder"),
-    #     get_model_attribute(model, "decoder"),
-    #     hutchinson_samples=hutchinson_samples,
-    # )
+    surrogate_loss, v_hat, x_hat = volume_change_surrogate(
+        x,
+        get_model_attribute(model, "encoder"),
+        get_model_attribute(model, "decoder"),
+        hutchinson_samples=hutchinson_samples,
+    )
 
     # # compute reconstruction loss
     # x_hat_from_encoder = model.module.decode(model.module.encode(x))
@@ -147,21 +147,21 @@ def compute_loss(model: DDP, x, distr_idx, beta, hutchinson_samples=2):
     recon_x, log_prob, log_means, log_vars = model(x, distr_idx=distr_idx)
     loss_reconstruction = torch.nn.functional.mse_loss(recon_x, x)
 
-    kld = -0.5 * torch.sum(1 + log_vars - log_means.pow(2) - log_vars.exp())
+    # kld = -0.5 * torch.sum(1 + log_vars - log_means.pow(2) - log_vars.exp())
 
     # get negative log likelihoood over the distributions
-    # embed_dim = get_model_attribute(model, "latent_dim")
-    # v_hat = v_hat.view(-1, embed_dim)
-    # loss_nll = (
-    #     -get_model_attribute(model, "latent")
-    #     .log_prob(v_hat, distr_idx=distr_idx)
-    #     .mean()
-    #     - surrogate_loss
-    # )
+    embed_dim = get_model_attribute(model, "latent_dim")
+    v_hat = v_hat.view(-1, embed_dim)
+    loss_nll = (
+        -get_model_attribute(model, "latent")
+        .log_prob(v_hat, distr_idx=distr_idx)
+        .mean()
+        - surrogate_loss
+    )
 
-    # loss = beta * loss_reconstruction.sum() + loss_nll.sum()
-    loss = loss_reconstruction.sum() + beta * kld.sum()
-    return loss, loss_reconstruction#, loss_nll, surrogate_loss
+    loss = beta * loss_reconstruction.sum() + loss_nll.sum()
+    # loss = loss_reconstruction.sum() + beta * kld.sum()
+    return loss, loss_reconstruction, loss_nll, surrogate_loss
 
 
 def data_loader(
@@ -529,7 +529,7 @@ if __name__ == "__main__":
                 # print(f"beta dtype: {beta.dtype}")
                 # compute the loss
                 # , loss_nll, surrogate_loss
-                loss, loss_reconstruction = compute_loss(
+                loss, loss_reconstruction, loss_nll, surrogate_loss = compute_loss(
                     model,
                     images,
                     distr_idx,
