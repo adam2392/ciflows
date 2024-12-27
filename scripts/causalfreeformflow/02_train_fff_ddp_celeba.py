@@ -158,7 +158,8 @@ def compute_loss(model: DDP, x, distr_idx, beta, hutchinson_samples=2):
     #     .mean()
     #     - surrogate_loss
     # )
-
+    
+    print(surrogate_loss.shape, loss_nll.shape)
     # loss nll can be unstable, so we clip it
     loss_nll = loss_nll.mean()
     # print(f"Mean loss NLL: {loss_nll}")

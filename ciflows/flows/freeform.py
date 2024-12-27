@@ -36,9 +36,8 @@ class ResnetFreeformflow(nn.Module):
         loss_nll = (
             -self.latent
             .log_prob(v_hat, distr_idx=distr_idx.cpu())
-            .mean()
-            - surrogate_loss.mean()
-        )
+            - surrogate_loss
+        ).mean()
 
 
         # compute the log-likelihood of the data
