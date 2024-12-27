@@ -182,7 +182,7 @@ def compute_loss(model: DDP, x, distr_idx, beta, hutchinson_samples=2):
     #     .mean()
     #     - surrogate_loss
     # )
-    
+
     # print(surrogate_loss.shape, loss_nll.shape)
     # loss nll can be unstable, so we clip it
     loss_nll = loss_nll.mean()
@@ -446,9 +446,15 @@ if __name__ == "__main__":
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     # where to find the checkpoint models
-    checkpoint_model_fdir = 'celeba_vae_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt'
-    model_checkpoint_dir = root / "CausalCelebA" / "fff" / checkpoint_model_fdir.split(".")[0]
-    checkpoint_model_fname = 'celeba_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt'
+    checkpoint_model_fdir = (
+        "celeba_vae_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt"
+    )
+    model_checkpoint_dir = (
+        root / "CausalCelebA" / "fff" / checkpoint_model_fdir.split(".")[0]
+    )
+    checkpoint_model_fname = (
+        "celeba_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt"
+    )
 
     model = make_fff_model(num_blocks_per_stage=num_blocks_per_stage, debug=debug)
     model = model.to(ptdtype).to(device)
@@ -545,8 +551,9 @@ if __name__ == "__main__":
     print(f"Effective batch size: {effective_batch_size}")
 
     # Training loop
+    max_epochs = start_epoch + max_epochs
     for step, epoch in tqdm(
-        enumerate(range(1, max_epochs + 1)), desc="outer", position=0
+        enumerate(range(start_epoch, max_epochs)), desc="outer", position=0
     ):
         # Training phase
         model.train()
@@ -554,7 +561,7 @@ if __name__ == "__main__":
         train_reconstruction_loss = 0.0
         train_nll_loss = 0.0
         train_surrogate_loss = 0.0
-        
+
         train_kld_loss = 0.0
 
         # Create an iterator for the DataLoader
@@ -669,7 +676,9 @@ if __name__ == "__main__":
             f"====> Epoch: {epoch} in time {dt*1000:.2f}ms \n"
             f"Average loss: {train_loss:.4f}, LR: {lr:.6f} "
         )
-        print(f"Reconstruction Loss: {train_reconstruction_loss:.4f}, KLD Loss: {train_kld_loss:.4f}")
+        print(
+            f"Reconstruction Loss: {train_reconstruction_loss:.4f}, KLD Loss: {train_kld_loss:.4f}"
+        )
         # print(f"Reconstruction Loss: {train_reconstruction_loss:.4f}, NLL Loss: {train_nll_loss:.4f}, Surrogate Loss: {train_surrogate_loss:.4f}")
 
         # Validation phase
@@ -700,11 +709,10 @@ if __name__ == "__main__":
                     sample_images, reconstructed_images
                 )
                 reconstructed_pert_images = raw_model.decode(encoding)
-                
+
                 # clamp
                 # reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
                 # reconstructed_pert_images = torch.clamp(reconstructed_pert_images, 0, 1)
-
 
             sample_images = torch.cat(
                 (
@@ -716,7 +724,8 @@ if __name__ == "__main__":
             )
             save_image(
                 sample_images,
-                checkpoint_dir / f"epoch_{epoch}_reconstruction_samples_{mse_loss:.4f}.png",
+                checkpoint_dir
+                / f"epoch_{epoch}_reconstruction_samples_{mse_loss:.4f}.png",
                 nrow=4,
                 normalize=True,
             )
