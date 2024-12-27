@@ -676,10 +676,10 @@ if __name__ == "__main__":
             f"====> Epoch: {epoch} in time {dt*1000:.2f}ms \n"
             f"Average loss: {train_loss:.4f}, LR: {lr:.6f} "
         )
-        print(
-            f"Reconstruction Loss: {train_reconstruction_loss:.4f}, KLD Loss: {train_kld_loss:.4f}"
-        )
-        # print(f"Reconstruction Loss: {train_reconstruction_loss:.4f}, NLL Loss: {train_nll_loss:.4f}, Surrogate Loss: {train_surrogate_loss:.4f}")
+        # print(
+        #     f"Reconstruction Loss: {train_reconstruction_loss:.4f}, KLD Loss: {train_kld_loss:.4f}"
+        # )
+        print(f"Reconstruction Loss: {train_reconstruction_loss:.4f}, NLL Loss: {train_nll_loss:.4f}, Surrogate Loss: {train_surrogate_loss:.4f}")
 
         # Validation phase
         if debug or epoch % check_samples_every_n_epoch == 0 and master_process:
