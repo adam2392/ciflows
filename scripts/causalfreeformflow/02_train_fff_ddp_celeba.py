@@ -700,6 +700,6 @@ if __name__ == "__main__":
 
     # Load back the saved final model and verify that it loads
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    fff_model = model.to(device)
+    fff_model = make_fff_model(num_blocks_per_stage=num_blocks_per_stage, debug=debug)
     model_path = checkpoint_dir / model_fname
     fff_model = load_model(fff_model, model_path, device, optimizer=optimizer)
