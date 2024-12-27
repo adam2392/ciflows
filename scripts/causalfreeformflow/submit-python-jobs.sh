@@ -39,7 +39,7 @@ LOG_FILE="celeba_fff_resnet_batch512_gradaccum_latentdim48_beta10_v1_${SCRIPT_NA
 # or `&` to run the command in the background
 export CUDA_VISIBLE_DEVICES=$GPU_INDICES
 CMD="torchrun --master_port=29501 --nproc_per_node=$NUM_GPUS $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
-LOG_FILE="celeba_vae_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_${SCRIPT_NAME}_multigpu.log"
+LOG_FILE="celeba_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_${SCRIPT_NAME}_multigpu.log"
 nohup $CMD > $LOG_FILE 2>&1 &
 
 # echo $TRAINING_SEED
