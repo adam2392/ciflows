@@ -488,6 +488,10 @@ if __name__ == "__main__":
     # Initialize Capacity and Scheduler
     cycle_length = len(train_loader) * 5  # Full cycle over 5 epochs
 
+    # XXX: remove when not doing FFF-VAE
+    loss_nll = torch.tensor(0.0)
+    surrogate_loss = torch.tensor(0.0)
+    
     # Training loop
     for step, epoch in tqdm(
         enumerate(range(1, max_epochs + 1)), desc="outer", position=0
