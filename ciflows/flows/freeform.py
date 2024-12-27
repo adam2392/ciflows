@@ -18,9 +18,14 @@ class ResnetFreeformflow(nn.Module):
         self.latent = latent
         self.latent_dim = latent_dim
 
-    def forward(self, x):
+    def forward(self, x, distr_idx=None):
         z = self.encoder(x)
-        return self.decoder(z)
+        recon_x = self.decoder(z)
+
+        # compute the log-likelihood of the data
+        log_prob, log_means, log_vars = self.latent.log_prob(z, distr_idx=distr_idx, return_means_log_vars=True)
+
+        return recon_x, log_prob, log_means, log_vars
 
     def encode(self, x):
         return self.encoder(x)
