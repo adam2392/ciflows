@@ -219,14 +219,17 @@ if __name__ == "__main__":
     if debug:
         root = Path("/Users/adam2392/pytorch_data/")
     else:
-        root = Path("/home/adam2392/projects/data/")
+        root = Path("/local/eb/adam2392/")
 
     latent_dim = 48
     batch_size = 1024
     model_fname = "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
-
     checkpoint_model_fdir = "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     checkpoint_model_fname = "model_epoch_930.pt"
+
+    model_fname = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    checkpoint_model_fdir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    checkpoint_model_fname = "model_epoch_610.pt"
     model_checkpoint_dir = (
         root / "CausalCelebA" / "vae_reduction" / checkpoint_model_fdir.split(".")[0]
     )
