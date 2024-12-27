@@ -37,7 +37,7 @@ class ResnetFreeformflow(nn.Module):
             -self.latent
             .log_prob(v_hat, distr_idx=distr_idx.cpu())
             .mean()
-            - surrogate_loss
+            - surrogate_loss.mean()
         )
 
 
