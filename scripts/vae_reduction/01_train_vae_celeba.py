@@ -187,7 +187,7 @@ def loss_function(recon_x, x, mu, log_var, log_sigma_x, capacity=0.0, beta=0.000
 
 
 # Beta annealing function (cyclic)
-def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=0.05):
+def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=0.01):
     """Cyclic cosine annealing schedule for beta."""
     cycle_position = step % cycle_length
     fraction = cycle_position / cycle_length
@@ -226,6 +226,10 @@ if __name__ == "__main__":
     model_fname = "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     checkpoint_model_fdir = "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     checkpoint_model_fname = "model_epoch_930.pt"
+
+    model_fname = 'celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt'
+    checkpoint_model_fdir = 'celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt'
+    checkpoint_model_fname = 'model_epoch_970.pt'
 
     model_fname = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     checkpoint_model_fdir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
@@ -320,7 +324,7 @@ if __name__ == "__main__":
     capacity_increment = 0.1  # Increment per epoch
     current_capacity = initial_capacity
     increment_capacity = False
-    cycle_length = len(train_loader) * 5  # Full cycle over 5 epochs
+    cycle_length = len(train_loader) * 10  # Full cycle over 5 epochs
 
     # default beta for sigma-VAE is 1.0
     # beta = 1.0
