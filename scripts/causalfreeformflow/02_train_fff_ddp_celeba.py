@@ -291,7 +291,7 @@ if __name__ == "__main__":
         if torch.cuda.is_available() and torch.cuda.is_bf16_supported()
         else "float16"
     )  # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
-    # dtype = "float32"
+    dtype = "float32"
 
     # pytorch dtype
     ptdtype = {
@@ -647,8 +647,8 @@ if __name__ == "__main__":
                 reconstructed_pert_images = raw_model.decode(encoding)
                 
                 # clamp
-                reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
-                reconstructed_pert_images = torch.clamp(reconstructed_pert_images, 0, 1)
+                # reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
+                # reconstructed_pert_images = torch.clamp(reconstructed_pert_images, 0, 1)
 
 
             sample_images = torch.cat(
