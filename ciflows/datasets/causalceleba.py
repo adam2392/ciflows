@@ -29,7 +29,7 @@ class CausalCelebA(Dataset):
         self.file_list = []
 
         # load attrs
-        distr_types = ["obs", "int_hair_0", "int_hair_1"]
+        distr_types = ["obs", "int_hair_0", "int_hair_1", 'int_hair_2', 'int_hair_3', 'int_hair_4']
         self.causal_distr_dfs = dict()
         self.distr_dfs = dict()
         self.causal_main_df = pd.DataFrame()
@@ -88,11 +88,14 @@ class CausalCelebA(Dataset):
             [0, 0, 0],
             [0, 0, 1],
             [0, 0, 1],
+            [0, 0, 1],
+            [0, 0, 1],
+            [0, 0, 1],
         ]
 
     @property
     def distr_idx_list(self):
-        return [0, 1, 2]
+        return [0, 1, 2, 3, 4, 5]
 
     @property
     def obs_attr(self):
