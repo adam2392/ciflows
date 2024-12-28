@@ -12,7 +12,14 @@ from ciflows.reduction.resnetvae import DeepResNetVAE
 def encode_images_in_directory(
     directory, model: DeepResNetVAE, transform: transforms.Compose, device="cpu"
 ):
-    image_files = sorted([f for f in os.listdir(directory) if f.endswith(".jpg")])
+    # image_files = sorted([f for f in os.listdir(directory) if f.endswith(".jpg")])
+    image_files = sorted(
+        [f for f in os.listdir(directory) if f.endswith(".jpg")],
+        key=lambda x: int(x.split('_')[1].split('.')[0])  # Extract the numeric part
+    )
+    if debug:
+        print(image_files[:5])
+        assert False
     encodings = []
 
     for idx, img_file in enumerate(image_files):
@@ -46,11 +53,12 @@ if __name__ == "__main__":
     print(f"Using accelerator: {accelerator}")
 
     graph_type = "chain"
-    debug = False
+    debug = True
     if debug:
         root = Path("/Users/adam2392/pytorch_data/")
     else:
         root = Path("/home/adam2392/projects/data/")
+        root = Path("/local/eb/adam2392/")
 
     data_dir = root / "CausalCelebA" / graph_type / "dim128"
     directories = [data_dir / "obs", data_dir / "int_hair_0", data_dir / "int_hair_1"]

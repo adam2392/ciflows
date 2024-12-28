@@ -1,3 +1,4 @@
+from tqdm import tqdm
 import os
 import re
 from copy import copy
@@ -154,6 +155,12 @@ def interventional_sample_img_indices(
         hair_categories = ["Gray", "Brown"]
     elif idx == 1:
         hair_categories = ["Black", "Blond"]
+    elif idx == 2:
+        hair_categories = ["Black", "Brown"]
+    elif idx == 3:
+        hair_categories = ["Gray"]
+    elif idx == 4:
+        hair_categories = ["Blond"]
 
     rng = np.random.default_rng(seed)
 
@@ -279,7 +286,7 @@ def celeba_scm(
         max_idx = 0
 
     # now actually sample the images, apply transformation and save them to disc
-    for idx, sample_idx in enumerate(sample_indices):
+    for idx, sample_idx in tqdm(enumerate(sample_indices)):
         image, meta_attrs = celeba_data[sample_idx]
         image = torch.permute(image, (1, 2, 0))
 
@@ -290,7 +297,7 @@ def celeba_scm(
 
         # Convert to a PIL Image
         # Convert to a PIL Image
-        transformed_image = transformed_image * 0.5 + 0.5  # Undo normalization (if applied)
+        # transformed_image = transformed_image * 0.5 + 0.5  # Undo normalization (if applied)
         transformed_image = (transformed_image.numpy() * 255).astype(np.uint8)
         if transformed_image.shape[0] == 3:
             transformed_image = np.transpose(transformed_image, (1, 2, 0))
@@ -333,12 +340,12 @@ if __name__ == "__main__":
         ),
     )
 
-    scm_type = "int_hair_1"
+    scm_type = "int_hair_2"
     # scm_type = "obs"
-    interv_idx = 1
-    append = True
+    interv_idx = 2
+    append = False
 
-    save_dir = data_root / "CausalCelebA" / "dim128" / scm_type
+    save_dir = data_root / "CausalCelebA" / "chain" / "dim128" / scm_type
     save_dir.mkdir(exist_ok=True, parents=True)
 
     saved_causal_attrs, saved_attrs = celeba_scm(
