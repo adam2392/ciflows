@@ -29,9 +29,12 @@ def make_nf_model(K=32, debug=False):
         ]
 
     node_dimensions = {
-        0: 22,
-        1: 22,
-        2: 4,
+        # 0: 22,
+        # 1: 22,
+        # 2: 4,
+        0: 16,
+        1: 16,
+        2: 16,
     }
     edge_list = [(1, 2)]
     noise_means = {
@@ -45,12 +48,18 @@ def make_nf_model(K=32, debug=False):
         2: torch.ones(node_dimensions[2]),
     }
     intervened_node_means = [
-        {2: torch.ones(node_dimensions[2]) + 4},
-        {2: torch.ones(node_dimensions[2]) + 8},
+        {2: torch.ones(node_dimensions[2]) + 2},  # 0
+        {2: torch.ones(node_dimensions[2]) + 5},  # 1
+        {2: torch.ones(node_dimensions[2]) + 4},  # 2
+        {2: torch.ones(node_dimensions[2]) + 3},  # 3
+        {2: torch.ones(node_dimensions[2]) + 6},  # 4
     ]
     intervened_node_vars = [
         {2: torch.ones(node_dimensions[2])},
         {2: torch.ones(node_dimensions[2])},
+        {2: torch.ones(node_dimensions[2])},
+        {2: torch.ones(node_dimensions[2])},
+        {2: torch.ones(node_dimensions[2]) * 2},
     ]
 
     confounded_list = [(0, 1)]
