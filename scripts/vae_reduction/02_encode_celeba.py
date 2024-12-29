@@ -15,7 +15,7 @@ def encode_images_in_directory(
     # image_files = sorted([f for f in os.listdir(directory) if f.endswith(".jpg")])
     image_files = sorted(
         [f for f in os.listdir(directory) if f.endswith(".jpg")],
-        key=lambda x: int(x.split('_')[1].split('.')[0])  # Extract the numeric part
+        key=lambda x: int(x.split("_")[1].split(".")[0]),  # Extract the numeric part
     )
     if debug:
         print(image_files[:5])
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     print(f"Using accelerator: {accelerator}")
 
     graph_type = "chain"
-    debug = True
+    debug = False
     if debug:
         root = Path("/Users/adam2392/pytorch_data/")
     else:
@@ -61,14 +61,23 @@ if __name__ == "__main__":
         root = Path("/local/eb/adam2392/")
 
     data_dir = root / "CausalCelebA" / graph_type / "dim128"
-    directories = [data_dir / "obs", data_dir / "int_hair_0", data_dir / "int_hair_1"]
+    directories = [
+        data_dir / "obs",
+        data_dir / "int_hair_0",
+        data_dir / "int_hair_1",
+        data_dir / "int_hair_2",
+        data_dir / "int_hair_3",
+        data_dir / "int_hair_4",
+    ]
     latent_vectors_per_directory = {}
 
-    model_fname = "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
-    model_dir = "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    model_fname = "model_epoch_840.pt"
 
-    model_dir = "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
-    model_fname = 'model_epoch_970.pt'
+    model_dir = (
+        "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    )
+    model_fname = "model_epoch_1250.pt"
     # model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
     # model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     vae_model_fpath = (
@@ -79,9 +88,7 @@ if __name__ == "__main__":
     latent_dim = 48
     num_blocks_per_stage = 3
     vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
-    vae_model.load_state_dict(
-        torch.load(vae_model_fpath, map_location=device)["model_state_dict"]
-    )
+    vae_model.load_state_dict(torch.load(vae_model_fpath, map_location=device)["model_state_dict"])
     vae_model.eval()
 
     # Define preprocessing for images
@@ -99,9 +106,7 @@ if __name__ == "__main__":
         directory.mkdir(parents=True, exist_ok=True)
 
         print(f"Processing directory: {directory}")
-        latent_vectors = encode_images_in_directory(
-            directory, vae_model, transform, device
-        )
+        latent_vectors = encode_images_in_directory(directory, vae_model, transform, device)
         latent_vectors_per_directory[directory] = latent_vectors
 
         # Save the tensor

@@ -153,14 +153,19 @@ def interventional_sample_img_indices(
     # Precompute hair categories
     if idx == 0:
         hair_categories = ["Gray", "Brown"]
+        hair_range = np.arange(2)
     elif idx == 1:
         hair_categories = ["Black", "Blond"]
+        hair_range = np.arange(2)
     elif idx == 2:
         hair_categories = ["Black", "Brown"]
+        hair_range = np.arange(2)
     elif idx == 3:
         hair_categories = ["Gray"]
+        hair_range = np.arange(1)
     elif idx == 4:
         hair_categories = ["Blond"]
+        hair_range = np.arange(1)
 
     rng = np.random.default_rng(seed)
 
@@ -197,7 +202,6 @@ def interventional_sample_img_indices(
         age_map = {"Young": 1, "Old": 0}
         age = age_map[age_str]
 
-        hair_range = np.arange(2)
         if age == "Old":
             hair_range = hair_range[::-1]
         p_hairs = exponential_weights(hair_range, alpha=1.0)
@@ -322,6 +326,8 @@ def celeba_scm(
 if __name__ == "__main__":
     # Root directory for the dataset
     data_root = Path("/Users/adam2392/pytorch_data/")
+    data_root = Path("/local/eb/adam2392/")
+
     # Spatial size of training images, images are resized to this size.
     image_size = 128
     n_samples = 20_000
@@ -340,47 +346,57 @@ if __name__ == "__main__":
         ),
     )
 
-    scm_type = "int_hair_2"
+    scm_types = [
+        # 'int_hair_2',
+        'int_hair_3',
+        'int_hair_4',
+    ]
+    interv_idxs = [
+        # 2,
+          3, 4]
+    for interv_idx, scm_type in zip(interv_idxs, scm_types):
+        print(f'Computing for {interv_idx} - {scm_type}')
+    # scm_type = "int_hair_2"
     # scm_type = "obs"
-    interv_idx = 2
-    append = False
+    # interv_idx = 2
+        append = False
 
-    save_dir = data_root / "CausalCelebA" / "chain" / "dim128" / scm_type
-    save_dir.mkdir(exist_ok=True, parents=True)
+        save_dir = data_root / "CausalCelebA" / "chain" / "dim128" / scm_type
+        save_dir.mkdir(exist_ok=True, parents=True)
 
-    saved_causal_attrs, saved_attrs = celeba_scm(
-        celeba_data,
-        save_dir,
-        scm_type=scm_type,
-        image_size=image_size,
-        interv_idx=interv_idx,
-        n_samples=n_samples,
-        seed=seed,
-        append=append,
-    )
+        saved_causal_attrs, saved_attrs = celeba_scm(
+            celeba_data,
+            save_dir,
+            scm_type=scm_type,
+            image_size=image_size,
+            interv_idx=interv_idx,
+            n_samples=n_samples,
+            seed=seed,
+            append=append,
+        )
 
-    # save the metadata csv files
-    saved_causal_df = pd.DataFrame(
-        saved_causal_attrs, columns=["Sampled Index", "Gender", "Age", "Haircolor"]
-    )
-    saved_attrs_df = pd.DataFrame(saved_attrs, columns=celeba_data.attr_names[:-1])
+        # save the metadata csv files
+        saved_causal_df = pd.DataFrame(
+            saved_causal_attrs, columns=["Sampled Index", "Gender", "Age", "Haircolor"]
+        )
+        saved_attrs_df = pd.DataFrame(saved_attrs, columns=celeba_data.attr_names[:-1])
 
-    if scm_type == "obs":
-        saved_causal_df["Intervention"] = ""
-    else:
-        saved_causal_df["Intervention"] = "Haircolor"
+        if scm_type == "obs":
+            saved_causal_df["Intervention"] = ""
+        else:
+            saved_causal_df["Intervention"] = "Haircolor"
 
-    causal_attrs_path = save_dir / "causal_attrs.csv"
-    meta_attrs_path = save_dir / "meta_attrs.csv"
-    if append:
-        # Check if the files already exist and append if they do
-        if causal_attrs_path.exists():
-            existing_causal_df = pd.read_csv(causal_attrs_path, index_col=0)
-            saved_causal_df = pd.concat([existing_causal_df, saved_causal_df], ignore_index=True)
+        causal_attrs_path = save_dir / "causal_attrs.csv"
+        meta_attrs_path = save_dir / "meta_attrs.csv"
+        if append:
+            # Check if the files already exist and append if they do
+            if causal_attrs_path.exists():
+                existing_causal_df = pd.read_csv(causal_attrs_path, index_col=0)
+                saved_causal_df = pd.concat([existing_causal_df, saved_causal_df], ignore_index=True)
 
-        if meta_attrs_path.exists():
-            existing_attrs_df = pd.read_csv(meta_attrs_path, index_col=0)
-            saved_attrs_df = pd.concat([existing_attrs_df, saved_attrs_df], ignore_index=True)
+            if meta_attrs_path.exists():
+                existing_attrs_df = pd.read_csv(meta_attrs_path, index_col=0)
+                saved_attrs_df = pd.concat([existing_attrs_df, saved_attrs_df], ignore_index=True)
 
-    saved_causal_df.to_csv(causal_attrs_path)
-    saved_attrs_df.to_csv(meta_attrs_path)
+        saved_causal_df.to_csv(causal_attrs_path)
+        saved_attrs_df.to_csv(meta_attrs_path)

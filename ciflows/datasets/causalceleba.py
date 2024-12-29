@@ -29,7 +29,7 @@ class CausalCelebA(Dataset):
         self.file_list = []
 
         # load attrs
-        distr_types = ["obs", "int_hair_0", "int_hair_1", 'int_hair_2', 'int_hair_3', 'int_hair_4']
+        distr_types = ["obs", "int_hair_0", "int_hair_1", "int_hair_2", "int_hair_3", "int_hair_4"]
         self.causal_distr_dfs = dict()
         self.distr_dfs = dict()
         self.causal_main_df = pd.DataFrame()
@@ -177,6 +177,7 @@ class CausalCelebAEmbedding(CausalCelebA):
         self,
         root,
         graph_type,
+        dataset,
         img_size=64,
         fast_dev_run=False,
     ):
@@ -187,16 +188,44 @@ class CausalCelebAEmbedding(CausalCelebA):
         root = Path(root)
 
         # load attrs
-        
-        encoding_fnames = {
-            "obs": "obs_cyclicbeta_encodings.pt",
-            "int_hair_0": "int_hair_0_cyclicbeta_encodings.pt",
-            "int_hair_1": "int_hair_1_cyclicbeta_encodings.pt",
-            # "obs": "obs_nonorm_encodings.pt",
-            # "int_hair_0": "int_hair_0_nonorm_encodings.pt",
-            # "int_hair_1": "int_hair_1_nonorm_encodings.pt",
-        }
-        distr_types_list = ["obs", "int_hair_0", "int_hair_1"]
+        if dataset == "alldata":
+            dataset_postfix = "alldata_cyclicbeta_noimgaug_encodings"
+            encoding_fnames = {
+                "obs": f"obs_{dataset_postfix}.pt",
+                "int_hair_0": f"int_hair_0_{dataset_postfix}.pt",
+                "int_hair_1": f"int_hair_1_{dataset_postfix}.pt",
+                "int_hair_2": f"int_hair_2_{dataset_postfix}.pt",
+                "int_hair_3": f"int_hair_3_{dataset_postfix}.pt",
+                "int_hair_4": f"int_hair_4_{dataset_postfix}.pt",
+                # "obs": "obs_nonorm_encodings.pt",
+                # "int_hair_0": "int_hair_0_nonorm_encodings.pt",
+                # "int_hair_1": "int_hair_1_nonorm_encodings.pt",
+            }
+        elif dataset == "cyclicbeta":
+            dataset_postfix = "cyclicbeta_noimgaug_encodings"
+            encoding_fnames = {
+                "obs": f"obs_{dataset_postfix}.pt",
+                "int_hair_0": f"int_hair_0_{dataset_postfix}.pt",
+                "int_hair_1": f"int_hair_1_{dataset_postfix}.pt",
+                "int_hair_2": f"int_hair_2_{dataset_postfix}.pt",
+                "int_hair_3": f"int_hair_3_{dataset_postfix}.pt",
+                "int_hair_4": f"int_hair_4_{dataset_postfix}.pt",
+                # "obs": "obs_nonorm_encodings.pt",
+                # "int_hair_0": "int_hair_0_nonorm_encodings.pt",
+                # "int_hair_1": "int_hair_1_nonorm_encodings.pt",
+            }
+
+        print()
+        print()
+        print(f"Loaded dataset postfix: {dataset_postfix}")
+        distr_types_list = [
+            "obs",
+            "int_hair_0",
+            "int_hair_1",
+            "int_hair_2",
+            "int_hair_3",
+            "int_hair_4",
+        ]
         self.causal_distr_dfs = dict()
         self.distr_dfs = dict()
         self.causal_main_df = pd.DataFrame()

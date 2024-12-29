@@ -226,7 +226,7 @@ if __name__ == "__main__":
 
     model_fname = 'celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt'
     checkpoint_model_fdir = 'celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt'
-    checkpoint_model_fname = 'model_epoch_970.pt'
+    checkpoint_model_fname = 'model_epoch_1050.pt'
 
     # model_fname = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     # checkpoint_model_fdir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"

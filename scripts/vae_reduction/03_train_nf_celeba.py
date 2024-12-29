@@ -18,6 +18,7 @@ from ciflows.training import TopKModelSaver, delete_old_checkpoints
 
 def data_loader(
     root_dir,
+    dataset,
     graph_type="chain",
     num_workers=4,
     batch_size=32,
@@ -26,6 +27,7 @@ def data_loader(
     causal_celeba_dataset = CausalCelebAEmbedding(
         root=root_dir,
         graph_type=graph_type,
+        dataset=dataset,
         img_size=img_size,
         fast_dev_run=False,  # Set to True for debugging
     )
@@ -109,7 +111,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfon_64flows_nonorm_noimgauged_cyclicresnetvaereduction_batch1024_latentdim48_hcdim4_trainableedges_sep4and8_v1.pt"
+    model_fname = "celeba_nfon_64flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim4_trainableedges_sep4and8_v1.pt"
     checkpoint_model_fname = "celeba_nfon_cyclicbetaresnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
     model_checkpoint_dir = (
         root
@@ -130,12 +132,18 @@ if __name__ == "__main__":
     # vae_model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
 
     # still with color augmentation
-    vae_model_fname = "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
-    vae_model_dir = "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    # vae_model_dir = "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    # vae_model_fname = "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
 
     # no image aumgentation
     vae_model_dir = "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
-    vae_model_fname = "model_epoch_970.pt"
+    vae_model_fname = "model_epoch_1250.pt"
+    dataset = 'cyclicbeta'
+    
+    # all data
+    vae_model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    vae_model_fname = "model_epoch_840.pt"
+    dataset = 'alldata'
 
     vae_dir = root / "CausalCelebA" / "vae_reduction" / vae_model_dir.split(".")[0]
     # vae_model = VAE().to(device)
