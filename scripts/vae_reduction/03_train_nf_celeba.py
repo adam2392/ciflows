@@ -43,9 +43,7 @@ def data_loader(
     distr_labels = [x[1] for x in causal_celeba_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(
-            f"Batch size must be at least {unique_distrs} for stratified sampling."
-        )
+        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
     # Define the DataLoader
@@ -111,19 +109,14 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfon_64flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim4_trainableedges_sep4and8_v1.pt"
+    model_fname = "celeba_nfon_64flows_notalldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim16_trainableedges_sep4and8_v1.pt"
     checkpoint_model_fname = "celeba_nfon_cyclicbetaresnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
     model_checkpoint_dir = (
-        root
-        / "CausalCelebA"
-        / "nf_on_vae_reduction"
-        / checkpoint_model_fname.split(".")[0]
+        root / "CausalCelebA" / "nf_on_vae_reduction" / checkpoint_model_fname.split(".")[0]
     )
 
     # checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
-    checkpoint_dir = (
-        root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split(".")[0]
-    )
+    checkpoint_dir = root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split(".")[0]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     # vae_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim48"
@@ -136,14 +129,16 @@ if __name__ == "__main__":
     # vae_model_fname = "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
 
     # no image aumgentation
-    vae_model_dir = "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    vae_model_dir = (
+        "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    )
     vae_model_fname = "model_epoch_1250.pt"
-    dataset = 'cyclicbeta'
-    
+    dataset = "cyclicbeta"
+
     # all data
-    vae_model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
-    vae_model_fname = "model_epoch_840.pt"
-    dataset = 'alldata'
+    # vae_model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    # vae_model_fname = "model_epoch_840.pt"
+    # dataset = 'alldata'
 
     vae_dir = root / "CausalCelebA" / "vae_reduction" / vae_model_dir.split(".")[0]
     # vae_model = VAE().to(device)
@@ -188,12 +183,11 @@ if __name__ == "__main__":
         optimizer, T_max=max_epochs, eta_min=lr_min
     )  # T_max = total epochs
 
-    top_k_saver = TopKModelSaver(
-        checkpoint_dir, k=5
-    )  # Initialize the top-k model saver
+    top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
 
     train_loader = data_loader(
         root_dir=root,
+        dataset=dataset,
         graph_type=graph_type,
         num_workers=num_workers,
         batch_size=batch_size,
@@ -220,9 +214,7 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             # extract data from tensor to Parameterdict
-            loss = model.forward_kld(
-                images, intervention_targets=targets, distr_idx=distr_idx
-            )
+            loss = model.forward_kld(images, intervention_targets=targets, distr_idx=distr_idx)
 
             # backward pass
             loss.backward()
@@ -250,9 +242,7 @@ if __name__ == "__main__":
         # Log training and validation loss
         if debug or epoch % 10 == 0:
             print()
-            print(
-                f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}"
-            )
+            print(f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}")
 
             # sample images from normalizing flow
             for distr_idx in train_loader.dataset.distr_idx_list:
@@ -275,9 +265,7 @@ if __name__ == "__main__":
 
             # reconstruct images using VAE
             embeddings = images[:8]
-            images = vae_model.decoder(embeddings).reshape(
-                -1, 3, image_size, image_size
-            )
+            images = vae_model.decoder(embeddings).reshape(-1, 3, image_size, image_size)
 
             # forward/inverse of flow model
             recon_embedding = model.forward(model.inverse(embeddings))
