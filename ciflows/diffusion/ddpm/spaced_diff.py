@@ -182,6 +182,9 @@ class SpacedDiffusion(nn.Module):
         num_steps = len(self.timestep_map)
         checkpoints = [num_steps] if checkpoints == [] else checkpoints
         for idx, t in enumerate(reversed(range(0, num_steps))):
+            # print(ddpm_latents.shape if ddpm_latents is not None)
+            torch.cuda.empty_cache()
+            
             z = (
                 torch.randn_like(x_t)
                 if ddpm_latents is None

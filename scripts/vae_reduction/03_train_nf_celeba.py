@@ -109,7 +109,8 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfon_64flows_notalldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim16_trainableedges_sep4and8_v1.pt"
+    model_fname = "celeba_nfon_64flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim4_nottrainableedges_sep4and8_v1.pt"
+    hcdim = 4
     checkpoint_model_fname = "celeba_nfon_cyclicbetaresnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
     model_checkpoint_dir = (
         root / "CausalCelebA" / "nf_on_vae_reduction" / checkpoint_model_fname.split(".")[0]
@@ -129,16 +130,16 @@ if __name__ == "__main__":
     # vae_model_fname = "celeba_cyclicbetawithcapacity_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
 
     # no image aumgentation
-    vae_model_dir = (
-        "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
-    )
-    vae_model_fname = "model_epoch_1250.pt"
-    dataset = "cyclicbeta"
+    # vae_model_dir = (
+    #     "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    # )
+    # vae_model_fname = "model_epoch_1250.pt"
+    # dataset = "cyclicbeta"
 
     # all data
-    # vae_model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
-    # vae_model_fname = "model_epoch_840.pt"
-    # dataset = 'alldata'
+    vae_model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    vae_model_fname = "model_epoch_1860.pt"
+    dataset = 'alldata'
 
     vae_dir = root / "CausalCelebA" / "vae_reduction" / vae_model_dir.split(".")[0]
     # vae_model = VAE().to(device)
@@ -157,7 +158,7 @@ if __name__ == "__main__":
 
         fast_dev = True
 
-    model = make_nf_model(K=num_flows, debug=debug)
+    model = make_nf_model(K=num_flows, hc_dim=hcdim, debug=debug)
     model = model.to(device)
 
     image_dim = 3 * image_size * image_size

@@ -5,7 +5,7 @@ from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.flows.model import CausalNormalizingFlow
 
 
-def make_nf_model(K=32, debug=False):
+def make_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False):
     """Make normalizing flow model."""
     # Define list of flows
     if debug:
@@ -28,14 +28,18 @@ def make_nf_model(K=32, debug=False):
             )
         ]
 
-    node_dimensions = {
-        # 0: 22,
-        # 1: 22,
-        # 2: 4,
-        0: 16,
-        1: 16,
-        2: 16,
-    }
+    if hc_dim == 4:
+        node_dimensions = {
+            0: 22,
+            1: 22,
+            2: 4,
+        }
+    elif hc_dim == 16:
+        node_dimensions = {
+            0: 16,
+            1: 16,
+            2: 16,
+        }
     edge_list = [(1, 2)]
     noise_means = {
         0: torch.zeros(node_dimensions[0]),
@@ -74,7 +78,7 @@ def make_nf_model(K=32, debug=False):
         confounded_list=confounded_list,
         intervened_node_means=intervened_node_means,
         intervened_node_vars=intervened_node_vars,
-        trainable_edges=True,
+        trainable_edges=trainable_edges,
     )
 
     # Construct flow model with the multiscale architecture

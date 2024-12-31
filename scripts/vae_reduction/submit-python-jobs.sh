@@ -2,7 +2,7 @@
 
 # Directory containing the Python script
 SCRIPT_NAME="01_train_vae_celeba.py"
-# SCRIPT_NAME="02_encode_celeba.py"
+SCRIPT_NAME="02_encode_celeba.py"
 SCRIPT_NAME="03_train_nf_celeba.py"
 
 LOG_DIR="/home/adam2392/projects/logs/"
@@ -23,7 +23,7 @@ TRAINING_SEED=0
 
 # Calculate the GPU index to use for this job
 # GPU_INDEX=$(((({TRAINING_SEED[$i]}) % $NUM_GPUS) + 1))
-GPU_INDEX=4
+GPU_INDEX=6
 
 # Set the environment variable for the GPU
 # export CUDA_VISIBLE_DEVICES=$GPU_INDEX,$((GPU_INDEX + 1))
@@ -34,9 +34,9 @@ CMD="python3 $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 
 # Optionally, you can use a job scheduler like `nohup` to run the command in the background
 # or `&` to run the command in the background
-LOG_FILE="celeba_nfon_64flows_notalldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim16_trainableedges_sep4and8_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
+LOG_FILE="celeba_nfon_64flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim4_nottrainableedges_sep4and8_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
 # LOG_FILE="celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
-# LOG_FILE="encodings_celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
+# LOG_FILE="encodings_celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
 
 # LOG_FILE="celeba_vaeresnetreduction_batch1024_latentdim48_img128_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
 nohup $CMD > $LOG_FILE 2>&1 &
