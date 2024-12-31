@@ -1,5 +1,5 @@
 from pathlib import Path
-
+from tqdm import tqdm
 import lightning as pl
 import numpy as np
 import torch
@@ -13,7 +13,7 @@ from torchvision.datasets import CelebA
 
 from ciflows.datasets.causalceleba_scm.pretrained import MultiTaskResNet
 from ciflows.eval import load_model
-from ciflows.training import TopKModelSaver
+from ciflows.training import TopKModelSaver, delete_old_checkpoints
 
 if __name__ == "__main__":
     seed = 1234
@@ -35,8 +35,8 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    batch_size = 256
-    image_size = 64
+    batch_size = 512
+    image_size = 128
 
     max_epochs = 1000
     lr = 3e-4
@@ -52,12 +52,13 @@ if __name__ == "__main__":
         root = Path("/Users/adam2392/pytorch_data/")
     else:
         root = Path("/home/adam2392/projects/data/")
-        # root = Path("/Users/adam2392/pytorch_data/")
+        root = Path("/local/eb/adam2392/")
+        # device = torch.device(f"cuda:{1}")
 
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_predictor_batch256_v1.pt"
+    model_fname = "celeba_dim128_predictor_batch512_v1.pt"
 
     # checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / "latentdim24"
     checkpoint_dir = root / "CausalCelebA" / "pretrained" / model_fname.split(".")[0]
@@ -81,7 +82,7 @@ if __name__ == "__main__":
             transforms.Resize((image_size, image_size)),
             transforms.CenterCrop(image_size),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
     )
 
@@ -117,7 +118,7 @@ if __name__ == "__main__":
 
     # Initialize the model, optimizer, and scheduler
     model = MultiTaskResNet().to(device)
-    model = torch.compile(model)
+    # model = torch.compile(model)
 
     optimizer = optim.AdamW(model.parameters(), lr=lr)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
@@ -153,10 +154,10 @@ if __name__ == "__main__":
     }
 
     # Training loop
-    for epoch in range(max_epochs):
+    for epoch in tqdm(range(max_epochs), desc="outer", position=0):
         model.train()
         running_loss = 0.0
-        for batch_idx, (images, labels) in enumerate(train_loader):
+        for batch_idx, (images, labels) in tqdm(enumerate(train_loader), desc="step", position=1, leave=False):
             images = images.to(device)
             labels = labels.to(device)
             gender, hair, age = (
@@ -174,14 +175,15 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             # Forward pass
-            (gender_out, gender_prob), (hair_out, hair_prob), (age_out, age_prob) = model(images)
+            # (gender_out, gender_prob), (hair_out, hair_prob), (age_out, age_prob) = model(images)
+            (hair_out, hair_prob) = model(images)
 
             # Calculate loss
-            loss_g = loss_gender(gender_out, gender)
+            # loss_g = loss_gender(gender_out, gender)
+            # loss_a = loss_age(age_out, age)
             loss_h = loss_hair(hair_out, hair)
-            loss_a = loss_age(age_out, age)
 
-            total_loss = loss_g + loss_h + loss_a
+            total_loss = loss_h #+ loss_a + loss_g
             total_loss.backward()
 
             optimizer.step()
@@ -191,25 +193,25 @@ if __name__ == "__main__":
             # Update metrics
             # print(gender_prob.shape, gender.shape)
             # print(gender_prob, torch.argmax(gender_prob, dim=1))
-            acc_gender.update(torch.argmax(gender_prob, dim=1), gender)
+            # acc_gender.update(torch.argmax(gender_prob, dim=1), gender)
+            # acc_age.update(torch.argmax(age_prob, dim=1), age)
             acc_hair.update(torch.argmax(hair_prob, dim=1), hair)
-            acc_age.update(torch.argmax(age_prob, dim=1), age)
 
         scheduler.step()
 
         avg_train_loss = running_loss / len(train_loader)
-        avg_train_acc_gender = acc_gender.compute()
+        # avg_train_acc_gender = acc_gender.compute()
+        # avg_train_acc_age = acc_age.compute()
         avg_train_acc_hair = acc_hair.compute()
-        avg_train_acc_age = acc_age.compute()
 
         lr = scheduler.get_last_lr()[0]
         print(f"====> Epoch: {epoch} Average train loss: {avg_train_loss:.4f}, LR: {lr:.6f}")
 
         # Log training results to TensorBoard
         writer.add_scalar("train_loss", avg_train_loss, epoch)
-        writer.add_scalar("train_acc_gender", avg_train_acc_gender, epoch)
+        # writer.add_scalar("train_acc_gender", avg_train_acc_gender, epoch)
+        # writer.add_scalar("train_acc_age", avg_train_acc_age, epoch)
         writer.add_scalar("train_acc_hair", avg_train_acc_hair, epoch)
-        writer.add_scalar("train_acc_age", avg_train_acc_age, epoch)
         writer.add_scalar("lr", scheduler.get_last_lr()[0], epoch)
 
         # Log gradients (optional)
@@ -243,37 +245,38 @@ if __name__ == "__main__":
                     hair = torch.argmax(hair, axis=1)
 
                     # Forward pass
-                    (
-                        (gender_out, gender_prob),
-                        (hair_out, hair_prob),
-                        (age_out, age_prob),
-                    ) = model(images)
+                    # (
+                    #     (gender_out, gender_prob),
+                    #     (hair_out, hair_prob),
+                    #     (age_out, age_prob),
+                    # ) = model(images)
+                    (hair_out, hair_prob) = model(images)
 
                     # Calculate loss
-                    loss_g = loss_gender(gender_out, gender)
+                    # loss_g = loss_gender(gender_out, gender)
+                    # loss_a = loss_age(age_out, age)
                     loss_h = loss_hair(hair_out, hair)
-                    loss_a = loss_age(age_out, age)
 
-                    val_loss += (loss_g + loss_h + loss_a).item()
+                    val_loss += loss_h.item() #(loss_g + loss_h + loss_a).item()
 
                     # Update metrics
-                    acc_gender.update(torch.argmax(gender_prob, dim=1), gender)
+                    # acc_gender.update(torch.argmax(gender_prob, dim=1), gender)
+                    # acc_age.update(torch.argmax(age_prob, dim=1), age)
                     acc_hair.update(torch.argmax(hair_prob, dim=1), hair)
-                    acc_age.update(torch.argmax(age_prob, dim=1), age)
 
             avg_val_loss = val_loss / len(val_loader)
-            avg_val_acc_gender = acc_gender.compute()
+            # avg_val_acc_gender = acc_gender.compute()
+            # avg_val_acc_age = acc_age.compute()
             avg_val_acc_hair = acc_hair.compute()
-            avg_val_acc_age = acc_age.compute()
 
             # Log validation results to TensorBoard
             writer.add_scalar("val_loss", avg_val_loss, epoch)
-            writer.add_scalar("val_acc_gender", avg_val_acc_gender, epoch)
+            # writer.add_scalar("val_acc_gender", avg_val_acc_gender, epoch)
+            # writer.add_scalar("val_acc_age", avg_val_acc_age, epoch)
             writer.add_scalar("val_acc_hair", avg_val_acc_hair, epoch)
-            writer.add_scalar("val_acc_age", avg_val_acc_age, epoch)
 
             print(
-                f"====> Epoch: {epoch} Average Val loss: {avg_val_loss:.4f} Val Acc (Gender): {avg_val_acc_gender:.4f}"
+                f"====> Epoch: {epoch} Average Val loss: {avg_val_loss:.4f}"# Val Acc (Gender): {avg_val_acc_gender:.4f}"
             )
 
         # Reset metrics for the next epoch
@@ -284,13 +287,14 @@ if __name__ == "__main__":
         print(
             f"====> Epoch {epoch+1}/{max_epochs}, "
             f"Train Loss: {avg_train_loss:.4f}, "
-            f"Train Acc (Gender): {avg_train_acc_gender:.4f}, "
+            # f"Train Acc (Gender): {avg_train_acc_gender:.4f}, "
         )
 
         # Track top 5 models based on validation loss
         if epoch % 5 == 0:
             # Optionally, remove worse models if there are more than k saved models
-            top_k_saver.save_model(model, epoch, avg_train_loss)
+            top_k_saver.save_model(model, optimizer, epoch, avg_train_loss)
+            delete_old_checkpoints(checkpoint_dir=checkpoint_dir, keep_top_k=5)
 
     # Close the TensorBoard writer after training is done
     writer.close()
@@ -301,6 +305,6 @@ if __name__ == "__main__":
 
     # Usage example:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    nf_model = model.to(device)
+    model = model.to(device)
     model_path = checkpoint_dir / model_fname
-    nf_model = load_model(nf_model, model_path, device)
+    model = load_model(model, model_path, device)
