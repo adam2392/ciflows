@@ -555,7 +555,7 @@ if __name__ == "__main__":
             # Sample and save reconstructed images
             train_images = images[:8]
             with torch.no_grad():
-                log_sigma_x = model.log_sigma_x
+                log_sigma_x = get_model_attribute(model, 'log_sigma_x')
 
                 print('Iterating through val loader')
                 for batch_idx, (
