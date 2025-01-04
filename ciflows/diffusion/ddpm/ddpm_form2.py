@@ -43,9 +43,7 @@ class DDPMv2(nn.Module):
         self.register_buffer("sqrt_alpha_bar", torch.sqrt(alpha_bar))
         self.register_buffer("minus_sqrt_alpha_bar", torch.sqrt(1.0 - alpha_bar))
         self.register_buffer("sqrt_recip_alphas_cumprod", torch.sqrt(1.0 / alpha_bar))
-        self.register_buffer(
-            "sqrt_recipm1_alphas_cumprod", torch.sqrt(1.0 / alpha_bar - 1)
-        )
+        self.register_buffer("sqrt_recipm1_alphas_cumprod", torch.sqrt(1.0 / alpha_bar - 1))
 
         # Posterior q(x_t-1|x_t,x_0,t) covariance of the forward process
         self.register_buffer(

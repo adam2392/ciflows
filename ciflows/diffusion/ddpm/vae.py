@@ -80,14 +80,10 @@ class ResBlock(nn.Module):
         self.residual = residual
         self.c1 = get_1x1(in_width, middle_width)
         self.c2 = (
-            get_3x3(middle_width, middle_width)
-            if use_3x3
-            else get_1x1(middle_width, middle_width)
+            get_3x3(middle_width, middle_width) if use_3x3 else get_1x1(middle_width, middle_width)
         )
         self.c3 = (
-            get_3x3(middle_width, middle_width)
-            if use_3x3
-            else get_1x1(middle_width, middle_width)
+            get_3x3(middle_width, middle_width) if use_3x3 else get_1x1(middle_width, middle_width)
         )
         self.c4 = get_1x1(middle_width, out_width, zero_weights=zero_last)
 
@@ -114,9 +110,7 @@ class Encoder(nn.Module):
             if isinstance(res, tuple):
                 # Denotes transition to another resolution
                 res1, res2 = res
-                blocks.append(
-                    nn.Conv2d(channel_config[res1], channel_config[res2], 1, bias=False)
-                )
+                blocks.append(nn.Conv2d(channel_config[res1], channel_config[res2], 1, bias=False))
                 continue
             in_channel = channel_config[res]
             use_3x3 = res > 1
@@ -153,9 +147,7 @@ class Decoder(nn.Module):
             if isinstance(res, tuple):
                 # Denotes transition to another resolution
                 res1, res2 = res
-                blocks.append(
-                    nn.Conv2d(channel_config[res1], channel_config[res2], 1, bias=False)
-                )
+                blocks.append(nn.Conv2d(channel_config[res1], channel_config[res2], 1, bias=False))
                 continue
 
             if up_rate is not None:

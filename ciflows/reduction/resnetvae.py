@@ -128,7 +128,6 @@ class DeepResNetVAE(nn.Module):
             self.log_sigma_x = nn.Parameter(torch.full((1,), 0)[0], requires_grad=True)
         else:
             self.log_sigma_x = torch.tensor(0, requires_grad=False, dtype=torch.float32)
-        
 
     def encode(self, x):
         return self.encoder(x)

@@ -1,6 +1,6 @@
 # CREDITS: https://github.com/openai/guided-diffusion/blob/27c20a8fab9cb472df5d6bdd6c8d11c8f430b924/guided_diffusion/respace.py
-import torch.nn as nn
 import torch
+import torch.nn as nn
 
 
 def extract(a, t, x_shape):
@@ -56,12 +56,8 @@ class SpacedDiffusionForm2(nn.Module):
         # Auxillary consts
         self.register_buffer("sqrt_alpha_bar", torch.sqrt(self.alpha_bar))
         self.register_buffer("minus_sqrt_alpha_bar", torch.sqrt(1.0 - self.alpha_bar))
-        self.register_buffer(
-            "sqrt_recip_alphas_cumprod", torch.sqrt(1.0 / self.alpha_bar)
-        )
-        self.register_buffer(
-            "sqrt_recipm1_alphas_cumprod", torch.sqrt(1.0 / self.alpha_bar - 1)
-        )
+        self.register_buffer("sqrt_recip_alphas_cumprod", torch.sqrt(1.0 / self.alpha_bar))
+        self.register_buffer("sqrt_recipm1_alphas_cumprod", torch.sqrt(1.0 / self.alpha_bar - 1))
 
         # Posterior q(x_t-1|x_t,x_0,t) covariance of the forward process
         self.register_buffer(
@@ -245,9 +241,7 @@ class SpacedDiffusionForm2(nn.Module):
     ):
         B = x.size(0)
         t_ = torch.full((x.size(0),), t, device=x.device, dtype=torch.long)
-        t_model_ = torch.full(
-            (x.size(0),), self.timestep_map[t], device=x.device, dtype=torch.long
-        )
+        t_model_ = torch.full((x.size(0),), self.timestep_map[t], device=x.device, dtype=torch.long)
         assert t_.shape == torch.Size(
             [
                 B,
@@ -279,23 +273,18 @@ class SpacedDiffusionForm2(nn.Module):
             * torch.sqrt((1 - alpha_bar_prev) / (1 - alpha_bar))
             * torch.sqrt(1 - alpha_bar / alpha_bar_prev)
         )
-        coeff = 1 - torch.sqrt(1 - alpha_bar_prev - sigma ** 2) / torch.sqrt(
-            1 - alpha_bar
-        )
+        coeff = 1 - torch.sqrt(1 - alpha_bar_prev - sigma**2) / torch.sqrt(1 - alpha_bar)
 
         # Compute mean
         x_hat = 0 if cond is None else cond
         mean_pred = (
             x_recons * torch.sqrt(alpha_bar_prev)
-            + torch.sqrt(1 - alpha_bar_prev - sigma ** 2)
-            * (eps + x_hat / torch.sqrt(1 - alpha_bar))
+            + torch.sqrt(1 - alpha_bar_prev - sigma**2) * (eps + x_hat / torch.sqrt(1 - alpha_bar))
             + coeff * x_hat
         )
         return mean_pred, sigma
 
-    def ddim_sample(
-        self, x_t, cond=None, z_vae=None, checkpoints=[], eta=0.0, guidance_weight=0.0
-    ):
+    def ddim_sample(self, x_t, cond=None, z_vae=None, checkpoints=[], eta=0.0, guidance_weight=0.0):
         # The sampling process goes here!
         x = x_t
         B, *_ = x_t.shape
@@ -306,7 +295,10 @@ class SpacedDiffusionForm2(nn.Module):
         for idx, t in enumerate(reversed(range(0, num_steps))):
             z = torch.randn_like(x_t)
             assert z.shape == x_t.shape
-            (post_mean, post_variance,) = self.get_ddim_mean_cov(
+            (
+                post_mean,
+                post_variance,
+            ) = self.get_ddim_mean_cov(
                 x,
                 t,
                 cond=cond,

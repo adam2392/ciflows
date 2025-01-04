@@ -1,10 +1,7 @@
+import glob
 import os
 
 import torch
-
-
-import os
-import glob
 
 
 def delete_old_checkpoints(checkpoint_dir, keep_top_k=3):

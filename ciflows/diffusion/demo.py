@@ -2,18 +2,15 @@ from copy import copy
 from pathlib import Path
 
 import lightning as pl
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
 
-
-import torch
-from ciflows.diffusion.ddpm.wrapper import DDPMWrapper
-from ciflows.diffusion.ddpm.ddpm_form2 import DDPMv2
 from ciflows.diffusion.ddpm.ddpm import DDPM
+from ciflows.diffusion.ddpm.ddpm_form2 import DDPMv2
 from ciflows.diffusion.ddpm.unet_openai import SuperResModel
 from ciflows.diffusion.ddpm.vae import VAE as BACKVAE
-
+from ciflows.diffusion.ddpm.wrapper import DDPMWrapper
 
 if __name__ == "__main__":
     print(torch.__version__)

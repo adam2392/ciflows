@@ -1,4 +1,3 @@
-from tqdm import tqdm
 import os
 import re
 from copy import copy
@@ -12,6 +11,7 @@ from albumentations.pytorch import ToTensorV2
 from PIL import Image
 from torchvision import transforms
 from torchvision.datasets import CelebA
+from tqdm import tqdm
 
 
 def exponential_weights(i_range, alpha=1.0):
@@ -348,17 +348,19 @@ if __name__ == "__main__":
 
     scm_types = [
         # 'int_hair_2',
-        'int_hair_3',
-        'int_hair_4',
+        "int_hair_3",
+        "int_hair_4",
     ]
     interv_idxs = [
         # 2,
-          3, 4]
+        3,
+        4,
+    ]
     for interv_idx, scm_type in zip(interv_idxs, scm_types):
-        print(f'Computing for {interv_idx} - {scm_type}')
-    # scm_type = "int_hair_2"
-    # scm_type = "obs"
-    # interv_idx = 2
+        print(f"Computing for {interv_idx} - {scm_type}")
+        # scm_type = "int_hair_2"
+        # scm_type = "obs"
+        # interv_idx = 2
         append = False
 
         save_dir = data_root / "CausalCelebA" / "chain" / "dim128" / scm_type
@@ -392,7 +394,9 @@ if __name__ == "__main__":
             # Check if the files already exist and append if they do
             if causal_attrs_path.exists():
                 existing_causal_df = pd.read_csv(causal_attrs_path, index_col=0)
-                saved_causal_df = pd.concat([existing_causal_df, saved_causal_df], ignore_index=True)
+                saved_causal_df = pd.concat(
+                    [existing_causal_df, saved_causal_df], ignore_index=True
+                )
 
             if meta_attrs_path.exists():
                 existing_attrs_df = pd.read_csv(meta_attrs_path, index_col=0)

@@ -1,6 +1,5 @@
 import numpy as np
-from torch.utils.data import Sampler
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader, Dataset, Sampler
 
 
 class StratifiedSampler(Sampler):
@@ -10,8 +9,7 @@ class StratifiedSampler(Sampler):
         self.num_samples = len(labels)
         self.unique_labels = np.unique(labels)
         self.label_indices = {
-            label: np.where(np.array(labels) == label)[0]
-            for label in self.unique_labels
+            label: np.where(np.array(labels) == label)[0] for label in self.unique_labels
         }
         self.rng = np.random.default_rng(seed)
         self.indices = self._generate_indices()
@@ -53,9 +51,7 @@ class SynchronizedDataset(Dataset):
         """
         self.image_dataset = image_dataset
         self.embedding_dataset = embedding_dataset
-        assert len(image_dataset) == len(
-            embedding_dataset
-        ), "Datasets must have same length"
+        assert len(image_dataset) == len(embedding_dataset), "Datasets must have same length"
 
     def __len__(self):
         return len(self.image_dataset)

@@ -52,9 +52,9 @@ class MultiTaskResNet(nn.Module):
         hair_probs = F.softmax(hair_logits, dim=1)  # Probabilities for hair
 
         # return (
-            # (gender_logits, gender_probs),
-        return  (hair_logits, hair_probs)
-            # (age_logits, age_probs),
+        # (gender_logits, gender_probs),
+        return (hair_logits, hair_probs)
+        # (age_logits, age_probs),
         # )
         # return gender_out, hair_out, age_out
 

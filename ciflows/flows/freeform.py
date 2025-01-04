@@ -1,8 +1,9 @@
-from torch import nn
 import torch
+from torch import nn
+
 from ciflows.distributions.pgm import LinearGaussianDag
-from ciflows.reduction.resnetvae import DeepResNetDecoder, ResNetEncoder
 from ciflows.loss import volume_change_surrogate
+from ciflows.reduction.resnetvae import DeepResNetDecoder, ResNetEncoder
 
 
 class ResnetFreeformflow(nn.Module):

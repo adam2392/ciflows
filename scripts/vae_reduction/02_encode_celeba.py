@@ -113,7 +113,7 @@ if __name__ == "__main__":
         # v2 nonorm encodings = sample from latent, rather than the mean
         # output_path = f"{directory.name}_cyclicbeta_noimgaug_encodings.pt"
         output_path = f"{directory.name}_alldata_cyclicbeta_noimgaug_encodings.pt"
-        
+
         # output_path = f"{directory.name}_nonorm_encodings.pt"
         torch.save(latent_vectors, directory / output_path)
         print(f"Saved encodings to: {output_path}")

@@ -1,9 +1,10 @@
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
+
+from .ddpm_form2 import DDPMv2
 from .spaced_diff import SpacedDiffusion
 from .spaced_diff_form2 import SpacedDiffusionForm2
-from .ddpm_form2 import DDPMv2
 from .utils import space_timesteps
 
 

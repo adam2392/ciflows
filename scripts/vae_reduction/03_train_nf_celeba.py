@@ -139,7 +139,7 @@ if __name__ == "__main__":
     # all data
     vae_model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     vae_model_fname = "model_epoch_1860.pt"
-    dataset = 'alldata'
+    dataset = "alldata"
 
     vae_dir = root / "CausalCelebA" / "vae_reduction" / vae_model_dir.split(".")[0]
     # vae_model = VAE().to(device)

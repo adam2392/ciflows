@@ -55,9 +55,7 @@ def configure_optimizers(
         f"num non-decayed parameter tensors: {len(nodecay_params)}, with {num_nodecay_params:,} parameters"
     )
     # Create AdamW optimizer and use the fused version if it is available
-    optimizer = torch.optim.AdamW(
-        optim_groups, lr=learning_rate, betas=betas, fused=True
-    )
+    optimizer = torch.optim.AdamW(optim_groups, lr=learning_rate, betas=betas, fused=True)
     print("using fused AdamW")
 
     return optimizer
@@ -177,9 +175,7 @@ def data_loader(
     distr_labels = [x[1] for x in causal_celeba_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
-        raise ValueError(
-            f"Batch size must be at least {unique_distrs} for stratified sampling."
-        )
+        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
     # Define the DataLoader
@@ -260,9 +256,7 @@ if __name__ == "__main__":
         device = torch.device("cpu")
         accelerator = "cpu"
     dtype = (
-        "bfloat16"
-        if torch.cuda.is_available() and torch.cuda.is_bf16_supported()
-        else "float16"
+        "bfloat16" if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else "float16"
     )  # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
     dtype = "float32"
 
@@ -343,9 +337,7 @@ if __name__ == "__main__":
         print("World size: ", ddp_world_size)
 
         torch.cuda.set_device(device)
-        master_process = (
-            ddp_rank == 0
-        )  # this process will do logging, checkpointing etc.
+        master_process = ddp_rank == 0  # this process will do logging, checkpointing etc.
         seed_offset = ddp_rank  # each process gets a different seed
         # world_size number of processes will be training simultaneously, so we can scale
         # down the desired gradient accumulation iterations per process proportionally
@@ -360,9 +352,7 @@ if __name__ == "__main__":
     print(
         f"Running training with {gradient_accumulation_steps} gradient accumulation steps per process"
     )
-    print(
-        f"Over {max_epochs} epochs, with batch size {batch_size} and {num_workers} workers"
-    )
+    print(f"Over {max_epochs} epochs, with batch size {batch_size} and {num_workers} workers")
 
     # set seed
     seed = 1234
@@ -378,9 +368,7 @@ if __name__ == "__main__":
         root = Path("/local/eb/adam2392/")
 
     ctx = (
-        nullcontext()
-        if device == "cpu"
-        else torch.autocast(device_type=accelerator, dtype=ptdtype)
+        nullcontext() if device == "cpu" else torch.autocast(device_type=accelerator, dtype=ptdtype)
     )
     ctx = nullcontext()
 
@@ -393,15 +381,9 @@ if __name__ == "__main__":
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     # where to find the checkpoint models
-    checkpoint_model_fdir = (
-        "celeba_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt"
-    )
-    model_checkpoint_dir = (
-        root / "CausalCelebA" / "fff" / checkpoint_model_fdir.split(".")[0]
-    )
-    checkpoint_model_fname = (
-        "celeba_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt"
-    )
+    checkpoint_model_fdir = "celeba_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt"
+    model_checkpoint_dir = root / "CausalCelebA" / "fff" / checkpoint_model_fdir.split(".")[0]
+    checkpoint_model_fname = "celeba_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt"
 
     model = make_fff_model(num_blocks_per_stage=num_blocks_per_stage, debug=debug)
     model = model.to(ptdtype).to(device)
@@ -449,9 +431,7 @@ if __name__ == "__main__":
         optimizer, T_max=max_epochs, eta_min=lr_min
     )  # T_max = total epochs
 
-    top_k_saver = TopKModelSaver(
-        checkpoint_dir, k=5
-    )  # Initialize the top-k model saver
+    top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
 
     train_loader = data_loader(
         root_dir=root,
@@ -499,9 +479,7 @@ if __name__ == "__main__":
 
     # Training loop
     max_epochs = start_epoch + max_epochs
-    for step, epoch in tqdm(
-        enumerate(range(start_epoch, max_epochs)), desc="outer", position=0
-    ):
+    for step, epoch in tqdm(enumerate(range(start_epoch, max_epochs)), desc="outer", position=0):
         # Training phase
         model.train()
         train_loss = 0.0
@@ -516,9 +494,7 @@ if __name__ == "__main__":
 
         # Compute cyclic beta
         global_step = epoch * len(train_loader) + step
-        beta = cyclic_beta(
-            global_step, cycle_length
-        )  # ).to(device=device, dtype=ptdtype)
+        beta = cyclic_beta(global_step, cycle_length)  # ).to(device=device, dtype=ptdtype)
 
         if master_process:
             print(f"Epoch: {epoch}, Step: {step}, Beta: {beta:.6f}")
@@ -527,9 +503,7 @@ if __name__ == "__main__":
         for micro_step in range(gradient_accumulation_steps):
             if ddp:
                 # DDP training requires syncing gradients at the last micro step
-                model.require_backward_grad_sync = (
-                    micro_step == gradient_accumulation_steps - 1
-                )
+                model.require_backward_grad_sync = micro_step == gradient_accumulation_steps - 1
 
             with ctx:
                 # forward pass
@@ -559,9 +533,7 @@ if __name__ == "__main__":
                 # scaler.scale(loss).backward()
 
                 loss_nll = loss_nll.sum() / gradient_accumulation_steps
-                loss_reconstruction = (
-                    loss_reconstruction.sum() / gradient_accumulation_steps
-                )
+                loss_reconstruction = loss_reconstruction.sum() / gradient_accumulation_steps
                 surrogate_loss = surrogate_loss.sum() / gradient_accumulation_steps
                 # loss_kld = kld.sum() / gradient_accumulation_steps
 
@@ -626,14 +598,14 @@ if __name__ == "__main__":
         # print(
         #     f"Reconstruction Loss: {train_reconstruction_loss:.4f}, KLD Loss: {train_kld_loss:.4f}"
         # )
-        print(f"Reconstruction Loss: {train_reconstruction_loss:.4f}, NLL Loss: {train_nll_loss:.4f}, Surrogate Loss: {train_surrogate_loss:.4f}")
+        print(
+            f"Reconstruction Loss: {train_reconstruction_loss:.4f}, NLL Loss: {train_nll_loss:.4f}, Surrogate Loss: {train_surrogate_loss:.4f}"
+        )
 
         # Validation phase
         if debug or epoch % check_samples_every_n_epoch == 0 and master_process:
             print()
-            print(
-                f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}"
-            )
+            print(f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}")
             model.eval()
 
             # now reconstruct images over a test batch
@@ -652,9 +624,7 @@ if __name__ == "__main__":
                 # now, perturb the latent space and generate new images
                 encoding[:, 32:48] = encoding[:, 32:48] + 2
 
-                mse_loss = torch.nn.functional.mse_loss(
-                    sample_images, reconstructed_images
-                )
+                mse_loss = torch.nn.functional.mse_loss(sample_images, reconstructed_images)
                 reconstructed_pert_images = raw_model.decode(encoding)
 
                 # clamp
@@ -671,8 +641,7 @@ if __name__ == "__main__":
             )
             save_image(
                 sample_images,
-                checkpoint_dir
-                / f"epoch_{epoch}_reconstruction_samples_{mse_loss:.4f}.png",
+                checkpoint_dir / f"epoch_{epoch}_reconstruction_samples_{mse_loss:.4f}.png",
                 nrow=4,
                 normalize=True,
             )

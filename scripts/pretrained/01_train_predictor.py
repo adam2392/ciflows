@@ -1,5 +1,5 @@
 from pathlib import Path
-from tqdm import tqdm
+
 import lightning as pl
 import numpy as np
 import torch
@@ -10,6 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchmetrics.classification import Accuracy
 from torchvision import transforms
 from torchvision.datasets import CelebA
+from tqdm import tqdm
 
 from ciflows.datasets.causalceleba_scm.pretrained import MultiTaskResNet
 from ciflows.eval import load_model
@@ -157,7 +158,9 @@ if __name__ == "__main__":
     for epoch in tqdm(range(max_epochs), desc="outer", position=0):
         model.train()
         running_loss = 0.0
-        for batch_idx, (images, labels) in tqdm(enumerate(train_loader), desc="step", position=1, leave=False):
+        for batch_idx, (images, labels) in tqdm(
+            enumerate(train_loader), desc="step", position=1, leave=False
+        ):
             images = images.to(device)
             labels = labels.to(device)
             gender, hair, age = (
@@ -183,7 +186,7 @@ if __name__ == "__main__":
             # loss_a = loss_age(age_out, age)
             loss_h = loss_hair(hair_out, hair)
 
-            total_loss = loss_h #+ loss_a + loss_g
+            total_loss = loss_h  # + loss_a + loss_g
             total_loss.backward()
 
             optimizer.step()
@@ -257,7 +260,7 @@ if __name__ == "__main__":
                     # loss_a = loss_age(age_out, age)
                     loss_h = loss_hair(hair_out, hair)
 
-                    val_loss += loss_h.item() #(loss_g + loss_h + loss_a).item()
+                    val_loss += loss_h.item()  # (loss_g + loss_h + loss_a).item()
 
                     # Update metrics
                     # acc_gender.update(torch.argmax(gender_prob, dim=1), gender)
@@ -276,7 +279,7 @@ if __name__ == "__main__":
             writer.add_scalar("val_acc_hair", avg_val_acc_hair, epoch)
 
             print(
-                f"====> Epoch: {epoch} Average Val loss: {avg_val_loss:.4f}"# Val Acc (Gender): {avg_val_acc_gender:.4f}"
+                f"====> Epoch: {epoch} Average Val loss: {avg_val_loss:.4f}"  # Val Acc (Gender): {avg_val_acc_gender:.4f}"
             )
 
         # Reset metrics for the next epoch
