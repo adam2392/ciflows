@@ -479,7 +479,7 @@ if __name__ == "__main__":
                 latent_logvar = torch.clamp_(latent_logvar, -10, 10)
 
                 # Compute log_sigma_x
-                log_sigma_x = model.log_sigma_x
+                log_sigma_x = get_model_attribute(model, 'log_sigma_x')
 
                 # Learning the variance can become unstable in some cases.
                 # Softly limiting log_sigma to a minimum of -6 ensures stable training.
