@@ -9,6 +9,7 @@ import numpy as np
 import torch
 import torch.distributed
 import torch.distributed as dist
+import torch.nn.functional as F
 import torch.version
 from torch.distributed import init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -18,20 +19,25 @@ from torchvision import transforms
 from torchvision.utils import save_image
 from tqdm import tqdm
 
-from ciflows.datasets.causalceleba import CausalCelebA
+from ciflows.reduction.resnetvae import DeepResNetVAE
+from ciflows.datasets.causalceleba import CausalCelebA, CausalCelebAEyeGlasses
 from ciflows.datasets.multidistr import StratifiedSampler
-from ciflows.distributions.pgm import LinearGaussianDag
+from torch.utils.data import DataLoader, random_split
 from ciflows.eval import load_model
-from ciflows.flows.freeform import ResnetFreeformflow
-from ciflows.loss import volume_change_surrogate
 from ciflows.training import TopKModelSaver, delete_old_checkpoints
+
+
+def softclip(tensor, min):
+    """Clips the tensor values at the minimum value min in a softway. Taken from Handful of Trials"""
+    result_tensor = min + F.softplus(tensor - min)
+
+    return result_tensor
 
 
 def configure_optimizers(
     model,
     learning_rate,
     betas,
-    device_type,
     weight_decay=0.0,
 ):
     # start with all of the candidate parameters
@@ -61,9 +67,124 @@ def configure_optimizers(
     return optimizer
 
 
+def data_loader(
+    root_dir,
+    graph_type="chain",
+    num_workers=4,
+    batch_size=32,
+    val_split=0.2,
+    img_size=64,
+    scm_type="haircolor",
+):
+    # Define the image transformations
+    image_transform = transforms.Compose(
+        [
+            transforms.Resize((img_size, img_size)),  # Resize images to 128x128
+            transforms.CenterCrop(img_size),  # Ensure square crop
+            transforms.RandomHorizontalFlip(p=0.5),
+            # transforms.RandomResizedCrop(size=128, scale=(0.8, 1.0)),
+            # transforms.ColorJitter(
+            #     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
+            # ),
+            transforms.ToTensor(),  # Convert images to PyTorch tensors
+        ]
+    )
+
+    if scm_type == "haircolor":
+        causal_celeba_dataset = CausalCelebA(
+            root=root_dir,
+            graph_type=graph_type,
+            transform=image_transform,
+            img_size=img_size,
+            fast_dev_run=False,  # Set to True for debugging
+        )
+    elif scm_type == "eyeglasses":
+        causal_celeba_dataset = CausalCelebAEyeGlasses(
+            root=root_dir,
+            graph_type=graph_type,
+            transform=image_transform,
+            img_size=img_size,
+            fast_dev_run=False,  # Set to True for debugging
+        )
+
+    # Calculate the number of samples for training and validation
+    total_len = len(causal_celeba_dataset)
+    val_len = int(total_len * val_split)
+    train_len = total_len - val_len
+
+    # Split the dataset into train and validation sets
+    train_dataset, val_dataset = random_split(causal_celeba_dataset, [train_len, val_len])
+
+    distr_labels = [x[1] for x in causal_celeba_dataset]
+    unique_distrs = len(np.unique(distr_labels))
+    if batch_size < unique_distrs:
+        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
+    sampler = StratifiedSampler(distr_labels, batch_size)
+
+    distr_labels = [x[1] for x in train_dataset]
+    unique_distrs = len(np.unique(distr_labels))
+    if batch_size < unique_distrs:
+        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
+    train_sampler = StratifiedSampler(distr_labels, batch_size)
+
+    distr_labels = [x[1] for x in val_dataset]
+    unique_distrs = len(np.unique(distr_labels))
+    if batch_size < unique_distrs:
+        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
+    val_sampler = StratifiedSampler(distr_labels, batch_size)
+
+    # Define the DataLoader
+    train_loader = DataLoader(
+        dataset=causal_celeba_dataset,
+        batch_size=batch_size,
+        sampler=sampler,
+        drop_last=True,
+        # shuffle=True,  # Shuffle data during training
+        num_workers=num_workers,
+        pin_memory=True,  # Enable if using a GPU
+        persistent_workers=True,
+    )
+    val_loader = DataLoader(
+        dataset=val_dataset,
+        batch_size=batch_size,
+        shuffle=False,  # Do not shuffle data during validation
+        sampler=val_sampler,
+        num_workers=num_workers // 2,
+        pin_memory=True,  # Enable if using a GPU
+    )
+    return train_loader, val_loader
+
+
+def gaussian_nll(recon_x, log_sigma, x):
+    first_term = 0.5 * torch.pow((x - recon_x) / log_sigma.exp(), 2)
+    # print(first_term.shape)
+    return first_term + log_sigma + 0.5 * np.log(2 * np.pi)
+
+
+# Reconstruction + KL divergence losses summed over all elements and batch
+def loss_function(recon_x, x, mu, log_var, log_sigma_x, capacity=0.0, beta=0.00025):
+    # print(recon_x.shape, x.shape)
+    rec_loss = F.mse_loss(recon_x, x)
+    # print(recon_x.shape, x.shape, mu.shape, log_var.shape)
+
+    # rec_loss = gaussian_nll(recon_x, log_sigma_x, x).sum()
+
+    KLD = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
+    # beta = 0.00025
+    # beta =
+    # Latent Capacity Control
+    if capacity == 0:
+        kl_loss_controlled = KLD
+    else:
+        kl_loss_controlled = torch.max(KLD - capacity, torch.tensor(0.0).cuda())
+
+    loss = rec_loss + beta * kl_loss_controlled
+    return loss
+
+
 # Beta annealing function (cyclic)
 def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=0.01):
-    """Cyclic annealing for beta."""
+    """Cyclic cosine annealing schedule for beta."""
     cycle_position = step % cycle_length
     fraction = cycle_position / cycle_length
     return beta_min + (beta_max - beta_min) * (1 - math.cos(math.pi * fraction)) / 2
@@ -73,176 +194,10 @@ def get_model_attribute(model, attr):
     return getattr(model.module if isinstance(model, DDP) else model, attr)
 
 
-def compute_vae_loss(model: DDP, x, distr_idx, beta):
-    # device = x.device
-    # beta = beta.to(device)
-
-    # calculate volume change surrogate loss
-    # surrogate_loss, v_hat, x_hat = volume_change_surrogate(
-    #     x,
-    #     get_model_attribute(model, "encoder"),
-    #     get_model_attribute(model, "decoder"),
-    #     hutchinson_samples=hutchinson_samples,
-    # )
-
-    # # compute reconstruction loss
-    # x_hat_from_encoder = model.module.decode(model.module.encode(x))
-    # loss_reconstruction = torch.nn.functional.mse_loss(x_hat_from_encoder, x)
-
-    recon_x, log_means, log_vars = model(x, distr_idx=distr_idx)
-    loss_reconstruction = torch.nn.functional.mse_loss(recon_x, x)
-
-    kld = -0.5 * torch.sum(1 + log_vars - log_means.pow(2) - log_vars.exp())
-    loss = beta * loss_reconstruction.mean() + kld.mean()
-    return loss, loss_reconstruction, kld
-
-
-def compute_loss(model: DDP, x, distr_idx, beta, hutchinson_samples=2):
-    device = x.device
-    # beta = beta.to(device)
-
-    # calculate volume change surrogate loss
-    # surrogate_loss, v_hat, x_hat = volume_change_surrogate(
-    #     x,
-    #     get_model_attribute(model, "encoder"),
-    #     get_model_attribute(model, "decoder"),
-    #     hutchinson_samples=hutchinson_samples,
-    # )
-
-    # # compute reconstruction loss
-    # x_hat_from_encoder = model.module.decode(model.module.encode(x))
-    # loss_reconstruction = torch.nn.functional.mse_loss(x_hat_from_encoder, x)
-
-    recon_x, surrogate_loss, loss_nll = model(x, distr_idx=distr_idx)
-    loss_reconstruction = torch.nn.functional.mse_loss(recon_x, x)
-
-    # kld = -0.5 * torch.sum(1 + log_vars - log_means.pow(2) - log_vars.exp())
-
-    # get negative log likelihoood over the distributions
-    # embed_dim = get_model_attribute(model, "latent_dim")
-    # v_hat = v_hat.view(-1, embed_dim)
-    # loss_nll = (
-    #     -get_model_attribute(model, "latent")
-    #     .log_prob(v_hat, distr_idx=distr_idx)
-    #     .mean()
-    #     - surrogate_loss
-    # )
-
-    # print(surrogate_loss.shape, loss_nll.shape)
-    # loss nll can be unstable, so we clip it
-    loss_nll = loss_nll.mean()
-    # print(f"Mean loss NLL: {loss_nll}")
-    # loss_nll = torch.clamp(loss_nll, -1e8, 6)
-    loss = loss_reconstruction + beta * loss_nll
-
-    # loss = loss_reconstruction.sum() + beta * kld.sum()
-    return loss, loss_reconstruction, loss_nll, surrogate_loss
-
-
-def data_loader(
-    root_dir,
-    graph_type="chain",
-    num_workers=4,
-    batch_size=32,
-    img_size=64,
-):
-    # Define the image transformations
-    image_transform = transforms.Compose(
-        [
-            transforms.Resize((img_size, img_size)),  # Resize images to 128x128
-            transforms.CenterCrop(img_size),  # Ensure square crop
-            transforms.ToTensor(),  # Convert images to PyTorch tensors
-            # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-        ]
-    )
-
-    causal_celeba_dataset = CausalCelebA(
-        root=root_dir,
-        graph_type=graph_type,
-        img_size=img_size,
-        transform=image_transform,
-        fast_dev_run=False,  # Set to True for debugging
-    )
-
-    # Calculate the number of samples for training and validation
-    # total_len = len(causal_celeba_dataset)
-    # val_len = int(total_len * val_split)
-    # train_len = total_len - val_len
-
-    # # Split the dataset into train and validation sets
-    # train_dataset, val_dataset = random_split(causal_celeba_dataset, [train_len, val_len])
-
-    distr_labels = [x[1] for x in causal_celeba_dataset]
-    unique_distrs = len(np.unique(distr_labels))
-    if batch_size < unique_distrs:
-        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
-    train_sampler = StratifiedSampler(distr_labels, batch_size)
-
-    # Define the DataLoader
-    train_loader = DataLoader(
-        dataset=causal_celeba_dataset,
-        batch_size=batch_size,
-        sampler=train_sampler,
-        drop_last=True,
-        # shuffle=True,  # Shuffle data during training
-        num_workers=num_workers,
-        pin_memory=True,  # Enable if using a GPU
-        persistent_workers=True,
-    )
-
-    return train_loader
-
-
-def make_fff_model(num_blocks_per_stage=5, debug=False):
-    node_dimensions = {
-        0: 22,
-        1: 22,
-        2: 4,
-    }
-    edge_list = [(1, 2)]
-    noise_means = {
-        0: torch.zeros(node_dimensions[0]),
-        1: torch.zeros(node_dimensions[1]),
-        2: torch.zeros(node_dimensions[2]),
-    }
-    noise_variances = {
-        0: torch.ones(node_dimensions[0]),
-        1: torch.ones(node_dimensions[1]),
-        2: torch.ones(node_dimensions[2]),
-    }
-    intervened_node_means = [
-        {2: torch.ones(node_dimensions[2]) + 4},
-        {2: torch.ones(node_dimensions[2]) + 8},
-    ]
-    intervened_node_vars = [
-        {2: torch.ones(node_dimensions[2])},
-        {2: torch.ones(node_dimensions[2])},
-    ]
-    latent_dim = 48
-
-    confounded_list = []
-    # independent noise with causal prior
-    latent = LinearGaussianDag(
-        node_dimensions=node_dimensions,
-        edge_list=edge_list,
-        noise_means=noise_means,
-        noise_variances=noise_variances,
-        confounded_list=confounded_list,
-        intervened_node_means=intervened_node_means,
-        intervened_node_vars=intervened_node_vars,
-    )
-
-    # define the encoder and decoder
-    model = ResnetFreeformflow(
-        latent=latent, latent_dim=latent_dim, num_blocks_per_stage=num_blocks_per_stage
-    )
-    return model
-
-
 if __name__ == "__main__":
     debug = False
     compile = False
-    load_from_checkpoint = True
+    load_from_checkpoint = False
 
     # System settings
     world_size = torch.cuda.device_count()
@@ -282,6 +237,7 @@ if __name__ == "__main__":
     gradient_accumulation_steps = 8 * 3  # used to simulate larger batch sizes
     img_size = 128
     graph_type = "chain"
+    scm_type = "haircolor"
     num_workers = 4
 
     check_samples_every_n_epoch = 5
@@ -298,7 +254,18 @@ if __name__ == "__main__":
     lr_scheduler = "cosine"
 
     # model settings
+    n_channels = 3
+    out_channels = 3
+    latent_dim = 48
     num_blocks_per_stage = 3
+
+    beta_max = 1.5
+    annealing_epochs = 1000  # Number of epochs for full beta
+
+    initial_capacity = 0.0
+    max_capacity = 25.0
+    capacity_increment = 0.1  # Increment per epoch
+    current_capacity = initial_capacity
 
     if debug:
         accelerator = "cpu"
@@ -311,10 +278,6 @@ if __name__ == "__main__":
 
         gradient_accumulation_steps = 2
         fast_dev = True
-
-    # for FreeformFlow's loss function
-    hutchinson_samples = 2
-    # beta = 10.0  # torch.tensor(10.0).to(device=device, dtype=ptdtype)
 
     # various inits, derived attributes, I/O setup
     ddp = int(os.environ.get("RANK", -1)) != -1  # is this a ddp run?
@@ -375,17 +338,22 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt"
-    checkpoint_dir = root / "CausalCelebA" / "fff" / model_fname.split(".")[0]
+    model_fname = "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
+    checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / scm_type / model_fname.split(".")[0]
+
+    # for loaded checkpoints
+    checkpoint_model_fdir = (
+        "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    )
+    saved_checkpoint_dir = (
+        root / "CausalCelebA" / "vae_reduction" / checkpoint_model_fdir.split(".")[0]
+    )
+    savedcheckpoint_model_fname = "celeba_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt"
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    # where to find the checkpoint models
-    checkpoint_model_fdir = "celeba_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt"
-    model_checkpoint_dir = root / "CausalCelebA" / "fff" / checkpoint_model_fdir.split(".")[0]
-    checkpoint_model_fname = "celeba_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt"
-
-    model = make_fff_model(num_blocks_per_stage=num_blocks_per_stage, debug=debug)
+    model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
+    # model.apply(weights_init)
     model = model.to(ptdtype).to(device)
     image_dim = 3 * img_size * img_size
 
@@ -398,8 +366,9 @@ if __name__ == "__main__":
         learning_rate=lr,
         betas=(beta1, beta2),
         weight_decay=1e-4,
-        device_type=device,
     )
+    # Default: create pytorch optimizer
+    # optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
     # compile the model
     if compile:
@@ -409,7 +378,7 @@ if __name__ == "__main__":
     if load_from_checkpoint:
         model, start_epoch = load_model(
             model,
-            model_checkpoint_dir / checkpoint_model_fname,
+            saved_checkpoint_dir / savedcheckpoint_model_fname,
             device,
             optimizer=optimizer,
         )
@@ -423,9 +392,6 @@ if __name__ == "__main__":
     # print the number of parameters in the model
     print(sum(p.numel() for p in model.parameters()) / 1e6, "M parameters")
 
-    # create pytorch optimizer
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-
     # Cosine Annealing Scheduler (adjust the T_max for the number of epochs)
     scheduler = CosineAnnealingLR(
         optimizer, T_max=max_epochs, eta_min=lr_min
@@ -433,13 +399,15 @@ if __name__ == "__main__":
 
     top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
 
-    train_loader = data_loader(
+    train_loader, val_loader = data_loader(
         root_dir=root,
         graph_type=graph_type,
         num_workers=num_workers,
         batch_size=batch_size,
         img_size=img_size,
+        scm_type=scm_type,
     )
+    print(f"Train loader has {len(train_loader)} images and val loader {len(val_loader)} images")
 
     # training loop
     # - log the train and val loss every 10 epochs
@@ -479,22 +447,18 @@ if __name__ == "__main__":
 
     # Training loop
     max_epochs = start_epoch + max_epochs
+    annealing_epochs = annealing_epochs + start_epoch
     for step, epoch in tqdm(enumerate(range(start_epoch, max_epochs)), desc="outer", position=0):
         # Training phase
         model.train()
         train_loss = 0.0
-        train_reconstruction_loss = 0.0
-        train_nll_loss = 0.0
-        train_surrogate_loss = 0.0
-
-        train_kld_loss = 0.0
 
         # Create an iterator for the DataLoader
         train_iterator = iter(train_loader)
 
-        # Compute cyclic beta
+        # Compute cyclic beta, which
         global_step = epoch * len(train_loader) + step
-        beta = cyclic_beta(global_step, cycle_length)  # ).to(device=device, dtype=ptdtype)
+        beta = cyclic_beta(global_step, cycle_length)
 
         if master_process:
             print(f"Epoch: {epoch}, Step: {step}, Beta: {beta:.6f}")
@@ -507,39 +471,35 @@ if __name__ == "__main__":
 
             with ctx:
                 # forward pass
-                # print(f"Images dtype: {images.dtype}")
-                # print(f"Model dtype: {next(model.parameters()).dtype}")
-                # print(f"beta dtype: {beta.dtype}")
-                # compute the loss
-                # , loss_nll, surrogate_loss
-                loss, loss_reconstruction, loss_nll, surrogate_loss = compute_loss(
-                    model,
+                images = images.to(device)
+                optimizer.zero_grad()
+                reconstructed, latent_mu, latent_logvar = model(images)  # Model forward pass
+
+                # Clamp logvar to prevent numerical instability
+                latent_logvar = torch.clamp_(latent_logvar, -10, 10)
+
+                # Compute log_sigma_x
+                log_sigma_x = model.log_sigma_x
+
+                # Learning the variance can become unstable in some cases.
+                # Softly limiting log_sigma to a minimum of -6 ensures stable training.
+                log_sigma_x = softclip(log_sigma_x, -6)
+
+                loss = loss_function(
+                    reconstructed,
                     images,
-                    distr_idx,
+                    latent_mu,
+                    latent_logvar,
+                    log_sigma_x=log_sigma_x,
+                    capacity=current_capacity,
                     beta=beta,
-                )
+                )  # Custom VAE loss function
 
-                # loss, loss_reconstruction, kld = compute_vae_loss(
-                #     model, images, distr_idx, beta
-                # )
-
-                # sum up the loss
-                loss = loss.sum()
-
-                # compute the average
+                # scale loss based on how many accumulation steps we take
                 loss = loss / gradient_accumulation_steps
 
                 # backwards pass, with gradient scaling
-                # scaler.scale(loss).backward()
-
-                loss_nll = loss_nll.sum() / gradient_accumulation_steps
-                loss_reconstruction = loss_reconstruction.sum() / gradient_accumulation_steps
-                surrogate_loss = surrogate_loss.sum() / gradient_accumulation_steps
-                # loss_kld = kld.sum() / gradient_accumulation_steps
-
-            # backwards pass, with gradient scaling
-            scaler.scale(loss).backward()
-            # loss.backward()
+                scaler.scale(loss).backward()
 
             # Prefetch next batch asynchronously
             try:
@@ -555,16 +515,11 @@ if __name__ == "__main__":
 
             # DDP: accumulate loss terms
             train_loss += loss.item()
-            train_reconstruction_loss += loss_reconstruction.item()
-            train_nll_loss += loss_nll.item()
-            train_surrogate_loss += surrogate_loss.item()
-            # train_kld_loss += loss_kld.item()
 
         # clip the gradient
         if grad_clip != 0.0:
-            # if scaler.is_enabled():
-            #     scaler.unscale_(optimizer)
-
+            if scaler.is_enabled():
+                scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
 
         # step optimizer and update
@@ -582,24 +537,11 @@ if __name__ == "__main__":
         t1 = time.time()
         dt = t1 - t0
         t0 = t1
-
-        # Log training loss
-        # train_loss /= len(train_loader)
-        # train_reconstruction_loss /= len(train_loader)
-        # train_nll_loss /= len(train_loader)
-        # train_surrogate_loss /= len(train_loader)
-
         lr = scheduler.get_last_lr()[0]
 
         print(
             f"====> Epoch: {epoch} in time {dt*1000:.2f}ms \n"
             f"Average loss: {train_loss:.4f}, LR: {lr:.6f} "
-        )
-        # print(
-        #     f"Reconstruction Loss: {train_reconstruction_loss:.4f}, KLD Loss: {train_kld_loss:.4f}"
-        # )
-        print(
-            f"Reconstruction Loss: {train_reconstruction_loss:.4f}, NLL Loss: {train_nll_loss:.4f}, Surrogate Loss: {train_surrogate_loss:.4f}"
         )
 
         # Validation phase
@@ -608,58 +550,84 @@ if __name__ == "__main__":
             print(f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}")
             model.eval()
 
-            # now reconstruct images over a test batch
-            sample_images = images[:8]
+            val_loss = 0.0
+
+            # Sample and save reconstructed images
+            train_images = images[:8]
             with torch.no_grad():
-                # VAE Unet
-                # mean_encoding, _, skips = model.encode(sample_images)
-                # reconstructed_images = model.decode(mean_encoding, skips).reshape(
-                #     -1, 3, img_size, img_size
-                # )
+                log_sigma_x = model.log_sigma_x
+
+                print('Iterating through val loader')
+                for batch_idx, (
+                    val_images,
+                    distr_idx,
+                    targets,
+                    meta_labels,
+                ) in enumerate(val_loader):
+                    val_images = val_images.to(device)
+                    reconstructed, latent_mu, latent_logvar = model(
+                        val_images
+                    )  # Model forward pass
+
+                    loss = loss_function(
+                        reconstructed,
+                        val_images,
+                        latent_mu,
+                        latent_logvar,
+                        log_sigma_x=log_sigma_x,
+                        capacity=current_capacity,
+                        beta=beta,
+                    )  # Custom VAE loss function
+                    val_loss += loss.item()
+
+                    if debug:
+                        break
+
+                # pick the first 8 images in the last val batch
+                # sample_images = val_images[:8]  # Pick 8 images for sampling
+                sample_images = train_images[:8]  # Pick 8 images for sampling
 
                 # Standard VAE
-                encoding = raw_model.encode(sample_images)
-                reconstructed_images = raw_model.decode(encoding)
+                encoding = model.encode(sample_images)
+                reconstructed_images = model.decode(encoding).reshape(-1, 3, img_size, img_size)
+                reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
 
-                # now, perturb the latent space and generate new images
-                encoding[:, 32:48] = encoding[:, 32:48] + 2
+                # sample images from VAE
+                # 1. Sample latent variables from standard Gaussian
+                num_samples = 8  # Number of images to generate
+                z = torch.randn(num_samples, latent_dim).to(device)  # Sample z ~ N(0, I)
 
-                mse_loss = torch.nn.functional.mse_loss(sample_images, reconstructed_images)
-                reconstructed_pert_images = raw_model.decode(encoding)
+                # 2. Pass the sampled z through the decoder
+                generated_images = model.decode(z)  # Shape: [num_samples, 3, 128, 128]
 
                 # clamp
-                # reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
-                # reconstructed_pert_images = torch.clamp(reconstructed_pert_images, 0, 1)
+                generated_images = torch.clamp(generated_images, 0, 1)
 
+                # now sample training images and then reconstruct
+                encoding = model.encode(train_images)
+                train_reconstructed_images = model.decode(encoding).reshape(
+                    -1, 3, img_size, img_size
+                )
+                train_reconstructed_images = torch.clamp(train_reconstructed_images, 0, 1)
+
+            val_loss /= len(val_loader)
+            print(f"====> Epoch: {epoch} Average Val loss: {val_loss:.4f}")
             sample_images = torch.cat(
                 (
                     sample_images.cpu(),
                     reconstructed_images.cpu(),
-                    reconstructed_pert_images.cpu(),
+                    generated_images.cpu(),
+                    train_images.cpu(),
+                    train_reconstructed_images.cpu(),
                 ),
                 dim=0,
             )
             save_image(
                 sample_images,
-                checkpoint_dir / f"epoch_{epoch}_reconstruction_samples_{mse_loss:.4f}.png",
+                checkpoint_dir / f"epoch_{epoch}_samples.png",
                 nrow=4,
                 normalize=True,
             )
-
-            # sample images from normalizing flow
-            for idx in train_loader.dataset.distr_idx_list:
-                # reconstruct images
-                reconstructed_images, _ = raw_model.sample(8, distr_idx=idx)
-
-                # clamp images to show
-                # reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
-
-                save_image(
-                    reconstructed_images.cpu(),
-                    checkpoint_dir / f"epoch_{epoch}_distr-{idx}_samples.png",
-                    nrow=4,
-                    normalize=True,
-                )
 
             # Track top 5 models based on validation loss
             # Optionally, remove worse models if there are more than k saved models
@@ -676,7 +644,7 @@ if __name__ == "__main__":
         dist.destroy_process_group()
 
     # Save final model
-    if dist.get_rank() == 0:
+    if not ddp or dist.get_rank() == 0:
         torch.save(
             {
                 "model_state_dict": raw_model.state_dict(),
@@ -691,6 +659,6 @@ if __name__ == "__main__":
 
     # Load back the saved final model and verify that it loads
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    fff_model = make_fff_model(num_blocks_per_stage=num_blocks_per_stage, debug=debug)
+    vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage).to(device)
     model_path = checkpoint_dir / model_fname
-    fff_model = load_model(fff_model, model_path, device, optimizer=optimizer)
+    vae_model = load_model(vae_model, model_path, device, optimizer=optimizer)
