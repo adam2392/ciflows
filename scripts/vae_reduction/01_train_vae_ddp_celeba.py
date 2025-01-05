@@ -340,16 +340,17 @@ if __name__ == "__main__":
     # v2: K=8
     # v3: K=8, batch higher
     model_fname = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
+    # model_fname = "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / scm_type / model_fname.split(".")[0]
 
     # for loaded checkpoints
     checkpoint_model_fdir = (
-        "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+        "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
     )
     saved_checkpoint_dir = (
         root / "CausalCelebA" / "vae_reduction" / checkpoint_model_fdir.split(".")[0]
     )
-    savedcheckpoint_model_fname = "celeba_fff_resnet_batch128_gradaccum_latentdim48_beta1000_v1_.pt"
+    savedcheckpoint_model_fname = "model_epoch_4200.pt"
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
