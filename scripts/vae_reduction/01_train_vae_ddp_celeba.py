@@ -588,7 +588,7 @@ if __name__ == "__main__":
                 sample_images = train_images[:8]  # Pick 8 images for sampling
 
                 # Standard VAE
-                reconstructed_x, _, _ = model(sample_images)
+                reconstructed_images, _, _ = model(sample_images)
                 # reconstructed_images = model.decode(encoding).reshape(-1, 3, img_size, img_size)
                 reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
 
