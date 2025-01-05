@@ -16,7 +16,7 @@ GPU_INDEX=6
 
 # Specify the GPUs to use
 GPU_INDICES="5,6,7"  # Adjust this as per available GPUs and your requirement
-
+GPU_INDICES="3,4,5"  # Adjust this as per available GPUs and your requirement
 # Number of GPUs available
 NUM_GPUS=3
 
@@ -34,8 +34,8 @@ LOG_FILE="celeba_nfon_64flows_alldata_cyclicresnetvaereduction_batch1024_latentd
 # LOG_FILE="encodings_celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
 
 export CUDA_VISIBLE_DEVICES=$GPU_INDICES
-LOG_FILE="celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1_${SCRIPT_NAME}_seed_multigpu.log"
-CMD="torchrun --master_port=29501 --nproc_per_node=$NUM_GPUS $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
+LOG_FILE="celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1_${SCRIPT_NAME}_seed_multigpu.log"
+CMD="torchrun --master_port=29500 --nproc_per_node=$NUM_GPUS $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 
 # LOG_FILE="celeba_vaeresnetreduction_batch1024_latentdim48_img128_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
 nohup $CMD > $LOG_FILE 2>&1 &

@@ -238,7 +238,7 @@ if __name__ == "__main__":
     img_size = 128
     graph_type = "chain"
     scm_type = "haircolor"
-    # scm_type = 'eyeglass'
+    scm_type = "eyeglass"
     num_workers = 4
 
     check_samples_every_n_epoch = 5
@@ -339,7 +339,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
+    model_fname = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / scm_type / model_fname.split(".")[0]
 
     # for loaded checkpoints
