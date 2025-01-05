@@ -98,7 +98,7 @@ def data_loader(
             img_size=img_size,
             fast_dev_run=False,  # Set to True for debugging
         )
-    elif scm_type == "eyeglasses":
+    elif scm_type == "eyeglass":
         causal_celeba_dataset = CausalCelebAEyeGlasses(
             root=root_dir,
             graph_type=graph_type,
@@ -234,10 +234,11 @@ if __name__ == "__main__":
 
     # Data settings
     batch_size = 128
-    gradient_accumulation_steps = 8 * 3  # used to simulate larger batch sizes
+    gradient_accumulation_steps = 3 * 3  # used to simulate larger batch sizes
     img_size = 128
     graph_type = "chain"
     scm_type = "haircolor"
+    # scm_type = 'eyeglass'
     num_workers = 4
 
     check_samples_every_n_epoch = 5
@@ -461,7 +462,7 @@ if __name__ == "__main__":
         beta = cyclic_beta(global_step, cycle_length)
 
         if master_process:
-            print(f"Epoch: {epoch}, Step: {step}, Beta: {beta:.6f}")
+            print(f"Epoch: {epoch}, Step: {step}, cycling over {cycle_length} Beta: {beta:.6f}")
 
         # forward update with optional gradient accumulation
         for micro_step in range(gradient_accumulation_steps):
@@ -479,7 +480,7 @@ if __name__ == "__main__":
                 latent_logvar = torch.clamp_(latent_logvar, -10, 10)
 
                 # Compute log_sigma_x
-                log_sigma_x = get_model_attribute(model, 'log_sigma_x')
+                log_sigma_x = get_model_attribute(model, "log_sigma_x")
 
                 # Learning the variance can become unstable in some cases.
                 # Softly limiting log_sigma to a minimum of -6 ensures stable training.
@@ -539,10 +540,11 @@ if __name__ == "__main__":
         t0 = t1
         lr = scheduler.get_last_lr()[0]
 
-        print(
-            f"====> Epoch: {epoch} in time {dt*1000:.2f}ms \n"
-            f"Average loss: {train_loss:.4f}, LR: {lr:.6f} "
-        )
+        if master_process:
+            print(
+                f"====> Epoch: {epoch} in time {dt*1000:.2f}ms \n"
+                f"Average loss: {train_loss:.4f}, LR: {lr:.6f} "
+            )
 
         # Validation phase
         if debug or epoch % check_samples_every_n_epoch == 0 and master_process:
@@ -555,9 +557,9 @@ if __name__ == "__main__":
             # Sample and save reconstructed images
             train_images = images[:8]
             with torch.no_grad():
-                log_sigma_x = get_model_attribute(model, 'log_sigma_x')
+                log_sigma_x = get_model_attribute(model, "log_sigma_x")
 
-                print('Iterating through val loader')
+                print("Iterating through val loader")
                 for batch_idx, (
                     val_images,
                     distr_idx,
