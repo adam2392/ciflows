@@ -34,14 +34,7 @@ class CausalCelebA(Dataset):
         self.distr_dfs = dict()
         self.causal_main_df = pd.DataFrame()
         for distr_type in distr_types:
-            distr_root = (
-                root
-                / self.__class__.__name__
-                / graph_type
-                / "haircolor"
-                / f"dim{img_size}"
-                / distr_type
-            )
+            distr_root = root / self.__class__.__name__ / graph_type / f"dim{img_size}" / distr_type
             filename = distr_root / "causal_attrs.csv"
             attrs_df = pd.read_csv(filename)
 
@@ -201,14 +194,7 @@ class CausalCelebAEyeGlasses(Dataset):
         self.distr_dfs = dict()
         self.causal_main_df = pd.DataFrame()
         for distr_type in distr_types:
-            distr_root = (
-                root
-                / self.__class__.__name__
-                / graph_type
-                / "eyeglass"
-                / f"dim{img_size}"
-                / distr_type
-            )
+            distr_root = root / self.__class__.__name__ / graph_type / f"dim{img_size}" / distr_type
             filename = distr_root / "causal_attrs.csv"
             attrs_df = pd.read_csv(filename)
 
