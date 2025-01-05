@@ -588,8 +588,8 @@ if __name__ == "__main__":
                 sample_images = train_images[:8]  # Pick 8 images for sampling
 
                 # Standard VAE
-                encoding = model.encode(sample_images)
-                reconstructed_images = model.decode(encoding).reshape(-1, 3, img_size, img_size)
+                reconstructed_x, _, _ = model(sample_images)
+                # reconstructed_images = model.decode(encoding).reshape(-1, 3, img_size, img_size)
                 reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
 
                 # sample images from VAE
@@ -598,14 +598,14 @@ if __name__ == "__main__":
                 z = torch.randn(num_samples, latent_dim).to(device)  # Sample z ~ N(0, I)
 
                 # 2. Pass the sampled z through the decoder
-                generated_images = model.decode(z)  # Shape: [num_samples, 3, 128, 128]
+                generated_images = raw_model.decode(z)  # Shape: [num_samples, 3, 128, 128]
 
                 # clamp
                 generated_images = torch.clamp(generated_images, 0, 1)
 
                 # now sample training images and then reconstruct
-                encoding = model.encode(train_images)
-                train_reconstructed_images = model.decode(encoding).reshape(
+                encoding = raw_model.encode(train_images)
+                train_reconstructed_images = raw_model.decode(encoding).reshape(
                     -1, 3, img_size, img_size
                 )
                 train_reconstructed_images = torch.clamp(train_reconstructed_images, 0, 1)
