@@ -238,7 +238,7 @@ if __name__ == "__main__":
     img_size = 128
     graph_type = "chain"
     scm_type = "haircolor"
-    scm_type = "eyeglass"
+    # scm_type = "eyeglass"
     num_workers = 4
 
     check_samples_every_n_epoch = 5
