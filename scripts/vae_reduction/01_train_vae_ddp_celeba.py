@@ -238,7 +238,7 @@ if __name__ == "__main__":
     img_size = 128
     graph_type = "chain"
     scm_type = "haircolor"
-    # scm_type = "eyeglass"
+    scm_type = "eyeglass"
     num_workers = 4
 
     check_samples_every_n_epoch = 5
@@ -344,15 +344,15 @@ if __name__ == "__main__":
     # v2: K=8
     # v3: K=8, batch higher
     model_fname = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
-    model_fname = "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
+    # model_fname = "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / scm_type / model_fname.split(".")[0]
 
     # for loaded checkpoints
-    checkpoint_model_fdir = "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
+    checkpoint_model_fdir = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
     saved_checkpoint_dir = (
         root / "CausalCelebA" / "vae_reduction" / scm_type / checkpoint_model_fdir.split(".")[0]
     )
-    savedcheckpoint_model_fname = "model_epoch_4200.pt"
+    savedcheckpoint_model_fname = "model_epoch_4865.pt"
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
@@ -460,7 +460,7 @@ if __name__ == "__main__":
     annealing_epochs = annealing_epochs + start_epoch
     if master_process:
         print(f"Starting training loop from epoch {start_epoch} to {max_epochs}")
-        
+
     for step, epoch in tqdm(enumerate(range(start_epoch, max_epochs)), desc="outer", position=0):
         # Training phase
         model.train()
