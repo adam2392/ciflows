@@ -562,7 +562,7 @@ if __name__ == "__main__":
             )
 
         # Validation phase
-        if debug or epoch % check_samples_every_n_epoch == 0 and master_process:
+        if debug or (epoch % check_samples_every_n_epoch == 0 and master_process):
             print()
             print(f"Saving images - Epoch [{epoch}/{max_epochs}], Val Loss: {train_loss:.4f}")
             model.eval()
@@ -574,7 +574,8 @@ if __name__ == "__main__":
             with torch.no_grad():
                 log_sigma_x = get_model_attribute(model, "log_sigma_x")
 
-                print("Iterating through val loader")
+                if master_process:
+                    print("Iterating through val loader")
                 for batch_idx, (
                     val_images,
                     distr_idx,
