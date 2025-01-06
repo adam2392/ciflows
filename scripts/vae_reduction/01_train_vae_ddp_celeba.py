@@ -183,7 +183,7 @@ def loss_function(recon_x, x, mu, log_var, log_sigma_x, capacity=0.0, beta=0.000
 
 
 # Beta annealing function (cyclic)
-def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=0.01):
+def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=0.001):
     """Cyclic cosine annealing schedule for beta."""
     cycle_position = step % cycle_length
     fraction = cycle_position / cycle_length
@@ -197,7 +197,7 @@ def get_model_attribute(model, attr):
 if __name__ == "__main__":
     debug = False
     compile = False
-    load_from_checkpoint = True
+    load_from_checkpoint = False
 
     # System settings
     world_size = torch.cuda.device_count()
@@ -244,7 +244,7 @@ if __name__ == "__main__":
     check_samples_every_n_epoch = 5
 
     # adamw optimizer settings
-    max_epochs = 5000
+    max_epochs = 10_000
     lr = 3e-4
     lr_min = 6e-5
     beta1 = 0.9
@@ -343,7 +343,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
+    model_fname = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v2.pt"
     # model_fname = "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / scm_type / model_fname.split(".")[0]
 
