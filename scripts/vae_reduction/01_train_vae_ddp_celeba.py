@@ -386,6 +386,9 @@ if __name__ == "__main__":
             device,
             optimizer=optimizer,
         )
+        # Synchronize all processes
+        if ddp:
+            torch.distributed.barrier()
     else:
         start_epoch = 1
 
