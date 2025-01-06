@@ -197,7 +197,7 @@ def get_model_attribute(model, attr):
 if __name__ == "__main__":
     debug = False
     compile = False
-    load_from_checkpoint = False
+    load_from_checkpoint = True
 
     # System settings
     world_size = torch.cuda.device_count()
@@ -293,6 +293,9 @@ if __name__ == "__main__":
         if ddp_local_rank >= torch.cuda.device_count():
             ddp_local_rank = ddp_world_size - ddp_local_rank
 
+        if dist.is_initialized() and dist.get_rank() == 0:
+            print("Distributed training initialized on rank 0")
+
         device = f"cuda:{ddp_local_rank}"
 
         print("Setting device to", device)
@@ -340,13 +343,11 @@ if __name__ == "__main__":
     # v2: K=8
     # v3: K=8, batch higher
     model_fname = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
-    # model_fname = "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
+    model_fname = "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / scm_type / model_fname.split(".")[0]
 
     # for loaded checkpoints
-    checkpoint_model_fdir = (
-        "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
-    )
+    checkpoint_model_fdir = "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
     saved_checkpoint_dir = (
         root / "CausalCelebA" / "vae_reduction" / checkpoint_model_fdir.split(".")[0]
     )
@@ -643,8 +644,6 @@ if __name__ == "__main__":
         # termination conditions
         if epoch > max_epochs:
             break
-    if ddp:
-        dist.destroy_process_group()
 
     # Save final model
     if not ddp or dist.get_rank() == 0:
@@ -659,6 +658,8 @@ if __name__ == "__main__":
         )
         print(f"Training complete. Models saved in {checkpoint_dir}.")
     dist.barrier()
+    if ddp:
+        dist.destroy_process_group()
 
     # Load back the saved final model and verify that it loads
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

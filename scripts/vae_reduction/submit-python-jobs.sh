@@ -35,6 +35,8 @@ LOG_FILE="celeba_nfon_64flows_alldata_cyclicresnetvaereduction_batch1024_latentd
 
 export CUDA_VISIBLE_DEVICES=$GPU_INDICES
 LOG_FILE="celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1_${SCRIPT_NAME}_seed_multigpu.log"
+LOG_FILE="celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1_${SCRIPT_NAME}_seed_multigpu.log"
+
 CMD="torchrun --master_port=29500 --nproc_per_node=$NUM_GPUS $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 
 # LOG_FILE="celeba_vaeresnetreduction_batch1024_latentdim48_img128_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
