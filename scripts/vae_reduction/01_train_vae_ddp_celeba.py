@@ -316,10 +316,11 @@ if __name__ == "__main__":
         seed_offset = 0
         ddp_world_size = 1
 
-    print(
-        f"Running training with {gradient_accumulation_steps} gradient accumulation steps per process"
-    )
-    print(f"Over {max_epochs} epochs, with batch size {batch_size} and {num_workers} workers")
+    if master_process:
+        print(
+            f"Running training with {gradient_accumulation_steps} gradient accumulation steps per process"
+        )
+        print(f"Over {max_epochs} epochs, with batch size {batch_size} and {num_workers} workers")
 
     # set seed
     seed = 1234
@@ -393,7 +394,8 @@ if __name__ == "__main__":
         model = DDP(model, device_ids=[ddp_local_rank])
 
     # print the number of parameters in the model
-    print(sum(p.numel() for p in model.parameters()) / 1e6, "M parameters")
+    if master_process:
+        print(sum(p.numel() for p in model.parameters()) / 1e6, "M parameters")
 
     # Cosine Annealing Scheduler (adjust the T_max for the number of epochs)
     scheduler = CosineAnnealingLR(
@@ -410,7 +412,10 @@ if __name__ == "__main__":
         img_size=img_size,
         scm_type=scm_type,
     )
-    print(f"Train loader has {len(train_loader)} images and val loader {len(val_loader)} images")
+    if master_process:
+        print(
+            f"Train loader has {len(train_loader)} images and val loader {len(val_loader)} images"
+        )
 
     # training loop
     # - log the train and val loss every 10 epochs
@@ -436,8 +441,9 @@ if __name__ == "__main__":
     images, distr_idx, targets, meta_labels = batch
     images = images.to(device=device, dtype=ptdtype)
 
-    print(f"Images dtype: {images.dtype}")
-    print(f"Model dtype: {next(model.parameters()).dtype}")
+    if master_process:
+        print(f"Images dtype: {images.dtype}")
+        print(f"Model dtype: {next(model.parameters()).dtype}")
 
     # Initialize Capacity and Scheduler
     cycle_length = len(train_loader) * 5  # Full cycle over 5 epochs
@@ -446,11 +452,15 @@ if __name__ == "__main__":
     # loss_nll = torch.tensor(0.0)
     # surrogate_loss = torch.tensor(0.0)
     effective_batch_size = batch_size * gradient_accumulation_steps * ddp_world_size
-    print(f"Effective batch size: {effective_batch_size}")
+    if master_process:
+        print(f"Effective batch size: {effective_batch_size}")
 
     # Training loop
     max_epochs = start_epoch + max_epochs
     annealing_epochs = annealing_epochs + start_epoch
+    if master_process:
+        print(f"Starting training loop from epoch {start_epoch} to {max_epochs}")
+        
     for step, epoch in tqdm(enumerate(range(start_epoch, max_epochs)), desc="outer", position=0):
         # Training phase
         model.train()
