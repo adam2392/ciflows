@@ -83,7 +83,7 @@ if __name__ == "__main__":
 
     batch_size = 512
 
-    max_epochs = 3000
+    max_epochs = 5000
     lr = 3e-4
     lr_min = 1e-6
     lr_scheduler = "cosine"
@@ -109,7 +109,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_nfon_64flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim4_nottrainableedges_sep4and8_v1.pt"
+    model_fname = "fixedceleba_nfon_64flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim4_nottrainableedges_sep4and8_v1.pt"
     hcdim = 4
     checkpoint_model_fname = "celeba_nfon_cyclicbetaresnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
     model_checkpoint_dir = (
@@ -139,9 +139,12 @@ if __name__ == "__main__":
     # all data
     vae_model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     vae_model_fname = "model_epoch_1860.pt"
+    
+    vae_model_dir = 'celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1'
+    vae_model_fname = "model_epoch_8540.pt"
     dataset = "alldata"
 
-    vae_dir = root / "CausalCelebA" / "vae_reduction" / vae_model_dir.split(".")[0]
+    vae_dir = root / "CausalCelebA" / "vae_reduction" / 'haircolor' / vae_model_dir.split(".")[0]
     # vae_model = VAE().to(device)
     vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
     model_path = vae_dir / vae_model_fname

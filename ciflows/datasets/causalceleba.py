@@ -349,7 +349,7 @@ class CausalCelebAEmbedding(CausalCelebA):
                 "int_hair_1": f"int_hair_1_{dataset_postfix}.pt",
                 "int_hair_2": f"int_hair_2_{dataset_postfix}.pt",
                 "int_hair_3": f"int_hair_3_{dataset_postfix}.pt",
-                "int_hair_4": f"int_hair_4_{dataset_postfix}.pt",
+                # "int_hair_4": f"int_hair_4_{dataset_postfix}.pt",
                 # "obs": "obs_nonorm_encodings.pt",
                 # "int_hair_0": "int_hair_0_nonorm_encodings.pt",
                 # "int_hair_1": "int_hair_1_nonorm_encodings.pt",
@@ -362,7 +362,7 @@ class CausalCelebAEmbedding(CausalCelebA):
                 "int_hair_1": f"int_hair_1_{dataset_postfix}.pt",
                 "int_hair_2": f"int_hair_2_{dataset_postfix}.pt",
                 "int_hair_3": f"int_hair_3_{dataset_postfix}.pt",
-                "int_hair_4": f"int_hair_4_{dataset_postfix}.pt",
+                # "int_hair_4": f"int_hair_4_{dataset_postfix}.pt",
                 # "obs": "obs_nonorm_encodings.pt",
                 # "int_hair_0": "int_hair_0_nonorm_encodings.pt",
                 # "int_hair_1": "int_hair_1_nonorm_encodings.pt",
@@ -377,7 +377,7 @@ class CausalCelebAEmbedding(CausalCelebA):
             "int_hair_1",
             "int_hair_2",
             "int_hair_3",
-            "int_hair_4",
+            # "int_hair_4",
         ]
         self.causal_distr_dfs = dict()
         self.distr_dfs = dict()
@@ -388,11 +388,8 @@ class CausalCelebAEmbedding(CausalCelebA):
             filename = distr_root / "causal_attrs.csv"
             attrs_df = pd.read_csv(filename)
 
-            filename = distr_root / "meta_attrs.csv"
-            meta_attrs_df = pd.read_csv(filename)
 
             self.causal_distr_dfs[distr_type] = attrs_df
-            self.distr_dfs[distr_type] = meta_attrs_df
 
             attrs_df["distr_idx"] = distr_types_list.index(distr_type)
             attrs_df["distr_type"] = distr_type

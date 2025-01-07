@@ -60,19 +60,23 @@ if __name__ == "__main__":
         root = Path("/home/adam2392/projects/data/")
         root = Path("/local/eb/adam2392/")
 
-    data_dir = root / "CausalCelebA" / graph_type / "dim128"
+    scm_model = "CausalCelebA"
+    # scm_model = "CausalCelebAEyeGlasses"
+
+    data_dir = root / scm_model / graph_type / "dim128"
     directories = [
         data_dir / "obs",
         data_dir / "int_hair_0",
         data_dir / "int_hair_1",
         data_dir / "int_hair_2",
         data_dir / "int_hair_3",
-        data_dir / "int_hair_4",
+        # data_dir / "int_hair_4",
     ]
     latent_vectors_per_directory = {}
 
-    model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
-    model_fname = "model_epoch_1860.pt"
+    # model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    model_dir = 'celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1'
+    model_fname = "model_epoch_8540.pt"
 
     # model_dir = (
     #     "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
@@ -81,7 +85,7 @@ if __name__ == "__main__":
     # model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
     # model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     vae_model_fpath = (
-        root / "CausalCelebA" / "vae_reduction" / model_dir.split(".")[0] / model_fname
+        root / "CausalCelebA" / "vae_reduction" / 'haircolor' / model_dir.split(".")[0] / model_fname
     )
 
     # vae_model = VAE()  # Replace with loading logic
@@ -112,7 +116,7 @@ if __name__ == "__main__":
         # Save the tensor
         # v2 nonorm encodings = sample from latent, rather than the mean
         # output_path = f"{directory.name}_cyclicbeta_noimgaug_encodings.pt"
-        output_path = f"{directory.name}_alldata_cyclicbeta_noimgaug_encodings.pt"
+        output_path = f"{directory.name}_alldata_encodings.pt"
 
         # output_path = f"{directory.name}_nonorm_encodings.pt"
         torch.save(latent_vectors, directory / output_path)
