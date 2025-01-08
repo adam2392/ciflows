@@ -19,6 +19,7 @@ from ciflows.training import TopKModelSaver, delete_old_checkpoints
 def data_loader(
     root_dir,
     dataset,
+    scm_type,
     graph_type="chain",
     num_workers=4,
     batch_size=32,
@@ -28,6 +29,7 @@ def data_loader(
         root=root_dir,
         graph_type=graph_type,
         dataset=dataset,
+        scm_type=scm_type,
         img_size=img_size,
         fast_dev_run=False,  # Set to True for debugging
     )
@@ -81,7 +83,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     print(f"Using accelerator: {accelerator}")
 
-    batch_size = 512
+    batch_size = 1024
 
     max_epochs = 5000
     lr = 3e-4
@@ -109,7 +111,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "fixedceleba_nfon_64flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim4_nottrainableedges_sep4and8_v1.pt"
+    model_fname = "fixedceleba_eyeglass_nfon_64flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim4_nottrainableedges_sep4and8_v1.pt"
     hcdim = 4
     checkpoint_model_fname = "celeba_nfon_cyclicbetaresnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
     model_checkpoint_dir = (
@@ -140,11 +142,19 @@ if __name__ == "__main__":
     vae_model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     vae_model_fname = "model_epoch_1860.pt"
     
-    vae_model_dir = 'celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1'
-    vae_model_fname = "model_epoch_8540.pt"
+    vae_model_dir = 'celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v2.pt'
+    vae_model_fname = "model_epoch_9595.pt"
+    scm_type = 'eyeglass'
+
+    # vae_model_dir = 'celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1'
+    # vae_model_fname = "model_epoch_8540.pt"
+    # scm_type = 'haircolor'
     dataset = "alldata"
 
-    vae_dir = root / "CausalCelebA" / "vae_reduction" / 'haircolor' / vae_model_dir.split(".")[0]
+    # prefix within the filename of embeddings
+    scm_name = 'hair' if scm_type == 'haircolor' else 'eye'
+
+    vae_dir = root / "CausalCelebA" / "vae_reduction" / scm_type / vae_model_dir.split(".")[0]
     # vae_model = VAE().to(device)
     vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
     model_path = vae_dir / vae_model_fname
@@ -192,6 +202,7 @@ if __name__ == "__main__":
     train_loader = data_loader(
         root_dir=root,
         dataset=dataset,
+        scm_type=scm_name,
         graph_type=graph_type,
         num_workers=num_workers,
         batch_size=batch_size,

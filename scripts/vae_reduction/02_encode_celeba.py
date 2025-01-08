@@ -61,7 +61,7 @@ if __name__ == "__main__":
         root = Path("/local/eb/adam2392/")
 
     scm_model = "CausalCelebA"
-    # scm_model = "CausalCelebAEyeGlasses"
+    scm_model = "CausalCelebAEyeGlasses"
 
     data_dir = root / scm_model / graph_type / "dim128"
     directories = [
@@ -72,11 +72,24 @@ if __name__ == "__main__":
         data_dir / "int_hair_3",
         # data_dir / "int_hair_4",
     ]
+
+    directories = [
+        data_dir / "obs",
+        data_dir / "int_eye_0",
+        data_dir / "int_eye_1",
+
+    ]
     latent_vectors_per_directory = {}
 
     # model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     model_dir = 'celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1'
     model_fname = "model_epoch_8540.pt"
+    eyeglass = 'haircolor'
+
+
+    model_dir = 'celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v2'
+    model_fname = "model_epoch_9595.pt"
+    scm_type = 'eyeglass'
 
     # model_dir = (
     #     "celeba_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
@@ -85,7 +98,7 @@ if __name__ == "__main__":
     # model_fname = "celeba_vaeresnetreduction_batch512_latentdim48_img128_v1.pt"
     # model_fname = "celeba_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     vae_model_fpath = (
-        root / "CausalCelebA" / "vae_reduction" / 'haircolor' / model_dir.split(".")[0] / model_fname
+        root / "CausalCelebA" / "vae_reduction" / scm_type / model_dir.split(".")[0] / model_fname
     )
 
     # vae_model = VAE()  # Replace with loading logic

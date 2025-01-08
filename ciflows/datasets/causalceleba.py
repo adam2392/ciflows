@@ -331,6 +331,7 @@ class CausalCelebAEmbedding(CausalCelebA):
         root,
         graph_type,
         dataset,
+        scm_type,
         img_size=64,
         fast_dev_run=False,
     ):
@@ -342,13 +343,13 @@ class CausalCelebAEmbedding(CausalCelebA):
 
         # load attrs
         if dataset == "alldata":
-            dataset_postfix = "alldata_cyclicbeta_noimgaug_encodings"
+            dataset_postfix = "alldata_encodings"
             encoding_fnames = {
                 "obs": f"obs_{dataset_postfix}.pt",
-                "int_hair_0": f"int_hair_0_{dataset_postfix}.pt",
-                "int_hair_1": f"int_hair_1_{dataset_postfix}.pt",
-                "int_hair_2": f"int_hair_2_{dataset_postfix}.pt",
-                "int_hair_3": f"int_hair_3_{dataset_postfix}.pt",
+                f"int_{scm_type}_0": f"int_{scm_type}_0_{dataset_postfix}.pt",
+                f"int_{scm_type}_1": f"int_{scm_type}_1_{dataset_postfix}.pt",
+                # f"int_{scm_type}_2": f"int_{scm_type}_2_{dataset_postfix}.pt",
+                # f"int_{scm_type}_3": f"int_{scm_type}_3_{dataset_postfix}.pt",
                 # "int_hair_4": f"int_hair_4_{dataset_postfix}.pt",
                 # "obs": "obs_nonorm_encodings.pt",
                 # "int_hair_0": "int_hair_0_nonorm_encodings.pt",
@@ -373,18 +374,18 @@ class CausalCelebAEmbedding(CausalCelebA):
         print(f"Loaded dataset postfix: {dataset_postfix}")
         distr_types_list = [
             "obs",
-            "int_hair_0",
-            "int_hair_1",
-            "int_hair_2",
-            "int_hair_3",
+            f"int_{scm_type}_0",
+            f"int_{scm_type}_1",
+            # "int_hair_2",
+            # "int_hair_3",
             # "int_hair_4",
         ]
         self.causal_distr_dfs = dict()
-        self.distr_dfs = dict()
         self.causal_main_df = pd.DataFrame()
         self.data = []
         for distr_type in distr_types_list:
             distr_root = root / "CausalCelebA" / graph_type / f"dim{img_size}" / distr_type
+            distr_root = root / "CausalCelebAEyeGlasses" / graph_type / f"dim{img_size}" / distr_type
             filename = distr_root / "causal_attrs.csv"
             attrs_df = pd.read_csv(filename)
 
