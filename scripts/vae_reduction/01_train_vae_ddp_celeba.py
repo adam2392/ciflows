@@ -14,16 +14,15 @@ import torch.version
 from torch.distributed import init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.utils import save_image
 from tqdm import tqdm
 
-from ciflows.reduction.resnetvae import DeepResNetVAE
 from ciflows.datasets.causalceleba import CausalCelebA, CausalCelebAEyeGlasses
 from ciflows.datasets.multidistr import StratifiedSampler
-from torch.utils.data import DataLoader, random_split
 from ciflows.eval import load_model
+from ciflows.reduction.resnetvae import DeepResNetVAE
 from ciflows.training import TopKModelSaver, delete_old_checkpoints
 
 

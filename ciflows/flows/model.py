@@ -1,7 +1,8 @@
 import normflows as nf
-from normflows import utils
 import torch
+from normflows import utils
 from torch import nn
+
 from ciflows.distributions.linear import MultidistrCausalFlow
 
 

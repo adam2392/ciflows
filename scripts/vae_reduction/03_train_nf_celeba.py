@@ -98,7 +98,7 @@ if __name__ == "__main__":
     latent_dim = 48
     num_blocks_per_stage = 3
 
-    num_flows = 64
+    num_flows = 128
 
     torch.set_float32_matmul_precision("high")
 
@@ -109,9 +109,7 @@ if __name__ == "__main__":
         root = Path("/local/eb/adam2392/")
 
     # v1: K=32
-    # v2: K=8
-    # v3: K=8, batch higher
-    model_fname = "fixedceleba_eyeglass_nfon_64flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim4_nottrainableedges_sep4and8_v1.pt"
+    model_fname = "fixedceleba_haircolor_nfon_128flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim4_nottrainableedges_sep4and8_v1.pt"
     hcdim = 4
     checkpoint_model_fname = "celeba_nfon_cyclicbetaresnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
     model_checkpoint_dir = (
@@ -139,20 +137,20 @@ if __name__ == "__main__":
     # dataset = "cyclicbeta"
 
     # all data
-    vae_model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
-    vae_model_fname = "model_epoch_1860.pt"
-    
-    vae_model_dir = 'celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v2.pt'
-    vae_model_fname = "model_epoch_9595.pt"
-    scm_type = 'eyeglass'
+    # vae_model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
+    # vae_model_fname = "model_epoch_1860.pt"
 
-    # vae_model_dir = 'celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1'
-    # vae_model_fname = "model_epoch_8540.pt"
-    # scm_type = 'haircolor'
+    # vae_model_dir = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v2.pt"
+    # vae_model_fname = "model_epoch_9595.pt"
+    # scm_type = "eyeglass"
+
+    vae_model_dir = 'celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1'
+    vae_model_fname = "model_epoch_8540.pt"
+    scm_type = 'haircolor'
     dataset = "alldata"
 
     # prefix within the filename of embeddings
-    scm_name = 'hair' if scm_type == 'haircolor' else 'eye'
+    scm_name = "hair" if scm_type == "haircolor" else "eye"
 
     vae_dir = root / "CausalCelebA" / "vae_reduction" / scm_type / vae_model_dir.split(".")[0]
     # vae_model = VAE().to(device)
