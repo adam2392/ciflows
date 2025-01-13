@@ -2,8 +2,10 @@ import os
 import re
 from copy import copy
 from pathlib import Path
+from collections import Counter
 
 import numpy as np
+from numpy.testing import assert_allclose
 import pandas as pd
 import torch
 from albumentations import CoarseDropout, Compose, HorizontalFlip, OneOf, RandomCrop
@@ -77,10 +79,21 @@ def get_random_transforms(image_size):
     )
 
 
-def obs_sample_img_indices(male_attrs, young_attrs, hair_attrs, n_samples=1000, seed=None):
+def obs_sample_img_indices(df, male_col, young_col, hair_cols, hair_categories, n_samples=1000, seed=None):
     """Set up the observational SCM."""
     rng = np.random.default_rng(seed)
 
+    # get the index over the files
+    file_sample_indices = df["sample_idx"].values
+
+    # index over the rows in the dataframe
+    male_attrs = df[male_col].values
+    young_attrs = df[young_col].values
+    hair_attrs = df[hair_cols].values
+
+    assert (
+        len(file_sample_indices) == len(male_attrs) == len(young_attrs) == len(hair_attrs)
+    )
     sample_idx = np.arange(len(male_attrs))
     image_attrs = np.concatenate(
         (
@@ -92,9 +105,10 @@ def obs_sample_img_indices(male_attrs, young_attrs, hair_attrs, n_samples=1000, 
         axis=1,
     )
 
+    hair_map = {"Black": 0, "Blond": 1, "Gray": 2}
+    hair_range = np.arange(len(hair_categories))
     # Precompute hair categories
     # hair_categories = np.unique(hair_attrs).astype(int).tolist()
-    hair_categories = ["Black", "Blond", "Brown", "Gray"]
 
     # List to store sampled indices
     sampled_indices = []
@@ -118,7 +132,6 @@ def obs_sample_img_indices(male_attrs, young_attrs, hair_attrs, n_samples=1000, 
         age_map = {"Young": 1, "Old": 0}
         age = age_map[age_str]
 
-        hair_range = np.arange(4)
         if age == "Old":
             hair_range = hair_range[::-1]
         p_hairs = exponential_weights(hair_range, alpha=1.0)
@@ -128,9 +141,8 @@ def obs_sample_img_indices(male_attrs, young_attrs, hair_attrs, n_samples=1000, 
         # 1: blond
         # 2: brown
         # 3: gray
-        hair_map = {"Black": 0, "Blond": 1, "Brown": 2, "Gray": 3}
         hair = hair_map[hair_str]
-
+# 
         # now sample an individual that is Male, Old and X-Hair color
         matching_indices = image_attrs[
             (image_attrs[:, 1] == gender) & (image_attrs[:, 2] == age) & (image_attrs[:, 3] == hair)
@@ -404,3 +416,40 @@ if __name__ == "__main__":
 
         saved_causal_df.to_csv(causal_attrs_path)
         saved_attrs_df.to_csv(meta_attrs_path)
+
+
+def get_joint_probability_table(sampled_attrs, verbose=False):
+    # Step 1: Count occurrences of each combination
+    counter = Counter(sampled_attrs)
+
+    # Step 2: Create a DataFrame for analysis
+    df = pd.DataFrame(counter.items(), columns=["Combination", "Count"])
+    # if verbose:
+        # display(df.head())
+    df[["Gender", "Age", "Hair Color"]] = pd.DataFrame(
+        df["Combination"].tolist(), index=df.index
+    )
+    df = df.drop(columns="Combination")
+
+    # Step 3: Calculate joint probabilities
+    total_count = df["Count"].sum()
+    df["Joint Probability"] = df["Count"] / total_count
+
+    # P(Gender | Age, Hair Color)
+    df["P(Gender | Age, Hair Color)"] = df.groupby(["Age", "Hair Color"])["Count"].transform(
+        lambda x: x / x.sum()
+    )
+
+    # P(Age | Gender, Hair Color)
+    df["P(Age | Gender, Hair Color)"] = df.groupby(["Gender", "Hair Color"])[
+        "Count"
+    ].transform(lambda x: x / x.sum())
+
+    # P(Hair Color | Gender, Age)
+    df["P(Hair Color | Gender, Age)"] = df.groupby(["Gender", "Age"])["Count"].transform(
+        lambda x: x / x.sum()
+    )
+
+    # test that the output makes sense
+    assert_allclose(df["Joint Probability"].sum(), 1.0)
+    return df

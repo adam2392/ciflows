@@ -29,7 +29,9 @@ class CausalCelebA(Dataset):
         self.file_list = []
 
         # load attrs
-        distr_types = ["obs", "int_hair_0", "int_hair_1", "int_hair_2", "int_hair_3"]
+        distr_types = [
+            # "obs", 
+                       "int_hair_0", "int_hair_1", "int_hair_2", "int_hair_3"]
         self.causal_distr_dfs = dict()
         self.distr_dfs = dict()
         self.causal_main_df = pd.DataFrame()
@@ -192,10 +194,12 @@ class CausalCelebA(Dataset):
         idx = idx.to_numpy().nonzero()[0]
 
         if len(idx) < n_samples:
+            print(idx)
             raise ValueError(f"Cannot sample {n_samples} samples with {attr_name} = {attr_val}")
 
         # randomly sample n_samples from idx
         idx = np.random.choice(idx, n_samples, replace=False)
+        print(idx)
         samples = []
         for i in idx:
             img, distr_idx, target, meta_label = self[i]

@@ -12,7 +12,7 @@ LOG_DIR="/home/adam2392/projects/logs/"
 # cd "$SCRIPT_DIR"
 
 # Calculate the GPU index to use for this job
-GPU_INDEX=2
+GPU_INDEX=7
 
 # Specify the GPUs to use
 GPU_INDICES="5,6,7"  # Adjust this as per available GPUs and your requirement

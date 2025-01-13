@@ -59,9 +59,9 @@ def make_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False):
         {2: torch.ones(node_dimensions[2]) + 6},  # 4
     ]
     intervened_node_vars = [
-        {2: torch.ones(node_dimensions[2])},
-        {2: torch.ones(node_dimensions[2])},
-        {2: torch.ones(node_dimensions[2])},
+        {2: torch.ones(node_dimensions[2]) * 0.5},
+        {2: torch.ones(node_dimensions[2]) * 0.5},
+        {2: torch.ones(node_dimensions[2]) * 0.5},
         {2: torch.ones(node_dimensions[2])},
         {2: torch.ones(node_dimensions[2]) * 2},
     ]
