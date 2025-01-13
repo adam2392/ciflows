@@ -1,5 +1,5 @@
 from pathlib import Path
-
+import numpy as np
 import pandas as pd
 import PIL
 import torch
@@ -165,6 +165,43 @@ class CausalCelebA(Dataset):
     @property
     def distribution_idx(self):
         return torch.Tensor(self.causal_main_df["distr_idx"].values)
+
+    def sample(self, n_samples, attr_name, attr_val):
+        """Sample n_samples of the given attribute value.
+
+        For example, one can sample 10 samples of images with
+        haircolor = 2, corresponding to brown hair.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples to sample.
+        attr_name : str
+            Attribute name to sample. Should be a column in the `causal_main_df`.
+        attr_val : int or float
+            Attribute value to sample. Should be a value in the `causal_main_df[attr_name]`.
+
+        Returns
+        -------
+        samples : array-like of shape (n_samples, ...)
+            Samples of the given attribute value.
+        idx : np.ndarray
+            Index of the samples in the dataset.
+        """
+        idx = self.causal_main_df[attr_name] == attr_val
+        idx = idx.to_numpy().nonzero()[0]
+
+        if len(idx) < n_samples:
+            raise ValueError(f"Cannot sample {n_samples} samples with {attr_name} = {attr_val}")
+
+        # randomly sample n_samples from idx
+        idx = np.random.choice(idx, n_samples, replace=False)
+        samples = []
+        for i in idx:
+            img, distr_idx, target, meta_label = self[i]
+            samples.append(img)
+        samples = torch.stack(samples, dim=0)
+        return samples, idx
 
 
 class CausalCelebAEyeGlasses(Dataset):

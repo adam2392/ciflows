@@ -26,6 +26,7 @@ from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
 from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.flows.glow import GlowBlock, InjectiveGlowBlock, ReshapeFlow, Squeeze
+from ciflows.flows.model import CausalInjectiveFlow
 from ciflows.reduction.resnetvae import DeepResNetVAE
 from ciflows.training import TopKModelSaver, delete_old_checkpoints
 
@@ -167,22 +168,15 @@ def get_inj_model(input_shape):
         if debug:
             print(f"On layer {n_mixing_layers - i}, n_chs = {n_chs}")
 
-    model = nf.NormalizingFlow(q0=q0, flows=flows)
-    model.output_n_chs = init_n_chs
-    model.output_latent_size = init_latent_size
-    pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(pytorch_total_params)
-
-    return model
+    inj_model = nf.NormalizingFlow(q0=None, flows=flows)
+    inj_model.output_n_chs = init_n_chs
+    inj_model.output_latent_size = init_latent_size
+    return inj_model
 
 
 def get_bij_model(
     n_chs,
     latent_size,
-    adj_mat,
-    cluster_sizes,
-    intervention_targets,
-    confounded_variables,
 ):
     use_lu = True
     net_actnorm = False
@@ -194,49 +188,6 @@ def get_bij_model(
     debug = False
 
     print("Starting at latent representation: ", n_chs, latent_size, latent_size)
-    print("Got Intervention targets for q0: ", intervention_targets)
-    # q0 = nf.distributions.DiagGaussian(
-    #     (n_chs, latent_size, latent_size), trainable=False
-    # )
-    q0 = nf.distributions.DiagGaussian((n_chs * latent_size * latent_size,), trainable=False)
-
-    # q0 = ClusteredLinearGaussianDistribution(
-    #     adjacency_matrix=adj_mat,
-    #     cluster_sizes=cluster_sizes,
-    #     intervention_targets_per_distr=intervention_targets,
-    #     hard_interventions_per_distr=None,
-    #     confounded_variables=confounded_variables,
-    # )
-    node_dimensions = {
-        0: 16,
-        1: 16,
-        2: 16,
-    }
-    edge_list = [(1, 2)]
-    noise_means = {
-        0: torch.zeros(16),
-        1: torch.zeros(16),
-        2: torch.zeros(16),
-    }
-    noise_variances = {
-        0: torch.ones(16),
-        1: torch.ones(16),
-        2: torch.ones(16),
-    }
-    intervened_node_means = [{2: torch.ones(16) + 2}, {2: torch.ones(16) + 4}]
-    intervened_node_vars = [{2: torch.ones(16)}, {2: torch.ones(16) + 2}]
-
-    confounded_list = []
-    # independent noise with causal prior
-    q0 = LinearGaussianDag(
-        node_dimensions=node_dimensions,
-        edge_list=edge_list,
-        noise_means=noise_means,
-        noise_variances=noise_variances,
-        confounded_list=confounded_list,
-        intervened_node_means=intervened_node_means,
-        intervened_node_vars=intervened_node_vars,
-    )
 
     split_mode = "checkerboard"
 
@@ -300,12 +251,78 @@ def get_bij_model(
             shape_out=(n_chs, latent_size, latent_size),
         )
     ]
-    # model = nf.NormalizingFlow(q0=q0, flows=flows)
-    model = NormalizingFlow(q0=q0, flows=flows)
-
-    pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(pytorch_total_params)
+    model = nf.NormalizingFlow(q0=None, flows=flows)
     return model
+
+
+def make_injflow_model(
+    input_shape,
+    n_chs,
+    latent_size,
+    adj_mat,
+    cluster_sizes,
+    intervention_targets,
+    confounded_variables,
+):
+    inj_model = get_inj_model(input_shape)
+    pytorch_total_params = sum(p.numel() for p in inj_model.parameters() if p.requires_grad)
+    print(pytorch_total_params)
+
+    bij_model = get_bij_model(
+        n_chs,
+        latent_size,
+        adj_mat,
+        cluster_sizes,
+        intervention_targets,
+        confounded_variables,
+    )
+
+    pytorch_total_params = sum(p.numel() for p in bij_model.parameters() if p.requires_grad)
+    print(pytorch_total_params)
+
+    print("Got Intervention targets for q0: ", intervention_targets)
+    # q0 = nf.distributions.DiagGaussian(
+    #     (n_chs, latent_size, latent_size), trainable=False
+    # )
+    q0 = nf.distributions.DiagGaussian((n_chs * latent_size * latent_size,), trainable=False)
+
+    node_dimensions = {
+        0: 16,
+        1: 16,
+        2: 16,
+    }
+    edge_list = [(1, 2)]
+    noise_means = {
+        0: torch.zeros(16),
+        1: torch.zeros(16),
+        2: torch.zeros(16),
+    }
+    noise_variances = {
+        0: torch.ones(16),
+        1: torch.ones(16),
+        2: torch.ones(16),
+    }
+    intervened_node_means = [{2: torch.ones(16) + 2}, {2: torch.ones(16) + 4}]
+    intervened_node_vars = [{2: torch.ones(16)}, {2: torch.ones(16) + 2}]
+
+    confounded_list = []
+    # independent noise with causal prior
+    q0 = LinearGaussianDag(
+        node_dimensions=node_dimensions,
+        edge_list=edge_list,
+        noise_means=noise_means,
+        noise_variances=noise_variances,
+        confounded_list=confounded_list,
+        intervened_node_means=intervened_node_means,
+        intervened_node_vars=intervened_node_vars,
+    )
+
+    # initialize the flow model
+    initialize_flow(inj_model)
+    initialize_flow(bij_model)
+    causalinj_model = CausalInjectiveFlow(q0=q0, inj_model=inj_model, bij_model=bij_model)
+
+    return causalinj_model
 
 
 def initialize_flow(model):
@@ -323,13 +340,6 @@ def initialize_flow(model):
                 nn.init.xavier_uniform_(param)
         elif "bias" in name:
             nn.init.constant_(param, 1e-5)
-
-
-def softclip(tensor, min):
-    """Clips the tensor values at the minimum value min in a softway. Taken from Handful of Trials"""
-    result_tensor = min + F.softplus(tensor - min)
-
-    return result_tensor
 
 
 def configure_optimizers(
@@ -466,7 +476,7 @@ def get_model_attribute(model, attr):
 
 
 if __name__ == "__main__":
-    debug = False
+    debug = True
     compile = False
     load_from_checkpoint = False
 
@@ -512,10 +522,11 @@ if __name__ == "__main__":
     # scm_type = "eyeglass"
     num_workers = 4
 
-    check_samples_every_n_epoch = 5
+    check_samples_every_n_epoch = 10
 
     # adamw optimizer settings
-    max_epochs = 10_000
+    max_epochs = 2000
+    n_steps_mse = 50
     lr = 3e-4
     lr_min = 6e-5
     beta1 = 0.9
@@ -529,15 +540,7 @@ if __name__ == "__main__":
     n_channels = 3
     out_channels = 3
     latent_dim = 48
-    num_blocks_per_stage = 3
-
-    beta_max = 1.5
-    annealing_epochs = 1000  # Number of epochs for full beta
-
-    initial_capacity = 0.0
-    max_capacity = 25.0
-    capacity_increment = 0.1  # Increment per epoch
-    current_capacity = initial_capacity
+    input_shape = (3, 128, 128)
 
     if debug:
         accelerator = "cpu"
@@ -546,7 +549,6 @@ if __name__ == "__main__":
         batch_size = 8
         check_samples_every_n_epoch = 1
         num_workers = 2
-        num_blocks_per_stage = 3
 
         gradient_accumulation_steps = 2
         fast_dev = True
@@ -627,8 +629,11 @@ if __name__ == "__main__":
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
-    # model.apply(weights_init)
+    model = make_injflow_model(
+        input_shape,
+        n_channels,
+        latent_size=latent_dim,
+    )
     model = model.to(ptdtype).to(device)
     image_dim = 3 * img_size * img_size
 
@@ -636,8 +641,14 @@ if __name__ == "__main__":
     scaler = torch.GradScaler(device=device, enabled=(dtype == "float16"))
 
     # configure optimizers
-    optimizer = configure_optimizers(
-        model,
+    mse_optimizer = configure_optimizers(
+        model.inj_model,
+        learning_rate=lr,
+        betas=(beta1, beta2),
+        weight_decay=1e-4,
+    )
+    nll_optimizer = configure_optimizers(
+        model.bij_model,
         learning_rate=lr,
         betas=(beta1, beta2),
         weight_decay=1e-4,
@@ -672,8 +683,11 @@ if __name__ == "__main__":
         print(sum(p.numel() for p in model.parameters()) / 1e6, "M parameters")
 
     # Cosine Annealing Scheduler (adjust the T_max for the number of epochs)
-    scheduler = CosineAnnealingLR(
-        optimizer, T_max=max_epochs, eta_min=lr_min
+    mse_scheduler = CosineAnnealingLR(
+        mse_optimizer, T_max=max_epochs, eta_min=lr_min
+    )  # T_max = total epochs
+    nll_scheduler = CosineAnnealingLR(
+        nll_optimizer, T_max=max_epochs, eta_min=lr_min
     )  # T_max = total epochs
 
     top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
@@ -731,7 +745,6 @@ if __name__ == "__main__":
 
     # Training loop
     max_epochs = start_epoch + max_epochs
-    annealing_epochs = annealing_epochs + start_epoch
     if master_process:
         print(f"Starting training loop from epoch {start_epoch} to {max_epochs}")
 
@@ -759,28 +772,25 @@ if __name__ == "__main__":
             with ctx:
                 # forward pass
                 images = images.to(device)
-                optimizer.zero_grad()
+                mse_optimizer.zero_grad()
+                nll_optimizer.zero_grad()
                 reconstructed, latent_mu, latent_logvar = model(images)  # Model forward pass
 
                 # Clamp logvar to prevent numerical instability
                 latent_logvar = torch.clamp_(latent_logvar, -10, 10)
 
-                # Compute log_sigma_x
-                log_sigma_x = get_model_attribute(model, "log_sigma_x")
+                if epoch <= n_steps_mse:
+                    v_latent = model.inj_flows.inverse(x)
+                    v_latent_recon = model.inj_flows.inverse(x_reconstructed)
 
-                # Learning the variance can become unstable in some cases.
-                # Softly limiting log_sigma to a minimum of -6 ensures stable training.
-                log_sigma_x = softclip(log_sigma_x, -6)
-
-                loss = loss_function(
-                    reconstructed,
-                    images,
-                    latent_mu,
-                    latent_logvar,
-                    log_sigma_x=log_sigma_x,
-                    capacity=current_capacity,
-                    beta=beta,
-                )  # Custom VAE loss function
+                    loss = torch.nn.functional.mse_loss(
+                        x_reconstructed, x
+                    ) + torch.nn.functional.mse_loss(v_latent_recon, v_latent)
+                else:
+                    inj_v = model.inj_model.inverse(x)
+                    vhat, log_q = model.bij_model.inverse_and_log_det(inj_v)
+                    log_q += model.bij_model.q0.log_prob(vhat, distr_idx, targets)
+                    loss = -torch.mean(log_q)
 
                 # scale loss based on how many accumulation steps we take
                 loss = loss / gradient_accumulation_steps
@@ -806,25 +816,34 @@ if __name__ == "__main__":
         # clip the gradient
         if grad_clip != 0.0:
             if scaler.is_enabled():
-                scaler.unscale_(optimizer)
+                scaler.unscale_(mse_optimizer)
+                scaler.unscale_(nll_optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
 
         # step optimizer and update
-        scaler.step(optimizer)
+        if epoch <= n_steps_mse:
+            scaler.step(mse_optimizer)
+        else:
+            scaler.step(nll_optimizer)
         scaler.update()
         # optimizer.step()
 
         # flush gradients to release memory
-        optimizer.zero_grad(set_to_none=True)
+        nll_optimizer.zero_grad(set_to_none=True)
+        mse_optimizer.zero_grad(set_to_none=True)
 
         # Step the scheduler at the end of the epoch
-        scheduler.step()
+        if epoch <= n_steps_mse:
+            mse_scheduler.step()
+            lr = mse_scheduler.get_last_lr()[0]
+        else:
+            nll_scheduler.step()
+            lr = nll_scheduler.get_last_lr()[0]
 
         # timing and logging
         t1 = time.time()
         dt = t1 - t0
         t0 = t1
-        lr = scheduler.get_last_lr()[0]
 
         if master_process:
             print(
@@ -843,34 +862,32 @@ if __name__ == "__main__":
             # Sample and save reconstructed images
             train_images = images[:8]
             with torch.no_grad():
-                log_sigma_x = get_model_attribute(model, "log_sigma_x")
-
                 if master_process:
                     print("Iterating through val loader")
-                for batch_idx, (
-                    val_images,
-                    distr_idx,
-                    targets,
-                    meta_labels,
-                ) in enumerate(val_loader):
-                    val_images = val_images.to(device)
-                    reconstructed, latent_mu, latent_logvar = model(
-                        val_images
-                    )  # Model forward pass
+                # for batch_idx, (
+                #     val_images,
+                #     distr_idx,
+                #     targets,
+                #     meta_labels,
+                # ) in enumerate(val_loader):
+                #     val_images = val_images.to(device)
+                #     reconstructed, latent_mu, latent_logvar = model(
+                #         val_images
+                #     )  # Model forward pass
 
-                    loss = loss_function(
-                        reconstructed,
-                        val_images,
-                        latent_mu,
-                        latent_logvar,
-                        log_sigma_x=log_sigma_x,
-                        capacity=current_capacity,
-                        beta=beta,
-                    )  # Custom VAE loss function
-                    val_loss += loss.item()
+                #     loss = loss_function(
+                #         reconstructed,
+                #         val_images,
+                #         latent_mu,
+                #         latent_logvar,
+                #         log_sigma_x=log_sigma_x,
+                #         capacity=current_capacity,
+                #         beta=beta,
+                #     )  # Custom VAE loss function
+                #     val_loss += loss.item()
 
-                    if debug:
-                        break
+                #     if debug:
+                #         break
 
                 # pick the first 8 images in the last val batch
                 # sample_images = val_images[:8]  # Pick 8 images for sampling
@@ -920,7 +937,7 @@ if __name__ == "__main__":
 
             # Track top 5 models based on validation loss
             # Optionally, remove worse models if there are more than k saved models
-            top_k_saver.save_model(raw_model, optimizer, epoch, train_loss)
+            top_k_saver.save_model(raw_model, nll_optimizer, epoch, train_loss)
             delete_old_checkpoints(checkpoint_dir, keep_top_k=5)
 
         epoch += 1
@@ -935,7 +952,7 @@ if __name__ == "__main__":
         torch.save(
             {
                 "model_state_dict": raw_model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
+                "optimizer_state_dict": nll_optimizer.state_dict(),
                 "epoch": epoch,  # Optional: Save the current epoch
                 "loss": loss,  # Optional: Save the last loss value
             },
@@ -950,4 +967,4 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage).to(device)
     model_path = checkpoint_dir / model_fname
-    vae_model = load_model(vae_model, model_path, device, optimizer=optimizer)
+    vae_model = load_model(vae_model, model_path, device, optimizer=nll_optimizer)

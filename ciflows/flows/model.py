@@ -96,10 +96,12 @@ class CausalNormalizingFlow(nf.NormalizingFlow):
 
 
 class CausalInjectiveFlow(nn.Module):
-    def __init__(self, q0, inj_flows, bij_flows):
+    def __init__(self, q0, inj_model: nf.NormalizingFlow, bij_model: nf.NormalizingFlow):
         self.q0 = q0
-        self.flows = nn.ModuleList(inj_flows)
-        self.flows.extend(bij_flows)
+        self.inj_model = inj_model
+        self.bij_model = bij_model
+        self.flows = nn.ModuleList(inj_model.flows)
+        self.flows.extend(bij_model.flows)
 
     def forward(self, z):
         """Transforms latent variable z to the flow variable x
