@@ -24,6 +24,14 @@ def exponential_weights(i_range, alpha=1.0):
     return normalized_weights
 
 
+def linear_weights(i_range):
+    weights = [i for i in i_range]
+    # Normalize weights so they sum to 1
+    total = sum(weights)
+    normalized_weights = [w / total for w in weights]
+    return normalized_weights
+
+
 def print_transforms(transforms, indent=0):
     for i, transform in enumerate(transforms):
         if isinstance(transform, OneOf):
@@ -50,22 +58,8 @@ def get_random_transforms(image_size):
                 ],
                 p=0.5,
             ),
-            # OneOf(
-            #     [
-            #         GaussianBlur(blur_limit=(3, 3), p=0.3),
-            #         Perspective(scale=(0.05, 0.1), p=0.3),
-            #     ],
-            #     p=0.5,
-            # ),
-            # RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.2),
-            # HueSaturationValue(
-            #     # hue_shift_limit=10,
-            #     # sat_shift_limit=5,
-            #     # val_shift_limit=20,
-            #     p=0.4,
-            # ),
             CoarseDropout(
-                max_holes=16,
+                max_holes=32,
                 max_height=3,
                 max_width=3,
                 min_holes=1,
@@ -79,25 +73,37 @@ def get_random_transforms(image_size):
     )
 
 
-def obs_sample_img_indices(df, male_col, young_col, hair_cols, hair_categories, n_samples=1000, seed=None):
+def obs_sample_img_indices(
+    file_sample_indices,
+    male_attrs,
+    young_attrs,
+    hair_attrs,
+    hair_categories,
+    n_samples=1000,
+    seed=None,
+):
     """Set up the observational SCM."""
     rng = np.random.default_rng(seed)
 
-    # get the index over the files
-    file_sample_indices = df["sample_idx"].values
-
     # index over the rows in the dataframe
-    male_attrs = df[male_col].values
-    young_attrs = df[young_col].values
-    hair_attrs = df[hair_cols].values
-
-    assert (
-        len(file_sample_indices) == len(male_attrs) == len(young_attrs) == len(hair_attrs)
+    assert len(file_sample_indices) == len(male_attrs) == len(young_attrs) == len(hair_attrs)
+    print(
+        hair_attrs.reshape(-1, 1).shape,
+        male_attrs.reshape(-1, 1).shape,
+        young_attrs.reshape(-1, 1).shape,
     )
-    sample_idx = np.arange(len(male_attrs))
+    # assert False
+
+    # the hair map encodings
+    hair_map = {"Black": 1, "Blond": 2, "Gray": 3}
+    # hair_map = {"Black": 1, "Gray": 2}
+    # hair_map = {"Black_Hair": 1, "Blond_Hair": 2, "Gray_Hair": 3}
+    # Precompute hair categories
+    # hair_categories = np.unique(hair_attrs).astype(int).tolist()
+
     image_attrs = np.concatenate(
         (
-            sample_idx.reshape(-1, 1),
+            file_sample_indices.reshape(-1, 1),
             male_attrs.reshape(-1, 1),
             young_attrs.reshape(-1, 1),
             hair_attrs.reshape(-1, 1),
@@ -105,19 +111,10 @@ def obs_sample_img_indices(df, male_col, young_col, hair_cols, hair_categories, 
         axis=1,
     )
 
-    hair_map = {"Black": 0, "Blond": 1, "Gray": 2}
-    hair_range = np.arange(len(hair_categories))
-    # Precompute hair categories
-    # hair_categories = np.unique(hair_attrs).astype(int).tolist()
-
     # List to store sampled indices
     sampled_indices = []
     sampled_attrs = []
     for idx in range(n_samples):
-        # shuffle image attributes
-        rng.shuffle(sample_idx)
-        image_attrs = image_attrs[sample_idx]
-
         # now, sample U_gh and use this to initialize the sampling process
         U_genderhair = rng.uniform()
 
@@ -132,74 +129,88 @@ def obs_sample_img_indices(df, male_col, young_col, hair_cols, hair_categories, 
         age_map = {"Young": 1, "Old": 0}
         age = age_map[age_str]
 
-        if age == "Old":
-            hair_range = hair_range[::-1]
-        p_hairs = exponential_weights(hair_range, alpha=1.0)
+        hair_range = np.arange(len(hair_categories))
+        # make older ppl more likely to have gray hair
+        if age_str == "Young":
+            p_hair_range = hair_range[::-1]
+        else:
+            p_hair_range = hair_range
+        p_hairs = exponential_weights(p_hair_range, alpha=1.0)
+        if idx < 2:
+            print(p_hairs)
+            print(age_str)
+            print(p_hair_range)
+            print(hair_categories)
         hair_str = rng.choice(hair_categories, p=p_hairs)
 
         # 0: black
         # 1: blond
         # 2: brown
         # 3: gray
+        # hair_map = {"Black": 1, "Blond": 2, "Gray": 3}
         hair = hair_map[hair_str]
-# 
+        # if idx == 0:
+        #     print(hair_categories)
+        #     print(hair_str)
+        #     print()
+
         # now sample an individual that is Male, Old and X-Hair color
         matching_indices = image_attrs[
             (image_attrs[:, 1] == gender) & (image_attrs[:, 2] == age) & (image_attrs[:, 3] == hair)
         ][
             :, 0
-        ].tolist()  # Extract indices
+        ].tolist()  # Extract file-sample indices
 
         # Sample a single individual if there are matches
         if matching_indices:
             sampled_index = rng.choice(matching_indices)
             sampled_indices.append(sampled_index)
-            sampled_attrs.append((sampled_index, gender_str, age_str, hair_str))
+            sampled_attrs.append((gender_str, age_str, hair_str))
     return sampled_indices, sampled_attrs
 
 
 def interventional_sample_img_indices(
-    male_attrs, young_attrs, hair_attrs, idx=0, n_samples=1000, seed=None
+    file_sample_indices,
+    male_attrs,
+    young_attrs,
+    hair_attrs,
+    interv_idx=0,
+    n_samples=1000,
+    seed=None,
 ):
     """Set up the observational SCM."""
     # Precompute hair categories
-    if idx == 0:
-        hair_categories = ["Gray", "Brown"]
-        hair_range = np.arange(2)
-    elif idx == 1:
+    if interv_idx == 0:
+        hair_categories = ["Gray", "Black"]
+        weight_func = exponential_weights
+    elif interv_idx == 1:
         hair_categories = ["Black", "Blond"]
-        hair_range = np.arange(2)
-    elif idx == 2:
-        hair_categories = ["Black", "Brown"]
-        hair_range = np.arange(2)
-    elif idx == 3:
+        weight_func = None
+    elif interv_idx == 2:
         hair_categories = ["Gray"]
-        hair_range = np.arange(1)
-    elif idx == 4:
+        weight_func = None
+    elif interv_idx == 3:
+        hair_categories = ["Black", "Brown"]
+    elif interv_idx == 4:
         hair_categories = ["Blond"]
-        hair_range = np.arange(1)
+    alpha = 1.0
 
     rng = np.random.default_rng(seed)
-
-    sample_idx = np.arange(len(male_attrs))
     image_attrs = np.concatenate(
         (
-            sample_idx.reshape(-1, 1),
+            file_sample_indices.reshape(-1, 1),
             male_attrs.reshape(-1, 1),
             young_attrs.reshape(-1, 1),
             hair_attrs.reshape(-1, 1),
         ),
         axis=1,
     )
+    hair_map = {"Black": 1, "Blond": 2, "Gray": 3}
 
     # List to store sampled indices
     sampled_indices = []
     sampled_attrs = []
     for idx in range(n_samples):
-        # shuffle image attributes
-        rng.shuffle(sample_idx)
-        image_attrs = image_attrs[sample_idx]
-
         # now, sample U_gh and use this to initialize the sampling process
         U_genderhair = rng.uniform()
 
@@ -214,16 +225,23 @@ def interventional_sample_img_indices(
         age_map = {"Young": 1, "Old": 0}
         age = age_map[age_str]
 
-        if age == "Old":
-            hair_range = hair_range[::-1]
-        p_hairs = exponential_weights(hair_range, alpha=1.0)
+        hair_range = np.arange(len(hair_categories))
+        if age_str == "Young":
+            p_hair_range = hair_range[::-1]
+        else:
+            p_hair_range = hair_range
+
+        if weight_func is None:
+            p_hairs = None
+        else:
+            p_hairs = weight_func(p_hair_range, alpha=alpha)
         hair_str = rng.choice(hair_categories, p=p_hairs)
 
         # 0: black
         # 1: blond
         # 2: brown
         # 3: gray
-        hair_map = {"Black": 0, "Blond": 1, "Brown": 2, "Gray": 3}
+        # hair_map = {"Black": 0, "Blond": 1, "Brown": 2, "Gray": 3}
         hair = hair_map[hair_str]
 
         # now sample an individual that is Male, Old and X-Hair color
@@ -237,7 +255,7 @@ def interventional_sample_img_indices(
         if matching_indices:
             sampled_index = rng.choice(matching_indices)
             sampled_indices.append(sampled_index)
-            sampled_attrs.append((sampled_index, gender_str, age_str, hair_str))
+            sampled_attrs.append((gender_str, age_str, hair_str))
     return sampled_indices, sampled_attrs
 
 
@@ -335,6 +353,120 @@ def celeba_scm(
     return saved_causal_attrs, saved_attrs
 
 
+
+def get_joint_probability_table(sampled_attrs, verbose=False):
+    # Step 1: Count occurrences of each combination
+    counter = Counter(sampled_attrs)
+
+    # Step 2: Create a DataFrame for analysis
+    df = pd.DataFrame(counter.items(), columns=["Combination", "Count"])
+    # if verbose:
+    # display(df.head())
+    df[["Gender", "Age", "Hair Color"]] = pd.DataFrame(df["Combination"].tolist(), index=df.index)
+    df = df.drop(columns="Combination")
+
+    # Step 3: Calculate joint probabilities
+    total_count = df["Count"].sum()
+    df["Joint Probability"] = df["Count"] / total_count
+
+    # P(Gender | Age, Hair Color)
+    df["P(Gender | Age, Hair Color)"] = df.groupby(["Age", "Hair Color"])["Count"].transform(
+        lambda x: x / x.sum()
+    )
+
+    # P(Age | Gender, Hair Color)
+    df["P(Age | Gender, Hair Color)"] = df.groupby(["Gender", "Hair Color"])["Count"].transform(
+        lambda x: x / x.sum()
+    )
+
+    # P(Hair Color | Gender, Age)
+    df["P(Hair Color | Gender, Age)"] = df.groupby(["Gender", "Age"])["Count"].transform(
+        lambda x: x / x.sum()
+    )
+
+    # test that the output makes sense
+    assert_allclose(df["Joint Probability"].sum(), 1.0)
+    return df
+
+
+from scipy.stats import chi2_contingency
+
+
+# Function to compute Cramér's V
+def cramers_v(confusion_matrix):
+    # Perform the chi-squared test
+    chi2, _, _, _ = chi2_contingency(confusion_matrix)
+    n = confusion_matrix.to_numpy().sum()  # Total number of observations
+    r, k = confusion_matrix.shape  # Rows and columns
+    # Compute and return Cramér's V as a scalar
+    return np.sqrt(chi2 / (n * (min(r, k) - 1)))
+
+
+# Function to compute pairwise correlations
+def pairwise_cramers_v(df, columns):
+    # Ensure the DataFrame has correct dimensions and numeric dtype
+    results = pd.DataFrame(index=columns, columns=columns, dtype=float)
+    for col1 in columns:
+        for col2 in columns:
+            if col1 == col2:
+                results.at[col1, col2] = 1.0  # Correlation with itself
+            else:
+                # Create a contingency table
+                contingency_table = pd.crosstab(df[col1], df[col2])
+                corr_vals = cramers_v(contingency_table)
+                # print(f"Contingency table for {col1} vs {col2}:\n{contingency_table}\n")
+                # print(corr_vals)
+                results.at[col1, col2] = corr_vals
+    return results
+
+
+# Function to compute conditional Cramér's V
+def conditional_cramers_v(df, x_col, y_col, z_col):
+    results = {}
+    for z_value, subset in df.groupby(z_col):
+        contingency_table = pd.crosstab(subset[x_col], subset[y_col])
+        results[z_value] = cramers_v(contingency_table)
+    return results
+
+
+def inspect_sampled_causal_distr(df):
+    # Define the columns for pairwise analysis
+    # columns = ['Male', 'Young', 'Hair_Category']
+    columns = ["Gender", "Age", "Hair Color"]
+    df_selected = df.loc[:, columns]
+
+    # Compute pairwise Cramér's V
+    correlation_matrix = pairwise_cramers_v(df_selected, columns)
+
+    # Display the correlation matrix
+    print("\nPairwise Cramér's V Correlation Matrix:")
+    from IPython import display
+    display(correlation_matrix)
+
+    # Compute conditional Cramér's V
+    conditional_results = conditional_cramers_v(
+        df_selected, x_col="Gender", y_col="Age", z_col="Hair Color"
+    )
+    print("Conditional Cramér's V:")
+    for val, v in conditional_results.items():
+        print(f"Hair Color = {val}: Cramér's V = {v:.4f}")
+
+    # Compute conditional Cramér's V
+    conditional_results = conditional_cramers_v(
+        df_selected, z_col="Gender", x_col="Age", y_col="Hair Color"
+    )
+    print("Conditional Cramér's V:")
+    for val, v in conditional_results.items():
+        print(f"Gender = {val}: Cramér's V = {v:.4f}")
+
+    conditional_results = conditional_cramers_v(
+        df_selected, x_col="Gender", y_col="Hair Color", z_col="Age"
+    )
+    print("Conditional Cramér's V:")
+    for val, v in conditional_results.items():
+        print(f"Age = {val}: Cramér's V = {v:.4f}")
+
+
 if __name__ == "__main__":
     # Root directory for the dataset
     data_root = Path("/Users/adam2392/pytorch_data/")
@@ -416,40 +548,3 @@ if __name__ == "__main__":
 
         saved_causal_df.to_csv(causal_attrs_path)
         saved_attrs_df.to_csv(meta_attrs_path)
-
-
-def get_joint_probability_table(sampled_attrs, verbose=False):
-    # Step 1: Count occurrences of each combination
-    counter = Counter(sampled_attrs)
-
-    # Step 2: Create a DataFrame for analysis
-    df = pd.DataFrame(counter.items(), columns=["Combination", "Count"])
-    # if verbose:
-        # display(df.head())
-    df[["Gender", "Age", "Hair Color"]] = pd.DataFrame(
-        df["Combination"].tolist(), index=df.index
-    )
-    df = df.drop(columns="Combination")
-
-    # Step 3: Calculate joint probabilities
-    total_count = df["Count"].sum()
-    df["Joint Probability"] = df["Count"] / total_count
-
-    # P(Gender | Age, Hair Color)
-    df["P(Gender | Age, Hair Color)"] = df.groupby(["Age", "Hair Color"])["Count"].transform(
-        lambda x: x / x.sum()
-    )
-
-    # P(Age | Gender, Hair Color)
-    df["P(Age | Gender, Hair Color)"] = df.groupby(["Gender", "Hair Color"])[
-        "Count"
-    ].transform(lambda x: x / x.sum())
-
-    # P(Hair Color | Gender, Age)
-    df["P(Hair Color | Gender, Age)"] = df.groupby(["Gender", "Age"])["Count"].transform(
-        lambda x: x / x.sum()
-    )
-
-    # test that the output makes sense
-    assert_allclose(df["Joint Probability"].sum(), 1.0)
-    return df
