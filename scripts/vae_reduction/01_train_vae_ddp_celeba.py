@@ -18,6 +18,8 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.utils import save_image
 from tqdm import tqdm
+from albumentations import CoarseDropout, Compose
+from albumentations.pytorch import ToTensorV2
 
 from ciflows.datasets.causalceleba import CausalCelebA, CausalCelebAEyeGlasses
 from ciflows.datasets.multidistr import StratifiedSampler
@@ -89,15 +91,33 @@ def data_loader(
         ]
     )
 
+    input_transform = Compose(
+        [
+            CoarseDropout(
+                max_holes=48,
+                max_height=5,
+                max_width=5,
+                min_holes=1,
+                min_height=1,
+                min_width=1,
+                p=0.9,
+            ),
+            ToTensorV2(),
+        ]
+    )
+
     if scm_type == "haircolor":
         causal_celeba_dataset = CausalCelebA(
             root=root_dir,
             graph_type=graph_type,
+            input_transform=input_transform,
             transform=image_transform,
             img_size=img_size,
             fast_dev_run=False,  # Set to True for debugging
         )
     elif scm_type == "eyeglass":
+        # need to implement input_transform
+        assert False
         causal_celeba_dataset = CausalCelebAEyeGlasses(
             root=root_dir,
             graph_type=graph_type,
@@ -114,19 +134,19 @@ def data_loader(
     # Split the dataset into train and validation sets
     train_dataset, val_dataset = random_split(causal_celeba_dataset, [train_len, val_len])
 
-    distr_labels = [x[1] for x in causal_celeba_dataset]
+    distr_labels = [x[2] for x in causal_celeba_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
         raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
     sampler = StratifiedSampler(distr_labels, batch_size)
 
-    distr_labels = [x[1] for x in train_dataset]
+    distr_labels = [x[2] for x in train_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
         raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
-    distr_labels = [x[1] for x in val_dataset]
+    distr_labels = [x[2] for x in val_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
         raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
@@ -243,7 +263,7 @@ if __name__ == "__main__":
     check_samples_every_n_epoch = 5
 
     # adamw optimizer settings
-    max_epochs = 10_000
+    max_epochs = 5_000
     lr = 3e-4
     lr_min = 6e-5
     beta1 = 0.9
@@ -342,7 +362,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v2.pt"
+    # model_fname = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v2.pt"
     model_fname = "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / scm_type / model_fname.split(".")[0]
 
@@ -440,8 +460,9 @@ if __name__ == "__main__":
         train_iterator = iter(train_loader)
         batch = next(train_iterator)
 
-    images, distr_idx, targets, meta_labels = batch
+    images, target_images, distr_idx, targets, meta_labels = batch
     images = images.to(device=device, dtype=ptdtype)
+    target_images = target_images.to(device=device, dtype=ptdtype)
 
     if master_process:
         print(f"Images dtype: {images.dtype}")
@@ -502,7 +523,7 @@ if __name__ == "__main__":
 
                 loss = loss_function(
                     reconstructed,
-                    images,
+                    target_images,
                     latent_mu,
                     latent_logvar,
                     log_sigma_x=log_sigma_x,
@@ -525,8 +546,9 @@ if __name__ == "__main__":
                 batch = next(train_iterator)
 
             # extract the variables within the batch
-            images, distr_idx, targets, meta_labels = batch
+            images, target_images, distr_idx, targets, meta_labels = batch
             images = images.to(device)
+            target_images = target_images.to(device)
 
             # DDP: accumulate loss terms
             train_loss += loss.item()
@@ -570,6 +592,7 @@ if __name__ == "__main__":
 
             # Sample and save reconstructed images
             train_images = images[:8]
+            target_images = target_images[:8]
             with torch.no_grad():
                 log_sigma_x = get_model_attribute(model, "log_sigma_x")
 
@@ -577,18 +600,20 @@ if __name__ == "__main__":
                     print("Iterating through val loader")
                 for batch_idx, (
                     val_images,
+                    val_target_images,
                     distr_idx,
                     targets,
                     meta_labels,
                 ) in enumerate(val_loader):
                     val_images = val_images.to(device)
+                    val_target_images = val_target_images.to(device)
                     reconstructed, latent_mu, latent_logvar = model(
                         val_images
                     )  # Model forward pass
 
                     loss = loss_function(
                         reconstructed,
-                        val_images,
+                        val_target_images,
                         latent_mu,
                         latent_logvar,
                         log_sigma_x=log_sigma_x,
@@ -634,7 +659,7 @@ if __name__ == "__main__":
                     sample_images.cpu(),
                     reconstructed_images.cpu(),
                     generated_images.cpu(),
-                    train_images.cpu(),
+                    target_images.cpu(),
                     train_reconstructed_images.cpu(),
                 ),
                 dim=0,
@@ -670,8 +695,8 @@ if __name__ == "__main__":
             checkpoint_dir / model_fname,
         )
         print(f"Training complete. Models saved in {checkpoint_dir}.")
-    dist.barrier()
     if ddp:
+        dist.barrier()
         dist.destroy_process_group()
 
     # Load back the saved final model and verify that it loads

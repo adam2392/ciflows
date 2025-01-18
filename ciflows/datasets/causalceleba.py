@@ -13,12 +13,14 @@ class CausalCelebA(Dataset):
         root,
         graph_type,
         transform=None,
+        input_transform=None,
         img_size=64,
         target_transform=None,
         fast_dev_run=False,
     ):
         self.root = root
         self.transform = transform
+        self.input_transform = input_transform
         self.target_transform = target_transform
         self.graph_type = graph_type
         self.img_size = img_size
@@ -29,9 +31,7 @@ class CausalCelebA(Dataset):
         self.file_list = []
 
         # load attrs
-        distr_types = [
-            # "obs", 
-                       "int_hair_0", "int_hair_1", "int_hair_2", "int_hair_3"]
+        distr_types = ["obs", "int_hair_0", "int_hair_1", "int_hair_2"]  # , "int_hair_3"]
         self.causal_distr_dfs = dict()
         self.distr_dfs = dict()
         self.causal_main_df = pd.DataFrame()
@@ -87,7 +87,7 @@ class CausalCelebA(Dataset):
             [0, 0, 1],
             [0, 0, 1],
             [0, 0, 1],
-            [0, 0, 1],
+            # [0, 0, 1],
         ]
 
     @property
@@ -135,7 +135,15 @@ class CausalCelebA(Dataset):
         if self.transform is not None:
             img = self.transform(img)
 
-        return img, distr_idx, target, meta_label
+        if self.input_transform is not None:
+            image = torch.permute(img, (1, 2, 0))
+            # print(image.shape)
+            # img = torch.permute(img, (1, 2, 0))
+            input_img = self.input_transform(image=np.array(image))["image"]
+        else:
+            input_img = img
+
+        return input_img, img, distr_idx, target, meta_label
 
     @property
     def meta_label_strs(self):
