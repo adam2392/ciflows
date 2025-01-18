@@ -5,7 +5,7 @@ from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.flows.model import CausalNormalizingFlow
 
 
-def make_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False):
+def make_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False, trainable_exogenous_weights=True):
     """Make normalizing flow model."""
     # Define list of flows
     if debug:
@@ -42,28 +42,28 @@ def make_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False):
         }
     edge_list = [(1, 2)]
     noise_means = {
-        0: torch.zeros(node_dimensions[0]),
-        1: torch.zeros(node_dimensions[1]),
-        2: torch.zeros(node_dimensions[2]),
+        0: torch.zeros(node_dimensions[0]) * torch.rand(node_dimensions[0]),
+        1: torch.zeros(node_dimensions[1]) * torch.rand(node_dimensions[1]),
+        2: torch.zeros(node_dimensions[2]) * torch.rand(node_dimensions[2]),
     }
     noise_variances = {
         0: torch.ones(node_dimensions[0]),
-        1: torch.ones(node_dimensions[1]),
-        2: torch.ones(node_dimensions[2]),
+        1: torch.ones(node_dimensions[1]) * 2.,
+        2: torch.ones(node_dimensions[2]) * 1.5,
     }
     intervened_node_means = [
-        {2: torch.ones(node_dimensions[2]) + 2},  # 0
-        {2: torch.ones(node_dimensions[2]) + 5},  # 1
-        {2: torch.ones(node_dimensions[2]) + 4},  # 2
-        {2: torch.ones(node_dimensions[2]) + 3},  # 3
-        {2: torch.ones(node_dimensions[2]) + 6},  # 4
+        {2: torch.ones(node_dimensions[2]) + 1},  # 0
+        {2: torch.ones(node_dimensions[2]) - 1},  # 1
+        {2: torch.ones(node_dimensions[2]) + 3},  # 2
+        # {2: torch.ones(node_dimensions[2]) + 3},  # 3
+        # {2: torch.ones(node_dimensions[2]) + 6},  # 4
     ]
     intervened_node_vars = [
-        {2: torch.ones(node_dimensions[2]) * 0.5},
-        {2: torch.ones(node_dimensions[2]) * 0.5},
-        {2: torch.ones(node_dimensions[2]) * 0.5},
         {2: torch.ones(node_dimensions[2])},
+        {2: torch.ones(node_dimensions[2]) * 0.5},
         {2: torch.ones(node_dimensions[2]) * 2},
+        # {2: torch.ones(node_dimensions[2])},
+        # {2: torch.ones(node_dimensions[2]) * 2},
     ]
 
     confounded_list = [(0, 1)]
@@ -79,6 +79,7 @@ def make_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False):
         intervened_node_means=intervened_node_means,
         intervened_node_vars=intervened_node_vars,
         trainable_edges=trainable_edges,
+        trainable_exogenous_weights=trainable_exogenous_weights
     )
 
     # Construct flow model with the multiscale architecture
