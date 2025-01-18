@@ -4,6 +4,11 @@ from copy import copy
 from pathlib import Path
 from collections import Counter
 
+from joblib import Parallel, delayed
+from tqdm import tqdm
+
+from tqdm_joblib import tqdm_joblib
+
 import numpy as np
 from numpy.testing import assert_allclose
 import pandas as pd
@@ -262,51 +267,11 @@ def interventional_sample_img_indices(
 def celeba_scm(
     celeba_data,
     save_dir,
-    image_size=64,
-    scm_type="obs",
-    interv_idx=0,
-    n_samples=1000,
-    seed=None,
+    sample_indices,
     append=False,
+    img_size=128,
+    n_workers=-1,
 ):
-    attr_names = copy(celeba_data.attr_names)
-    gender_idx = attr_names.index("Male")
-    age_idx = attr_names.index("Young")
-
-    blackhair_idx = attr_names.index("Black_Hair")
-    blondhair_idx = attr_names.index("Blond_Hair")
-    brownhair_idx = attr_names.index("Brown_Hair")
-    grayhair_idx = attr_names.index("Gray_Hair")
-
-    # Use np.argwhere to get the indices of matching elements
-    hair_cols = np.array([blackhair_idx, blondhair_idx, brownhair_idx, grayhair_idx])
-
-    male_attrs = celeba_data.attr[:, gender_idx]
-    young_attrs = celeba_data.attr[:, age_idx]
-    hair_attrs = celeba_data.attr[:, hair_cols]
-
-    # 0: black
-    # 1: blond
-    # 2: brown
-    # 3: gray
-    hair_attrs = np.argmax(hair_attrs, axis=1)
-
-    if scm_type == "obs":
-        sample_indices, sampled_attrs = obs_sample_img_indices(
-            male_attrs, young_attrs, hair_attrs, n_samples=n_samples, seed=seed
-        )
-    else:
-        sample_indices, sampled_attrs = interventional_sample_img_indices(
-            male_attrs,
-            young_attrs,
-            hair_attrs,
-            idx=interv_idx,
-            n_samples=n_samples,
-            seed=seed,
-        )
-    saved_attrs = []
-    saved_causal_attrs = []
-
     if append:
         # Define the pattern to match the file names
         pattern = re.compile(r"sample_(\d+)\.jpg")
@@ -319,39 +284,38 @@ def celeba_scm(
     else:
         max_idx = 0
 
-    # now actually sample the images, apply transformation and save them to disc
-    for idx, sample_idx in tqdm(enumerate(sample_indices)):
-        image, meta_attrs = celeba_data[sample_idx]
+    def process_sample(sample_idx, idx_offset):
+        # Load image and metadata
+        image, _ = celeba_data[sample_idx]
         image = torch.permute(image, (1, 2, 0))
 
         # Apply transformations
-        transform_pipeline = get_random_transforms(image_size=image_size)
-        transformed = transform_pipeline(image=np.array(image))
-        transformed_image = transformed["image"]
+        # transform_pipeline = get_random_transforms(image_size=img_size)
+        # transformed = transform_pipeline(image=np.array(image))
+        # transformed_image = transformed["image"]
+        transformed_image = image
 
         # Convert to a PIL Image
-        # Convert to a PIL Image
-        # transformed_image = transformed_image * 0.5 + 0.5  # Undo normalization (if applied)
         transformed_image = (transformed_image.numpy() * 255).astype(np.uint8)
         if transformed_image.shape[0] == 3:
             transformed_image = np.transpose(transformed_image, (1, 2, 0))
         image_pil = Image.fromarray(transformed_image)
 
-        # Save the image as PNG
-        save_path = save_dir / f"sample_{idx + max_idx}.jpg"
+        # Save the image as JPG
+        save_path = save_dir / f"sample_{idx_offset}.jpg"
         image_pil.save(save_path)
 
-        attrs = sampled_attrs[idx]
-
-        saved_causal_attrs.append(attrs)
-        saved_attrs.append(meta_attrs.numpy())
-        # print(attrs)
-
-        # if idx == 3:
-        #     return transformed
-
-    return saved_causal_attrs, saved_attrs
-
+    if n_workers == 1:
+        # Sequential execution
+        for idx, sample_idx in tqdm(enumerate(sample_indices), desc="Processing Samples"):
+            process_sample(sample_idx, idx + max_idx)
+    else:
+        # Wrap Parallel jobs with tqdm
+        with tqdm_joblib(tqdm(desc="Processing Samples", total=len(sample_indices))):
+            Parallel(n_jobs=n_workers)(
+                delayed(process_sample)(sample_idx, idx + max_idx)
+                for idx, sample_idx in enumerate(sample_indices)
+            )
 
 
 def get_joint_probability_table(sampled_attrs, verbose=False):
@@ -441,6 +405,7 @@ def inspect_sampled_causal_distr(df):
     # Display the correlation matrix
     print("\nPairwise Cramér's V Correlation Matrix:")
     from IPython import display
+
     display(correlation_matrix)
 
     # Compute conditional Cramér's V
@@ -467,6 +432,7 @@ def inspect_sampled_causal_distr(df):
         print(f"Age = {val}: Cramér's V = {v:.4f}")
 
 
+
 if __name__ == "__main__":
     # Root directory for the dataset
     data_root = Path("/Users/adam2392/pytorch_data/")
@@ -490,15 +456,82 @@ if __name__ == "__main__":
         ),
     )
 
+    df_filtered = filter_df(celeba_data)
+    df = df_filtered.copy()
+    hair_cat_col = "Hair_Category"
+    male_col = "Male"
+    young_col = "Young"
+    # Precompute hair categories
+    # hair_map = {"Black_Hair": 1, "Blond_Hair": 2, "Gray_Hair": 3}
+    # hair_categories = ["Black", "Blond", "Gray"]
+    hair_categories = ["Black", "Gray"]
+    sampled_indices, sampled_attrs = obs_sample_img_indices(
+        df["sample_idx"].values,
+        df[male_col].values,
+        df[young_col].values,
+        df[hair_cat_col].values,
+        hair_categories=hair_categories,
+        n_samples=n_samples,
+        seed=seed,
+    )
+
+    # save joint probability table
+    df = get_joint_probability_table(sampled_attrs)
+
+    # save resulting dataframe table
+    df.to_csv(
+        data_root / "CausalCelebA" / "chain" / "dim128" / "causalceleba_obs_joint_probability.csv",
+        index=False,
+    )
+
+    scm_type = "obs"
+    append = False
+
+    save_dir = data_root / "CausalCelebA" / "chain" / "dim128" / scm_type
+    save_dir.mkdir(exist_ok=True, parents=True)
+
+    celeba_scm(
+        celeba_data,
+        save_dir,
+        sample_indices=sampled_indices,
+        append=append,
+        img_size=image_size,
+        n_workers=1,
+    )
+
+    # save the metadata csv files
+    saved_causal_df = pd.DataFrame(sampled_attrs, columns=["Gender", "Age", "Hair Color"])
+    saved_causal_df["Sample Index"] = sampled_indices
+
+    # save the metadata csv files
+    if scm_type == "obs":
+        saved_causal_df["Intervention"] = "Obs"
+    else:
+        saved_causal_df["Intervention"] = "Haircolor"
+
+    causal_attrs_path = save_dir / "causal_attrs.csv"
+    meta_attrs_path = save_dir / "meta_attrs.csv"
+    if append:
+        # TODO: need to append the existing CSV
+        # Define file paths
+
+        # Check if the files already exist and append if they do
+        if causal_attrs_path.exists():
+            existing_causal_df = pd.read_csv(causal_attrs_path, index_col=0)
+            saved_causal_df = pd.concat([existing_causal_df, saved_causal_df], ignore_index=True)
+
+    saved_causal_df.to_csv(causal_attrs_path)
+
+
     scm_types = [
-        # 'int_hair_2',
-        "int_hair_3",
-        "int_hair_4",
+        "int_hair_0",
+        "int_hair_1",
+        "int_hair_2",
     ]
     interv_idxs = [
-        # 2,
-        3,
-        4,
+        0,
+        1,
+        2,
     ]
     for interv_idx, scm_type in zip(interv_idxs, scm_types):
         print(f"Computing for {interv_idx} - {scm_type}")
@@ -548,3 +581,5 @@ if __name__ == "__main__":
 
         saved_causal_df.to_csv(causal_attrs_path)
         saved_attrs_df.to_csv(meta_attrs_path)
+
+        
