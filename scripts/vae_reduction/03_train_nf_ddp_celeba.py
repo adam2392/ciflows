@@ -185,6 +185,7 @@ if __name__ == "__main__":
     out_channels = 3
     latent_dim = 48
     num_flows = 128
+    num_blocks_per_stage = 3
 
     beta_max = 1.5
     annealing_epochs = 1000  # Number of epochs for full beta
@@ -214,11 +215,10 @@ if __name__ == "__main__":
         if ddp_local_rank >= torch.cuda.device_count():
             ddp_local_rank = ddp_world_size - ddp_local_rank
 
-        if dist.is_initialized() and dist.get_rank() == 0:
-            print("Distributed training initialized on rank 0")
-
         device = f"cuda:{ddp_local_rank}"
 
+        if dist.is_initialized() and dist.get_rank() == 0:
+            print("Distributed training initialized on rank 0")
         print("Setting device to", device)
         print("DDP rank: ", ddp_rank)
         print("Local rank: ", ddp_local_rank)
@@ -412,7 +412,7 @@ if __name__ == "__main__":
                 images = images.to(device)
                 optimizer.zero_grad()
 
-                print(images.shape, distr_idx, targets.shape)
+                # print(images.shape, distr_idx, targets.shape)
                 # extract data from tensor to Parameterdict
                 loss = model.forward_kld(images, intervention_targets=targets, distr_idx=distr_idx)
 
@@ -492,7 +492,7 @@ if __name__ == "__main__":
                     # reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
                     save_image(
                         reconstructed_images.cpu(),
-                        checkpoint_dir / f"epoch_{epoch}_distr-{distr_idx}_samples.png",
+                        checkpoint_dir / f"epoch_{epoch}_distr-{distr_index}_samples.png",
                         nrow=4,
                         normalize=True,
                     )
