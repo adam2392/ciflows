@@ -121,7 +121,7 @@ def get_model_attribute(model, attr):
 
 
 if __name__ == "__main__":
-    debug = True
+    debug = False
     compile = False
     load_from_checkpoint = False
 
@@ -160,7 +160,7 @@ if __name__ == "__main__":
 
     # Data settings
     batch_size = 128
-    gradient_accumulation_steps = 3 * 3  # used to simulate larger batch sizes
+    gradient_accumulation_steps = 2 * 3  # used to simulate larger batch sizes
     img_size = 128
     graph_type = "chain"
     scm_type = "haircolor"

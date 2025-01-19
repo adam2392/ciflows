@@ -186,6 +186,7 @@ def loss_function(recon_x, x, mu, log_var, log_sigma_x, capacity=0.0, beta=0.000
     rec_loss = F.mse_loss(recon_x, x)
     # print(recon_x.shape, x.shape, mu.shape, log_var.shape)
 
+    l1_loss = F.l1_loss(recon_x, x)
     # rec_loss = gaussian_nll(recon_x, log_sigma_x, x).sum()
 
     KLD = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
@@ -197,7 +198,7 @@ def loss_function(recon_x, x, mu, log_var, log_sigma_x, capacity=0.0, beta=0.000
     else:
         kl_loss_controlled = torch.max(KLD - capacity, torch.tensor(0.0).cuda())
 
-    loss = rec_loss + beta * kl_loss_controlled
+    loss = rec_loss + l1_loss + beta * kl_loss_controlled
     return loss
 
 
@@ -216,7 +217,7 @@ def get_model_attribute(model, attr):
 if __name__ == "__main__":
     debug = False
     compile = False
-    load_from_checkpoint = False
+    load_from_checkpoint = True
 
     # System settings
     world_size = torch.cuda.device_count()
@@ -253,7 +254,7 @@ if __name__ == "__main__":
 
     # Data settings
     batch_size = 128
-    gradient_accumulation_steps = 3 * 3  # used to simulate larger batch sizes
+    gradient_accumulation_steps = 2 * 8  # used to simulate larger batch sizes
     img_size = 128
     graph_type = "chain"
     scm_type = "haircolor"
@@ -327,7 +328,7 @@ if __name__ == "__main__":
         seed_offset = ddp_rank  # each process gets a different seed
         # world_size number of processes will be training simultaneously, so we can scale
         # down the desired gradient accumulation iterations per process proportionally
-        assert gradient_accumulation_steps % ddp_world_size == 0
+        assert gradient_accumulation_steps % ddp_world_size == 0, f""
         gradient_accumulation_steps //= ddp_world_size
     else:
         # if not ddp, we are running on a single gpu, and one process
@@ -363,15 +364,15 @@ if __name__ == "__main__":
     # v2: K=8
     # v3: K=8, batch higher
     # model_fname = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v2.pt"
-    model_fname = "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
+    model_fname = "celeba_cyclicbetal1loss_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / scm_type / model_fname.split(".")[0]
 
     # for loaded checkpoints
-    checkpoint_model_fdir = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
+    checkpoint_model_fdir = "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1cont.pt"
     saved_checkpoint_dir = (
         root / "CausalCelebA" / "vae_reduction" / scm_type / checkpoint_model_fdir.split(".")[0]
     )
-    savedcheckpoint_model_fname = "model_epoch_4865.pt"
+    savedcheckpoint_model_fname = "model_epoch_9040.pt"
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
@@ -508,6 +509,7 @@ if __name__ == "__main__":
             with ctx:
                 # forward pass
                 images = images.to(device)
+                target_images = target_images.to(device)
                 optimizer.zero_grad()
                 reconstructed, latent_mu, latent_logvar = model(images)  # Model forward pass
 
@@ -592,7 +594,7 @@ if __name__ == "__main__":
 
             # Sample and save reconstructed images
             train_images = images[:8]
-            target_images = target_images[:8]
+            target_train_images = target_images[:8]
             with torch.no_grad():
                 log_sigma_x = get_model_attribute(model, "log_sigma_x")
 
@@ -659,7 +661,7 @@ if __name__ == "__main__":
                     sample_images.cpu(),
                     reconstructed_images.cpu(),
                     generated_images.cpu(),
-                    target_images.cpu(),
+                    target_train_images.cpu(),
                     train_reconstructed_images.cpu(),
                 ),
                 dim=0,
