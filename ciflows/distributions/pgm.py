@@ -195,6 +195,10 @@ class LinearGaussianDag(MultidistrCausalFlow):
                 weight = self.edge_weights[f"{parent}->{node}"]
                 parent_contributions += samples[parent] @ weight
 
+                # print(
+                #     f"Parent: {parent}, Weight: {weight.shape}, Parent contrib: {parent_contributions.shape}"
+                # )
+
             # Sample from the conditional normal distribution
             mean = parent_contributions  # Mean determined by parents
             # noise_mean = self.noise_means.get(node, 0.0)  # Non-zero mean of the noise
@@ -205,13 +209,15 @@ class LinearGaussianDag(MultidistrCausalFlow):
                     self, f"exog_mean_{node}_0", 0.0
                 )  # self.noise_means.get(node, 0.0)
 
-                exogenous_weight = getattr(self, f"exogenous_weights_{node}_0")
+                # exogenous_weight = getattr(self, f"exogenous_weights_{node}_0")
+                exogenous_weight = self.exogenous_weights[f"{node}_0"]
                 # Compute total noise variance (node-specific + confounders)
                 node_noise_var = getattr(self, f"exog_variance_{node}_0", torch.tensor(1.0))
             else:
                 # Intervened noise mean and variance
                 noise_mean = getattr(self, f"exog_mean_{node}_{distr_idx}")
-                exogenous_weight = getattr(self, f"exogenous_weights_{node}_{distr_idx}")
+                # exogenous_weight = getattr(self, f"exogenous_weights_{node}_{distr_idx}")
+                exogenous_weight = self.exogenous_weights[f"{node}_{distr_idx}"]
                 node_noise_var = getattr(self, f"exog_variance_{node}_{distr_idx}")
 
             noise_std = torch.sqrt(node_noise_var)  # Standard deviation of the noise
@@ -221,12 +227,12 @@ class LinearGaussianDag(MultidistrCausalFlow):
             for confounded_node in self.confounder_means.get(node, {}):
                 confounder_mean = self.confounder_means[node][confounded_node]
                 confounder_var = self.confounder_variances[node][confounded_node]
-                print(
-                    confounder_mean.shape,
-                    confounder_var.shape,
-                    torch.randn(batch_size, node_dim).shape,
-                    noise_mean.shape,
-                )
+                # print(
+                #     confounder_mean.shape,
+                #     confounder_var.shape,
+                #     torch.randn(batch_size, node_dim).shape,
+                #     noise_mean.shape,
+                # )
                 confounder_noise += torch.add(
                     confounder_mean,
                     torch.multiply(
@@ -235,11 +241,13 @@ class LinearGaussianDag(MultidistrCausalFlow):
                     ),
                 )
 
-            # exogenous noise
-            noise = (
-                noise_mean + noise_std * torch.randn(batch_size, node_dim).to(device)
-            ) @ exogenous_weight  # Gaussian noise with non-zero mean
+            # exogenous noise - # Gaussian noise with non-zero mean scaled by means and std
+            noise = ((noise_mean + noise_std) * torch.randn(batch_size, node_dim).to(device) * exogenous_weight)
 
+            # print("inside forward: ")
+            # print(node)
+            # print(noise_mean.shape, noise_std.shape, exogenous_weight.shape)
+            # print(mean.shape, noise.shape, confounder_noise.shape)
             samples[node] = (
                 mean + noise + confounder_noise
             )  # Sampled value for each node in the batch
@@ -342,15 +350,20 @@ class LinearGaussianDag(MultidistrCausalFlow):
                 if idx == 0 or node not in intervened_vars:
                     # Non-zero noise mean and variance
                     noise_mean = getattr(self, f"exog_mean_{node}_0")
+                    exogenous_weight = self.exogenous_weights[f"{node}_0"]
 
-                    exogenous_weight = getattr(self, f"exogenous_weights_{node}_0")
                     # Compute total noise variance (node-specific + confounders)
-                    node_noise_var = getattr(self, f"exog_variance_{node}_0")
+                    node_noise_var = getattr(self, f"exog_variance_{node}_0") * (
+                        exogenous_weight.T @ exogenous_weight
+                    )
                 else:
                     # Intervened noise mean and variance
                     noise_mean = getattr(self, f"exog_mean_{node}_{idx}")
-                    exogenous_weight = getattr(self, f"exogenous_weights_{node}_{idx}")
-                    node_noise_var = getattr(self, f"exog_variance_{node}_{idx}")
+                    # exogenous_weight = getattr(self, f"exogenous_weights_{node}_{idx}")
+                    exogenous_weight = self.exogenous_weights[f"{node}_{idx}"]
+                    node_noise_var = getattr(self, f"exog_variance_{node}_{idx}") * (
+                        exogenous_weight.T @ exogenous_weight
+                    )
 
                 node_noise_std = torch.sqrt(node_noise_var)
                 if node in self.confounder_means:
@@ -392,69 +405,149 @@ class LinearGaussianDag(MultidistrCausalFlow):
         return log_prob
 
 
-if __name__ == "__main__":
-    node_dimensions = {"A": 5, "B": 4, "C": 3}
-    edge_list = [("A", "B"), ("C", "B")]
-    noise_variances = {"A": 1.0, "B": 1.0, "C": 1.0}
-    noise_means = {"A": 2.0, "B": 0.0, "C": 0.0}
-    confounded_list = [("A", "C")]
+def test_main():
+    hc_dim = 4
+
+    if hc_dim == 4:
+        node_dimensions = {
+            0: 22,
+            1: 22,
+            2: 4,
+        }
+    elif hc_dim == 16:
+        node_dimensions = {
+            0: 16,
+            1: 16,
+            2: 16,
+        }
+    edge_list = [(1, 2)]
+    noise_means = {
+        0: torch.zeros(node_dimensions[0]) * torch.rand(node_dimensions[0]),
+        1: torch.zeros(node_dimensions[1]) * torch.rand(node_dimensions[1]),
+        2: torch.zeros(node_dimensions[2]) * torch.rand(node_dimensions[2]),
+    }
+    noise_variances = {
+        0: torch.ones(node_dimensions[0]),
+        1: torch.ones(node_dimensions[1]) * 2.,
+        2: torch.ones(node_dimensions[2]) * 1.5,
+    }
     intervened_node_means = [
-        {"A": 0.5, "B": -0.3},  # First intervention
-        {"B": 0.1, "C": -0.2},  # Second intervention
+        {2: torch.ones(node_dimensions[2]) + 1},  # 0
+        {2: torch.ones(node_dimensions[2]) - 1},  # 1
+        {2: torch.ones(node_dimensions[2]) + 3},  # 2
+        # {2: torch.ones(node_dimensions[2]) + 3},  # 3
+        # {2: torch.ones(node_dimensions[2]) + 6},  # 4
     ]
     intervened_node_vars = [
-        {"A": 0.02, "B": 0.05},  # Variances for first intervention
-        {"B": 0.1, "C": 0.2},  # Variances for second intervention
+        {2: torch.ones(node_dimensions[2])},
+        {2: torch.ones(node_dimensions[2]) * 0.5},
+        {2: torch.ones(node_dimensions[2]) * 2},
+        # {2: torch.ones(node_dimensions[2])},
+        # {2: torch.ones(node_dimensions[2]) * 2},
     ]
-    sampler = LinearGaussianDag(
-        node_dimensions,
-        edge_list,
-        noise_means,
-        noise_variances,
+
+    confounded_list = [(0, 1)]
+    confounded_list = []
+
+    # independent noise with causal prior
+    q0 = LinearGaussianDag(
+        node_dimensions=node_dimensions,
+        edge_list=edge_list,
+        noise_means=noise_means,
+        noise_variances=noise_variances,
         confounded_list=confounded_list,
         intervened_node_means=intervened_node_means,
         intervened_node_vars=intervened_node_vars,
+        trainable_edges=False,
+        trainable_exogenous_weights=True
     )
-    batch_size = 1000
+    return q0
+
+
+if __name__ == "__main__":
+    sampler = test_main()
+
+    batch_size = 10
     distr_idx = 0
-    samples = sampler.sample(batch_size, distr_idx=distr_idx, as_dict=True)
+    samples = sampler.sample(batch_size, distr_idx=distr_idx, as_dict=False)
     distr_idx = 0
 
-    for node, data in samples.items():
-        print(f"Node {node}: {data.shape}")
+    # for node, data in samples.items():
+    #     print(f"Node {node}: {data.shape}")
 
     # Test with exogenous weights
-    for node, weight in sampler.exogenous_weights.items():
-        print(f"Exogenous weight for {node}: {weight}")
+    # for node, weight in sampler.exogenous_weights.items():
+    #     print(f"Exogenous weight for {node}: {weight}")
 
     print(sampler.distr_idx_map)
 
     log_probs = sampler.log_prob(samples, distr_idx=np.ones(batch_size, dtype=int) * distr_idx)
-    print(log_probs.shape)  # Should be (10,)
+    print(samples.shape, log_probs.shape)  # Should be (10,)
     # print(log_probs)  # Log-probabilities for each sample
     print(-log_probs.mean())
 
-    # Generate samples
-    batch_size = 1000
-    # samples = sampler.sample(batch_size, as_dict=True)
+    # node_dimensions = {"A": 5, "B": 4, "C": 3}
+    # edge_list = [("A", "B"), ("C", "B")]
+    # noise_variances = {"A": 1.0, "B": 1.0, "C": 1.0}
+    # noise_means = {"A": 2.0, "B": 0.0, "C": 0.0}
+    # confounded_list = [("A", "C")]
+    # intervened_node_means = [
+    #     {"A": 0.5, "B": -0.3},  # First intervention
+    #     {"B": 0.1, "C": -0.2},  # Second intervention
+    # ]
+    # intervened_node_vars = [
+    #     {"A": 0.02, "B": 0.05},  # Variances for first intervention
+    #     {"B": 0.1, "C": 0.2},  # Variances for second intervention
+    # ]
+    # sampler = LinearGaussianDag(
+    #     node_dimensions,
+    #     edge_list,
+    #     noise_means,
+    #     noise_variances,
+    #     confounded_list=confounded_list,
+    #     intervened_node_means=intervened_node_means,
+    #     intervened_node_vars=intervened_node_vars,
+    # )
+    # batch_size = 1000
+    # distr_idx = 0
+    # samples = sampler.sample(batch_size, distr_idx=distr_idx, as_dict=True)
+    # distr_idx = 0
 
-    # Verify the sample distribution
-    import matplotlib.pyplot as plt
+    # for node, data in samples.items():
+    #     print(f"Node {node}: {data.shape}")
 
-    # Plot histograms for one of the dimensions of 'A', 'B', and 'C'
-    plt.figure(figsize=(12, 4))
-    for i, node in enumerate(["A", "B", "C"]):
-        plt.subplot(1, 3, i + 1)
-        plt.hist(
-            samples[node][:, 2].detach().cpu().numpy(),
-            bins=50,
-            density=True,
-            alpha=0.7,
-            label=f"{node}",
-        )
-        plt.title(f"Node {node} (Dim 0)")
-        plt.xlabel("Value")
-        plt.ylabel("Density")
-        plt.legend()
-    plt.tight_layout()
-    plt.show()
+    # # Test with exogenous weights
+    # for node, weight in sampler.exogenous_weights.items():
+    #     print(f"Exogenous weight for {node}: {weight}")
+
+    # print(sampler.distr_idx_map)
+
+    # log_probs = sampler.log_prob(samples, distr_idx=np.ones(batch_size, dtype=int) * distr_idx)
+    # print(log_probs.shape)  # Should be (10,)
+    # # print(log_probs)  # Log-probabilities for each sample
+    # print(-log_probs.mean())
+
+    # # Generate samples
+    # batch_size = 1000
+    # # samples = sampler.sample(batch_size, as_dict=True)
+
+    # # Verify the sample distribution
+    # import matplotlib.pyplot as plt
+
+    # # Plot histograms for one of the dimensions of 'A', 'B', and 'C'
+    # plt.figure(figsize=(12, 4))
+    # for i, node in enumerate(["A", "B", "C"]):
+    #     plt.subplot(1, 3, i + 1)
+    #     plt.hist(
+    #         samples[node][:, 2].detach().cpu().numpy(),
+    #         bins=50,
+    #         density=True,
+    #         alpha=0.7,
+    #         label=f"{node}",
+    #     )
+    #     plt.title(f"Node {node} (Dim 0)")
+    #     plt.xlabel("Value")
+    #     plt.ylabel("Density")
+    #     plt.legend()
+    # plt.tight_layout()
+    # plt.show()

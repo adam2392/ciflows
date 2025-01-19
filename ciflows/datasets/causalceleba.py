@@ -86,13 +86,13 @@ class CausalCelebA(Dataset):
             [0, 0, 0],
             [0, 0, 1],
             [0, 0, 1],
-            [0, 0, 1],
+            # [0, 0, 1],
             # [0, 0, 1],
         ]
 
     @property
     def distr_idx_list(self):
-        return [0, 1, 2, 3, 4]
+        return [0, 1, 2]
 
     @property
     def obs_attr(self):
@@ -398,7 +398,7 @@ class CausalCelebAEmbedding(CausalCelebA):
                 f"int_{scm_type}_0": f"int_{scm_type}_0_{dataset_postfix}.pt",
                 f"int_{scm_type}_1": f"int_{scm_type}_1_{dataset_postfix}.pt",
                 f"int_{scm_type}_2": f"int_{scm_type}_2_{dataset_postfix}.pt",
-                f"int_{scm_type}_3": f"int_{scm_type}_3_{dataset_postfix}.pt",
+                # f"int_{scm_type}_3": f"int_{scm_type}_3_{dataset_postfix}.pt",
                 # "int_hair_4": f"int_hair_4_{dataset_postfix}.pt",
                 # "obs": "obs_nonorm_encodings.pt",
                 # "int_hair_0": "int_hair_0_nonorm_encodings.pt",
@@ -425,8 +425,8 @@ class CausalCelebAEmbedding(CausalCelebA):
             "obs",
             f"int_{scm_type}_0",
             f"int_{scm_type}_1",
-            "int_hair_2",
-            "int_hair_3",
+            f"int_{scm_type}_2",
+            # "int_hair_3",
             # "int_hair_4",
         ]
         self.causal_distr_dfs = dict()

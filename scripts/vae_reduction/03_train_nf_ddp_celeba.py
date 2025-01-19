@@ -121,7 +121,7 @@ def get_model_attribute(model, attr):
 
 
 if __name__ == "__main__":
-    debug = True
+    debug = False
     compile = False
     load_from_checkpoint = False
 
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     gradient_accumulation_steps = 3 * 3  # used to simulate larger batch sizes
     img_size = 128
     graph_type = "chain"
-    scm_type = "haircolor"
+    scm_type = "hair"
     # scm_type = "eyeglass"
     num_workers = 4
 
@@ -341,18 +341,17 @@ if __name__ == "__main__":
 
     top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
 
-    train_loader, val_loader = data_loader(
+    train_loader = data_loader(
         root_dir=root,
+        dataset=dataset,
         graph_type=graph_type,
         num_workers=num_workers,
         batch_size=batch_size,
         img_size=img_size,
-        scm_type=scm_type,
+        scm_type=scm_name,
     )
     if master_process:
-        print(
-            f"Train loader has {len(train_loader)} images and val loader {len(val_loader)} images"
-        )
+        print(f"Train loader has {len(train_loader)} images")
 
     # training loop
     # - log the train and val loss every 10 epochs
@@ -413,6 +412,7 @@ if __name__ == "__main__":
                 images = images.to(device)
                 optimizer.zero_grad()
 
+                print(images.shape, distr_idx, targets.shape)
                 # extract data from tensor to Parameterdict
                 loss = model.forward_kld(images, intervention_targets=targets, distr_idx=distr_idx)
 
@@ -480,8 +480,8 @@ if __name__ == "__main__":
                 if master_process:
                     print("Iterating through val loader")
                 # sample images from normalizing flow
-                for distr_idx in train_loader.dataset.distr_idx_list:
-                    sample_embeddings, _ = model.sample(8, distr_idx=distr_idx)
+                for distr_index in train_loader.dataset.distr_idx_list:
+                    sample_embeddings, _ = model.sample(8, distr_idx=distr_index)
 
                     # reconstruct images
                     reconstructed_images = vae_model.decode(sample_embeddings).reshape(
@@ -499,7 +499,7 @@ if __name__ == "__main__":
 
                 # reconstruct images using VAE
                 embeddings = images[:8]
-                images = vae_model.decoder(embeddings).reshape(-1, 3, img_size, img_size)
+                recon_images = vae_model.decoder(embeddings).reshape(-1, 3, img_size, img_size)
 
                 # forward/inverse of flow model
                 recon_embedding = model.forward(model.inverse(embeddings))
@@ -510,7 +510,7 @@ if __name__ == "__main__":
                 )
 
                 # clamp said images
-                reconstructed_images = torch.cat([images, reconstructed_images], dim=0)
+                reconstructed_images = torch.cat([recon_images, reconstructed_images], dim=0)
                 # reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
 
                 save_image(
