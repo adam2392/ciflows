@@ -17,6 +17,7 @@ def encode_images_in_directory(
         [f for f in os.listdir(directory) if f.endswith(".jpg")],
         key=lambda x: int(x.split("_")[1].split(".")[0]),  # Extract the numeric part
     )
+    print('First few files: ', [Path(x).name for x in image_files[:5]])
     if debug:
         print(image_files[:5])
         assert False
@@ -82,9 +83,9 @@ if __name__ == "__main__":
 
     # model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
     model_dir = (
-        "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1cont"
+        "celeba_cyclicbetal1loss_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1"
     )
-    model_fname = "model_epoch_9040.pt"
+    model_fname = "model_epoch_15670.pt"
     scm_type = "haircolor"
 
     # model_dir = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v2"
@@ -129,7 +130,7 @@ if __name__ == "__main__":
         # Save the tensor
         # v2 nonorm encodings = sample from latent, rather than the mean
         # output_path = f"{directory.name}_cyclicbeta_noimgaug_encodings.pt"
-        output_path = f"{directory.name}_alldata_encodings.pt"
+        output_path = f"{directory.name}_alldata_l1loss_encodings.pt"
 
         # output_path = f"{directory.name}_nonorm_encodings.pt"
         torch.save(latent_vectors, directory / output_path)

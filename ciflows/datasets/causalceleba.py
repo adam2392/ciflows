@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -46,7 +47,14 @@ class CausalCelebA(Dataset):
             img_files = list(
                 distr_root.rglob("sample_*.jpg")
             )  # Use glob for the current directory, rglob for recursive search
-            self.file_list.extend(img_files)
+            # Sort the images based on the number after "sample_"
+            img_files_sorted = sorted(
+                img_files, key=lambda x: int(re.search(r"sample_(\d+)", x.name).group(1))
+            )
+
+            print(f"Found {len(img_files)} images..")
+            print(f"here are the first 20... ", [print([x.name for x in img_files_sorted[:5]])])
+            self.file_list.extend(img_files_sorted)
 
             attrs_df["distr_type"] = distr_type
             attrs_df["distr_idx"] = distr_types.index(distr_type)
@@ -206,14 +214,14 @@ class CausalCelebA(Dataset):
             raise ValueError(f"Cannot sample {n_samples} samples with {attr_name} = {attr_val}")
 
         # randomly sample n_samples from idx
-        idx = np.random.choice(idx, n_samples, replace=False)
-        print(idx)
+        rand_idx = np.random.choice(idx, n_samples, replace=False)
+        # print(idx)
         samples = []
-        for i in idx:
-            img, distr_idx, target, meta_label = self[i]
+        for i in rand_idx:
+            img, _, distr_idx, target, meta_label = self[i]
             samples.append(img)
         samples = torch.stack(samples, dim=0)
-        return samples, idx
+        return samples, rand_idx
 
 
 class CausalCelebAEyeGlasses(Dataset):
@@ -393,6 +401,19 @@ class CausalCelebAEmbedding(CausalCelebA):
         # load attrs
         if dataset == "alldata":
             dataset_postfix = "alldata_encodings"
+            encoding_fnames = {
+                "obs": f"obs_{dataset_postfix}.pt",
+                f"int_{scm_type}_0": f"int_{scm_type}_0_{dataset_postfix}.pt",
+                f"int_{scm_type}_1": f"int_{scm_type}_1_{dataset_postfix}.pt",
+                f"int_{scm_type}_2": f"int_{scm_type}_2_{dataset_postfix}.pt",
+                # f"int_{scm_type}_3": f"int_{scm_type}_3_{dataset_postfix}.pt",
+                # "int_hair_4": f"int_hair_4_{dataset_postfix}.pt",
+                # "obs": "obs_nonorm_encodings.pt",
+                # "int_hair_0": "int_hair_0_nonorm_encodings.pt",
+                # "int_hair_1": "int_hair_1_nonorm_encodings.pt",
+            }
+        elif dataset == 'alldata_l1loss':
+            dataset_postfix = "alldata_l1loss_encodings"
             encoding_fnames = {
                 "obs": f"obs_{dataset_postfix}.pt",
                 f"int_{scm_type}_0": f"int_{scm_type}_0_{dataset_postfix}.pt",
