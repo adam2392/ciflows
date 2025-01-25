@@ -296,7 +296,13 @@ if __name__ == "__main__":
     # initialize a GradScaler. If enabled=False scaler is a no-op
     scaler = torch.GradScaler(device=device, enabled=(dtype == "float16"))
 
-    model = make_nf_model(K=num_flows, hc_dim=hcdim, trainable_edges=False, debug=debug, trainable_exogenous_weights=True)
+    model = make_nf_model(
+        K=num_flows,
+        hc_dim=hcdim,
+        trainable_edges=False,
+        debug=debug,
+        trainable_exogenous_weights=True,
+    )
     model = model.to(device)
 
     # configure optimizers
@@ -306,8 +312,6 @@ if __name__ == "__main__":
         betas=(beta1, beta2),
         weight_decay=1e-4,
     )
-    # Default: create pytorch optimizer
-    # optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
     # compile the model
     if compile:

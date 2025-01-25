@@ -28,7 +28,7 @@ CMD="python3 $SCRIPT_NAME" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 
 # Optionally, you can use a job scheduler like `nohup` to run the command in the background
 # or `&` to run the command in the background
-LOG_FILE="celeba_haircolor_nfon_128flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim8_trainableedges_sep4and8_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
+LOG_FILE="celeba_haircolor_innfon_128flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim8_trainableedges_sep4and8_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
 # LOG_FILE="celeba_cyclicbetal1loss_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
 # LOG_FILE="encodings_haircolor_celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1cont_${SCRIPT_NAME}_seed_${GPU_INDEX}.log"
 
