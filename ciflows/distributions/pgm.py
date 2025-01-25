@@ -354,7 +354,7 @@ class LinearGaussianDag(MultidistrCausalFlow):
 
                     # Compute total noise variance (node-specific + confounders)
                     node_noise_var = getattr(self, f"exog_variance_{node}_0") * (
-                        exogenous_weight.T @ exogenous_weight
+                        exogenous_weight.mT @ exogenous_weight
                     )
                 else:
                     # Intervened noise mean and variance
@@ -362,7 +362,7 @@ class LinearGaussianDag(MultidistrCausalFlow):
                     # exogenous_weight = getattr(self, f"exogenous_weights_{node}_{idx}")
                     exogenous_weight = self.exogenous_weights[f"{node}_{idx}"]
                     node_noise_var = getattr(self, f"exog_variance_{node}_{idx}") * (
-                        exogenous_weight.T @ exogenous_weight
+                        exogenous_weight.mT @ exogenous_weight
                     )
 
                 node_noise_std = torch.sqrt(node_noise_var)

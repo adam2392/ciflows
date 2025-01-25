@@ -86,13 +86,13 @@ class CausalCelebA(Dataset):
             [0, 0, 0],
             [0, 0, 1],
             [0, 0, 1],
-            # [0, 0, 1],
+            [0, 0, 1],
             # [0, 0, 1],
         ]
 
     @property
     def distr_idx_list(self):
-        return [0, 1, 2]
+        return [0, 1, 2, 3]
 
     @property
     def obs_attr(self):
