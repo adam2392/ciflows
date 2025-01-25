@@ -81,7 +81,7 @@ class LinearGaussianDag(MultidistrCausalFlow):
         self.edge_weights = nn.ParameterDict(
             {
                 f"{src}->{tgt}": nn.Parameter(
-                    torch.randn(node_dimensions[src], node_dimensions[tgt]) + 1.0,
+                    torch.rand(node_dimensions[src], node_dimensions[tgt]) + 1.0,
                     requires_grad=trainable_edges,
                 )
                 for src, tgt in edge_list

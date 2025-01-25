@@ -109,8 +109,7 @@ class DAGFlow(MultidistrCausalFlow):
         return super().sample(num_samples, **kwargs)
     
     def forward(self, num_samples=1):
-        # start from the q0's of each of the DAGNodes
-
+        return super().forward(num_samples)
     
     def log_prob(self, v, e, intervention_targets, hard_interventions = None):
         return super().log_prob(v, e, intervention_targets, hard_interventions)

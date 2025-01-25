@@ -368,11 +368,11 @@ if __name__ == "__main__":
     checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / scm_type / model_fname.split(".")[0]
 
     # for loaded checkpoints
-    checkpoint_model_fdir = "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1cont.pt"
+    checkpoint_model_fdir = "celeba_cyclicbetal1loss_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
     saved_checkpoint_dir = (
         root / "CausalCelebA" / "vae_reduction" / scm_type / checkpoint_model_fdir.split(".")[0]
     )
-    savedcheckpoint_model_fname = "model_epoch_9040.pt"
+    savedcheckpoint_model_fname = "model_epoch_11085.pt"
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
