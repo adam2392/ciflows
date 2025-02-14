@@ -46,8 +46,8 @@ def make_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False, trainable_
             1: 16,
             2: 16,
         }
-    # edge_list = [(1, 2)]
-    edge_list = []
+    edge_list = [(1, 2)]
+    # edge_list = []
     noise_means = {
         0: torch.rand(node_dimensions[0]),
         1: torch.rand(node_dimensions[1]),
@@ -73,6 +73,7 @@ def make_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False, trainable_
         # {2: torch.ones(node_dimensions[2]) * 2},
     ]
     confounded_list = [(0, 1)]
+    confounded_list = []
 
     # independent noise with causal prior
     q0 = LinearGaussianDag(

@@ -32,7 +32,7 @@ class MultiTaskResNet(nn.Module):
         )  # Exclude the FC layer
 
         # Define task-specific classifiers
-        # self.fc_gender = nn.Linear(512, 2)  # Gender: 2 classes
+        self.fc_gender = nn.Linear(512, 2)  # Gender: 2 classes
         # self.fc_age = nn.Linear(512, 2)  # Age: 2 classes
         self.fc_hair = nn.Linear(512, 4)  # Hair color: 4 classes
 
@@ -42,18 +42,17 @@ class MultiTaskResNet(nn.Module):
         x = torch.flatten(x, 1)  # Flatten the features
 
         # Task-specific logits
-        # gender_logits = self.fc_gender(x)
+        gender_logits = self.fc_gender(x)
         # age_logits = self.fc_age(x)
-        hair_logits = self.fc_hair(x)
+        # hair_logits = self.fc_hair(x)
 
         # Compute probabilities from logits
-        # gender_probs = F.softmax(gender_logits, dim=1)  # Probabilities for gender
+        gender_probs = F.softmax(gender_logits, dim=1)  # Probabilities for gender
         # age_probs = F.softmax(age_logits, dim=1)  # Probabilities for age
-        hair_probs = F.softmax(hair_logits, dim=1)  # Probabilities for hair
+        # hair_probs = F.softmax(hair_logits, dim=1)  # Probabilities for hair
 
-        # return (
-        # (gender_logits, gender_probs),
-        return (hair_logits, hair_probs)
+        return gender_logits, gender_probs
+        # return (hair_logits, hair_probs)
         # (age_logits, age_probs),
         # )
         # return gender_out, hair_out, age_out

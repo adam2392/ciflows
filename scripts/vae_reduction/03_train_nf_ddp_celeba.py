@@ -265,7 +265,7 @@ if __name__ == "__main__":
     # v2: K=8
     # v3: K=8, batch higher
     # model_fname = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v2.pt"
-    model_fname = "celeba_haircolor_indnfon_128flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim8_trainableedges_sep4and8_v1.pt"
+    model_fname = "celeba_haircolor_nfon_128flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim8_trainableedges_sep4and8_v2.pt"
     hcdim = 8
     checkpoint_model_fname = "celeba_nfon_cyclicbetaresnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
     model_checkpoint_dir = (

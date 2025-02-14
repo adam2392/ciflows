@@ -39,7 +39,7 @@ class CausalCelebA(Dataset):
         for distr_type in distr_types:
             distr_root = root / self.__class__.__name__ / graph_type / f"dim{img_size}" / distr_type
             filename = distr_root / "causal_attrs.csv"
-            attrs_df = pd.read_csv(filename)
+            attrs_df = pd.read_csv(filename, index_col=0)
 
             self.causal_distr_dfs[distr_type] = attrs_df
 
@@ -52,8 +52,6 @@ class CausalCelebA(Dataset):
                 img_files, key=lambda x: int(re.search(r"sample_(\d+)", x.name).group(1))
             )
 
-            print(f"Found {len(img_files)} images..")
-            print(f"here are the first 20... ", [print([x.name for x in img_files_sorted[:5]])])
             self.file_list.extend(img_files_sorted)
 
             attrs_df["distr_type"] = distr_type
@@ -184,7 +182,7 @@ class CausalCelebA(Dataset):
     def distribution_idx(self):
         return torch.Tensor(self.causal_main_df["distr_idx"].values)
 
-    def sample(self, n_samples, attr_name, attr_val):
+    def sample(self, n_samples, attr_name, attr_val, seed=None):
         """Sample n_samples of the given attribute value.
 
         For example, one can sample 10 samples of images with
@@ -206,6 +204,7 @@ class CausalCelebA(Dataset):
         idx : np.ndarray
             Index of the samples in the dataset.
         """
+        rng = np.random.default_rng(seed)
         idx = self.causal_main_df[attr_name] == attr_val
         idx = idx.to_numpy().nonzero()[0]
 
@@ -214,7 +213,7 @@ class CausalCelebA(Dataset):
             raise ValueError(f"Cannot sample {n_samples} samples with {attr_name} = {attr_val}")
 
         # randomly sample n_samples from idx
-        rand_idx = np.random.choice(idx, n_samples, replace=False)
+        rand_idx = rng.choice(idx, n_samples, replace=False)
         # print(idx)
         samples = []
         for i in rand_idx:

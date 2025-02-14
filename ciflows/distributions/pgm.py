@@ -95,6 +95,7 @@ class LinearGaussianDag(MultidistrCausalFlow):
                 self.graph.add_node(node)
         self.topological_order = list(nx.topological_sort(self.graph))
 
+        # Each exogenous weight is a vector that 
         self.exogenous_weights = nn.ParameterDict()
 
         # Register buffers for node parameters (non-trainable)
@@ -108,7 +109,7 @@ class LinearGaussianDag(MultidistrCausalFlow):
             self.exogenous_weights.update(
                 {
                     f"{node}_0": nn.Parameter(
-                        torch.randn(node_dimensions[node]),
+                        torch.diag(torch.randn(node_dimensions[node])),
                         requires_grad=trainable_exogenous_weights,
                     )
                     for node in node_dimensions
@@ -159,7 +160,7 @@ class LinearGaussianDag(MultidistrCausalFlow):
                 self.exogenous_weights.update(
                     {
                         f"{node}_{idx}": nn.Parameter(
-                            torch.randn(node_dimensions[node]),
+                            torch.diag(torch.randn(node_dimensions[node])),
                             requires_grad=trainable_exogenous_weights,
                         )
                     }
@@ -242,7 +243,7 @@ class LinearGaussianDag(MultidistrCausalFlow):
                 )
 
             # exogenous noise - # Gaussian noise with non-zero mean scaled by means and std
-            noise = ((noise_mean + noise_std) * torch.randn(batch_size, node_dim).to(device) * exogenous_weight)
+            noise = ((noise_mean + noise_std) * torch.randn(batch_size, node_dim).to(device) @ exogenous_weight)
 
             # print("inside forward: ")
             # print(node)
@@ -353,17 +354,21 @@ class LinearGaussianDag(MultidistrCausalFlow):
                     exogenous_weight = self.exogenous_weights[f"{node}_0"]
 
                     # Compute total noise variance (node-specific + confounders)
-                    node_noise_var = getattr(self, f"exog_variance_{node}_0") * (
-                        exogenous_weight.mT @ exogenous_weight
-                    )
+                    try:
+                        node_noise_var = (
+                            exogenous_weight.mT @ exogenous_weight
+                        ) @ getattr(self, f"exog_variance_{node}_0")
+                    except Exception as e:
+                        print(exogenous_weight.shape, getattr(self, f"exog_variance_{node}_0").shape, noise_mean.shape)
+                        raise Exception(e)
                 else:
                     # Intervened noise mean and variance
                     noise_mean = getattr(self, f"exog_mean_{node}_{idx}")
                     # exogenous_weight = getattr(self, f"exogenous_weights_{node}_{idx}")
                     exogenous_weight = self.exogenous_weights[f"{node}_{idx}"]
-                    node_noise_var = getattr(self, f"exog_variance_{node}_{idx}") * (
+                    node_noise_var = (
                         exogenous_weight.mT @ exogenous_weight
-                    )
+                    ) @ getattr(self, f"exog_variance_{node}_{idx}")
 
                 node_noise_std = torch.sqrt(node_noise_var)
                 if node in self.confounder_means:
