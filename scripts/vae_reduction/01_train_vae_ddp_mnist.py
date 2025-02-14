@@ -25,7 +25,7 @@ from ciflows.datasets.causalmnist import CausalDigitBarMNIST
 from ciflows.datasets.causalceleba import CausalCelebA, CausalCelebAEyeGlasses
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
-from ciflows.reduction.resnetvae import DeepResNetVAE
+from ciflows.reduction.resnetvae_mnist import DeepResNetMNISTVAE
 from ciflows.training import TopKModelSaver, delete_old_checkpoints
 
 
@@ -76,22 +76,20 @@ def data_loader(
     batch_size=32,
     val_split=0.2,
     img_size=64,
-    scm_type="haircolor",
 ):
     # Define the image transformations
-    image_transform = transforms.Compose(
-        [
-            transforms.Resize((img_size, img_size)),  # Resize images to 128x128
-            transforms.CenterCrop(img_size),  # Ensure square crop
-            transforms.RandomHorizontalFlip(p=0.5),
-            # transforms.RandomResizedCrop(size=128, scale=(0.8, 1.0)),
-            # transforms.ColorJitter(
-            #     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
-            # ),
-            transforms.ToTensor(),  # Convert images to PyTorch tensors
-        ]
-    )
-
+    # image_transform = transforms.Compose(
+    #     [
+    #         transforms.Resize((img_size, img_size)),  # Resize images to 128x128
+    #         transforms.CenterCrop(img_size),  # Ensure square crop
+    #         transforms.RandomHorizontalFlip(p=0.5),
+    #         # transforms.RandomResizedCrop(size=128, scale=(0.8, 1.0)),
+    #         # transforms.ColorJitter(
+    #         #     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
+    #         # ),
+    #         transforms.ToTensor(),  # Convert images to PyTorch tensors
+    #     ]
+    # )
     input_transform = Compose(
         [
             CoarseDropout(
@@ -107,35 +105,23 @@ def data_loader(
         ]
     )
 
-    if scm_type == "haircolor":
-        causal_celeba_dataset = CausalCelebA(
-            root=root_dir,
-            graph_type=graph_type,
-            input_transform=input_transform,
-            transform=image_transform,
-            img_size=img_size,
-            fast_dev_run=False,  # Set to True for debugging
-        )
-    elif scm_type == "eyeglass":
-        # need to implement input_transform
-        assert False
-        causal_celeba_dataset = CausalCelebAEyeGlasses(
-            root=root_dir,
-            graph_type=graph_type,
-            transform=image_transform,
-            img_size=img_size,
-            fast_dev_run=False,  # Set to True for debugging
-        )
+    causal_mnist_dataset = CausalDigitBarMNIST(
+        root=root_dir,
+        graph_type=graph_type,
+        input_transform=input_transform,
+        img_size=img_size,
+        fast_dev_run=False,  # Set to True for debugging
+    )
 
     # Calculate the number of samples for training and validation
-    total_len = len(causal_celeba_dataset)
+    total_len = len(causal_mnist_dataset)
     val_len = int(total_len * val_split)
     train_len = total_len - val_len
 
     # Split the dataset into train and validation sets
-    train_dataset, val_dataset = random_split(causal_celeba_dataset, [train_len, val_len])
+    train_dataset, val_dataset = random_split(causal_mnist_dataset, [train_len, val_len])
 
-    distr_labels = [x[2] for x in causal_celeba_dataset]
+    distr_labels = [x[2] for x in causal_mnist_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
         raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
@@ -155,7 +141,7 @@ def data_loader(
 
     # Define the DataLoader
     train_loader = DataLoader(
-        dataset=causal_celeba_dataset,
+        dataset=causal_mnist_dataset,
         batch_size=batch_size,
         sampler=sampler,
         drop_last=True,
@@ -256,10 +242,8 @@ if __name__ == "__main__":
     # Data settings
     batch_size = 128
     gradient_accumulation_steps = 2 * 8  # used to simulate larger batch sizes
-    img_size = 128
+    img_size = 64
     graph_type = "chain"
-    scm_type = "haircolor"
-    # scm_type = "eyeglass"
     num_workers = 4
 
     check_samples_every_n_epoch = 5
@@ -364,20 +348,19 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    # model_fname = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v2.pt"
-    model_fname = "celeba_cyclicbetal1loss_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
-    checkpoint_dir = root / "CausalCelebA" / "vae_reduction" / scm_type / model_fname.split(".")[0]
+    model_fname = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img64_v1.pt"
+    checkpoint_dir = root / "CausalMNIST" / "vae_reduction" / model_fname.split(".")[0]
 
     # for loaded checkpoints
-    checkpoint_model_fdir = "celeba_cyclicbetal1loss_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1.pt"
+    checkpoint_model_fdir = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img64_v1.pt"
     saved_checkpoint_dir = (
-        root / "CausalCelebA" / "vae_reduction" / scm_type / checkpoint_model_fdir.split(".")[0]
+        root / "CausalMNIST" / "vae_reduction" / checkpoint_model_fdir.split(".")[0]
     )
     savedcheckpoint_model_fname = "model_epoch_11085.pt"
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
+    model = DeepResNetMNISTVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
     # model.apply(weights_init)
     model = model.to(ptdtype).to(device)
     image_dim = 3 * img_size * img_size
@@ -434,7 +417,6 @@ if __name__ == "__main__":
         num_workers=num_workers,
         batch_size=batch_size,
         img_size=img_size,
-        scm_type=scm_type,
     )
     if master_process:
         print(
@@ -704,6 +686,6 @@ if __name__ == "__main__":
 
     # Load back the saved final model and verify that it loads
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage).to(device)
+    vae_model = DeepResNetMNISTVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage).to(device)
     model_path = checkpoint_dir / model_fname
     vae_model = load_model(vae_model, model_path, device, optimizer=optimizer)
