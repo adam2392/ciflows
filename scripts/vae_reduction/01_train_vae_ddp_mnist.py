@@ -22,7 +22,6 @@ from albumentations import CoarseDropout, Compose
 from albumentations.pytorch import ToTensorV2
 
 from ciflows.datasets.causalmnist import CausalDigitBarMNIST
-from ciflows.datasets.causalceleba import CausalCelebA, CausalCelebAEyeGlasses
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
 from ciflows.reduction.resnetvae_mnist import DeepResNetMNISTVAE
@@ -78,24 +77,24 @@ def data_loader(
     img_size=64,
 ):
     # Define the image transformations
-    # image_transform = transforms.Compose(
-    #     [
-    #         transforms.Resize((img_size, img_size)),  # Resize images to 128x128
-    #         transforms.CenterCrop(img_size),  # Ensure square crop
-    #         transforms.RandomHorizontalFlip(p=0.5),
-    #         # transforms.RandomResizedCrop(size=128, scale=(0.8, 1.0)),
-    #         # transforms.ColorJitter(
-    #         #     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
-    #         # ),
-    #         transforms.ToTensor(),  # Convert images to PyTorch tensors
-    #     ]
-    # )
+    image_transform = transforms.Compose(
+        [
+            transforms.Resize((img_size, img_size)),  # Resize images to 128x128
+            transforms.CenterCrop(img_size),  # Ensure square crop
+            # transforms.RandomHorizontalFlip(p=0.5),
+            # transforms.RandomResizedCrop(size=128, scale=(0.8, 1.0)),
+            # transforms.ColorJitter(
+            #     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
+            # ),
+            transforms.ToTensor(),  # Convert images to PyTorch tensors
+        ]
+    )
     input_transform = Compose(
         [
             CoarseDropout(
-                max_holes=48,
-                max_height=5,
-                max_width=5,
+                max_holes=20,
+                max_height=3,
+                max_width=3,
                 min_holes=1,
                 min_height=1,
                 min_width=1,
@@ -108,8 +107,8 @@ def data_loader(
     causal_mnist_dataset = CausalDigitBarMNIST(
         root=root_dir,
         graph_type=graph_type,
-        input_transform=input_transform,
-        img_size=img_size,
+        transform=image_transform,
+        # img_size=img_size,
         fast_dev_run=False,  # Set to True for debugging
     )
 
@@ -204,7 +203,7 @@ def get_model_attribute(model, attr):
 if __name__ == "__main__":
     debug = False
     compile = False
-    load_from_checkpoint = True
+    load_from_checkpoint = False
 
     # System settings
     world_size = torch.cuda.device_count()
@@ -240,9 +239,9 @@ if __name__ == "__main__":
     print("NCCL backend available:", torch.distributed.is_nccl_available())
 
     # Data settings
-    batch_size = 128
+    batch_size = 512
     gradient_accumulation_steps = 2 * 8  # used to simulate larger batch sizes
-    img_size = 64
+    img_size = 32
     graph_type = "chain"
     num_workers = 4
 
@@ -348,7 +347,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img64_v1.pt"
+    model_fname = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img32_v2.pt"
     checkpoint_dir = root / "CausalMNIST" / "vae_reduction" / model_fname.split(".")[0]
 
     # for loaded checkpoints
@@ -444,8 +443,10 @@ if __name__ == "__main__":
         train_iterator = iter(train_loader)
         batch = next(train_iterator)
 
-    images, target_images, distr_idx, targets, meta_labels = batch
+    # images, target_images, distr_idx, targets, meta_labels = batch
+    images, distr_idx, targets, meta_labels = batch
     images = images.to(device=device, dtype=ptdtype)
+    target_images = images
     target_images = target_images.to(device=device, dtype=ptdtype)
 
     if master_process:
@@ -531,7 +532,10 @@ if __name__ == "__main__":
                 batch = next(train_iterator)
 
             # extract the variables within the batch
-            images, target_images, distr_idx, targets, meta_labels = batch
+            # images, target_images, distr_idx, targets, meta_labels = batch
+            images, distr_idx, targets, meta_labels = batch
+            target_images = images
+            
             images = images.to(device)
             target_images = target_images.to(device)
 
@@ -585,12 +589,13 @@ if __name__ == "__main__":
                     print("Iterating through val loader")
                 for batch_idx, (
                     val_images,
-                    val_target_images,
+                    # val_target_images,
                     distr_idx,
                     targets,
                     meta_labels,
                 ) in enumerate(val_loader):
                     val_images = val_images.to(device)
+                    val_target_images = val_images
                     val_target_images = val_target_images.to(device)
                     reconstructed, latent_mu, latent_logvar = model(
                         val_images
