@@ -203,7 +203,7 @@ def get_model_attribute(model, attr):
 if __name__ == "__main__":
     debug = False
     compile = False
-    load_from_checkpoint = False
+    load_from_checkpoint = True
 
     # System settings
     world_size = torch.cuda.device_count()
@@ -239,7 +239,7 @@ if __name__ == "__main__":
     print("NCCL backend available:", torch.distributed.is_nccl_available())
 
     # Data settings
-    batch_size = 512
+    batch_size = 128
     gradient_accumulation_steps = 2 * 8  # used to simulate larger batch sizes
     img_size = 32
     graph_type = "chain"
@@ -351,11 +351,11 @@ if __name__ == "__main__":
     checkpoint_dir = root / "CausalMNIST" / "vae_reduction" / model_fname.split(".")[0]
 
     # for loaded checkpoints
-    checkpoint_model_fdir = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img64_v1.pt"
+    checkpoint_model_fdir = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img32_v2.pt"
     saved_checkpoint_dir = (
         root / "CausalMNIST" / "vae_reduction" / checkpoint_model_fdir.split(".")[0]
     )
-    savedcheckpoint_model_fname = "model_epoch_11085.pt"
+    savedcheckpoint_model_fname = "model_epoch_4990.pt"
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
