@@ -125,3 +125,79 @@ class CausalDigitBarMNIST(Dataset):
     @property
     def distribution_idx(self):
         return self.labels[:, 3]
+
+
+class CausalMNISTAEmbedding(CausalDigitBarMNIST):
+    def __init__(
+        self,
+        root,
+        graph_type,
+        transform=None,
+        target_transform=None,
+        fast_dev_run=False,
+    ):
+        self.root = root
+        self.graph_type = graph_type
+
+        root = Path(root)
+
+        # load attrs
+        dataset = 'alldata'
+        if dataset == "alldata":
+            dataset_postfix = "alldata_encodings"
+            encoding_fnames = {
+                "obs": f"obs_{dataset_postfix}.pt",
+                f"int_{scm_type}_0": f"int_{scm_type}_0_{dataset_postfix}.pt",
+                f"int_{scm_type}_1": f"int_{scm_type}_1_{dataset_postfix}.pt",
+                f"int_{scm_type}_2": f"int_{scm_type}_2_{dataset_postfix}.pt",
+                # f"int_{scm_type}_3": f"int_{scm_type}_3_{dataset_postfix}.pt",
+                # "int_hair_4": f"int_hair_4_{dataset_postfix}.pt",
+                # "obs": "obs_nonorm_encodings.pt",
+                # "int_hair_0": "int_hair_0_nonorm_encodings.pt",
+                # "int_hair_1": "int_hair_1_nonorm_encodings.pt",
+            }
+
+        print()
+        print()
+        print(f"Loaded dataset postfix: {dataset_postfix}")
+        
+        if fast_dev_run:
+            subsample = 100
+            self.causal_main_df = self.causal_main_df.iloc[:subsample]
+            self.file_list = self.file_list[:subsample]
+
+        self._load_intervention_targets()
+
+    def __getitem__(self, index):
+        """Get a sample from the image dataset.
+
+        The target composes of the meta-labeling:
+        - gender
+        - age
+        - haircolor
+
+        Returns
+        -------
+        img : torch.Tensor of shape (C, H, W)
+            Image tensor
+        distr_idx : int
+            Which distribution associated.
+        target : torch.Tensor of shape (latent_dim,)
+            Intervention target with 1's where the intervention is applied.
+        meta_label : list
+            List of meta-labels
+        """
+        img = self.data[index].squeeze()
+
+        meta_label = self.causal_main_df.iloc[index]
+        distr_idx = meta_label["distr_idx"]
+        # XXX: only can handle one type of intervention
+        target = self.intervention_targets[index]
+        # print(meta_label)
+        # print(target)
+
+        # only extract the array
+        # print(meta_label)
+        meta_label = meta_label.values.tolist()
+
+        return img, distr_idx, target, meta_label
