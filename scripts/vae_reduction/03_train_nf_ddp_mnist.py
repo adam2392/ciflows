@@ -21,10 +21,11 @@ from tqdm import tqdm
 from albumentations import CoarseDropout, Compose
 from albumentations.pytorch import ToTensorV2
 
-from ciflows.datasets.causalmnist import CausalDigitBarMNIST
+from ciflows.datasets.causalmnist import CausalMNISTEmbedding
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
-from ciflows.reduction.resnetvae_mnist import DeepResNetMNISTVAE
+from ciflows.reduction import make_nf_model
+from ciflows.reduction.resnetvae import DeepResNetVAE
 from ciflows.training import TopKModelSaver, delete_old_checkpoints
 
 
@@ -70,130 +71,49 @@ def configure_optimizers(
 
 def data_loader(
     root_dir,
+    dataset,
+    scm_type,
     graph_type="chain",
     num_workers=4,
     batch_size=32,
-    val_split=0.2,
-    img_size=64,
+    img_size=128,
 ):
-    # Define the image transformations
-    image_transform = transforms.Compose(
-        [
-            transforms.Resize((img_size, img_size)),  # Resize images to 128x128
-            transforms.CenterCrop(img_size),  # Ensure square crop
-            # transforms.RandomHorizontalFlip(p=0.5),
-            # transforms.RandomResizedCrop(size=128, scale=(0.8, 1.0)),
-            # transforms.ColorJitter(
-            #     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
-            # ),
-            transforms.ToTensor(),  # Convert images to PyTorch tensors
-        ]
-    )
-    input_transform = Compose(
-        [
-            CoarseDropout(
-                max_holes=20,
-                max_height=3,
-                max_width=3,
-                min_holes=1,
-                min_height=1,
-                min_width=1,
-                p=0.9,
-            ),
-            ToTensorV2(),
-        ]
-    )
-
-    causal_mnist_dataset = CausalDigitBarMNIST(
+    causal_celeba_dataset = CausalCelebAEmbedding(
         root=root_dir,
         graph_type=graph_type,
-        transform=image_transform,
-        # img_size=img_size,
+        dataset=dataset,
+        scm_type=scm_type,
+        img_size=img_size,
         fast_dev_run=False,  # Set to True for debugging
     )
 
     # Calculate the number of samples for training and validation
-    total_len = len(causal_mnist_dataset)
-    val_len = int(total_len * val_split)
-    train_len = total_len - val_len
+    # total_len = len(causal_celeba_dataset)
+    # val_len = int(total_len * val_split)
+    # train_len = total_len - val_len
 
-    # Split the dataset into train and validation sets
-    train_dataset, val_dataset = random_split(causal_mnist_dataset, [train_len, val_len])
+    # # Split the dataset into train and validation sets
+    # train_dataset, val_dataset = random_split(causal_celeba_dataset, [train_len, val_len])
 
-    distr_labels = [x[2] for x in causal_mnist_dataset]
-    unique_distrs = len(np.unique(distr_labels))
-    if batch_size < unique_distrs:
-        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
-    sampler = StratifiedSampler(distr_labels, batch_size)
-
-    distr_labels = [x[2] for x in train_dataset]
+    distr_labels = [x[1] for x in causal_celeba_dataset]
     unique_distrs = len(np.unique(distr_labels))
     if batch_size < unique_distrs:
         raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
     train_sampler = StratifiedSampler(distr_labels, batch_size)
 
-    distr_labels = [x[2] for x in val_dataset]
-    unique_distrs = len(np.unique(distr_labels))
-    if batch_size < unique_distrs:
-        raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
-    val_sampler = StratifiedSampler(distr_labels, batch_size)
-
     # Define the DataLoader
     train_loader = DataLoader(
-        dataset=causal_mnist_dataset,
+        dataset=causal_celeba_dataset,
         batch_size=batch_size,
-        sampler=sampler,
+        sampler=train_sampler,
         drop_last=True,
         # shuffle=True,  # Shuffle data during training
         num_workers=num_workers,
         pin_memory=True,  # Enable if using a GPU
         persistent_workers=True,
     )
-    val_loader = DataLoader(
-        dataset=val_dataset,
-        batch_size=batch_size,
-        shuffle=False,  # Do not shuffle data during validation
-        sampler=val_sampler,
-        num_workers=num_workers // 2,
-        pin_memory=True,  # Enable if using a GPU
-    )
-    return train_loader, val_loader
 
-
-def gaussian_nll(recon_x, log_sigma, x):
-    first_term = 0.5 * torch.pow((x - recon_x) / log_sigma.exp(), 2)
-    # print(first_term.shape)
-    return first_term + log_sigma + 0.5 * np.log(2 * np.pi)
-
-
-# Reconstruction + KL divergence losses summed over all elements and batch
-def loss_function(recon_x, x, mu, log_var, log_sigma_x, capacity=0.0, beta=0.00025):
-    # print(recon_x.shape, x.shape)
-    rec_loss = F.mse_loss(recon_x, x)
-    # print(recon_x.shape, x.shape, mu.shape, log_var.shape)
-
-    # l1_loss = F.l1_loss(recon_x, x)
-    # rec_loss = gaussian_nll(recon_x, log_sigma_x, x).sum()
-
-    KLD = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
-    # beta = 0.00025
-    # beta =
-    # Latent Capacity Control
-    if capacity == 0:
-        kl_loss_controlled = KLD
-    else:
-        kl_loss_controlled = torch.max(KLD - capacity, torch.tensor(0.0).cuda())
-
-    loss = rec_loss + beta * kl_loss_controlled
-    return loss
-
-
-# Beta annealing function (cyclic)
-def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=0.001):
-    """Cyclic cosine annealing schedule for beta."""
-    cycle_position = step % cycle_length
-    fraction = cycle_position / cycle_length
-    return beta_min + (beta_max - beta_min) * (1 - math.cos(math.pi * fraction)) / 2
+    return train_loader
 
 
 def get_model_attribute(model, attr):
@@ -203,7 +123,7 @@ def get_model_attribute(model, attr):
 if __name__ == "__main__":
     debug = False
     compile = False
-    load_from_checkpoint = True
+    load_from_checkpoint = False
 
     # System settings
     world_size = torch.cuda.device_count()
@@ -240,9 +160,11 @@ if __name__ == "__main__":
 
     # Data settings
     batch_size = 128
-    gradient_accumulation_steps = 2 * 8  # used to simulate larger batch sizes
-    img_size = 32
+    gradient_accumulation_steps = 2 * 3  # used to simulate larger batch sizes
+    img_size = 128
     graph_type = "chain"
+    scm_type = "hair"
+    # scm_type = "eyeglass"
     num_workers = 4
 
     check_samples_every_n_epoch = 5
@@ -262,15 +184,11 @@ if __name__ == "__main__":
     n_channels = 3
     out_channels = 3
     latent_dim = 48
+    num_flows = 128
     num_blocks_per_stage = 3
 
     beta_max = 1.5
     annealing_epochs = 1000  # Number of epochs for full beta
-
-    initial_capacity = 0.0
-    max_capacity = 25.0
-    capacity_increment = 0.1  # Increment per epoch
-    current_capacity = initial_capacity
 
     if debug:
         accelerator = "cpu"
@@ -297,11 +215,10 @@ if __name__ == "__main__":
         if ddp_local_rank >= torch.cuda.device_count():
             ddp_local_rank = ddp_world_size - ddp_local_rank
 
-        if dist.is_initialized() and dist.get_rank() == 0:
-            print("Distributed training initialized on rank 0")
-
         device = f"cuda:{ddp_local_rank}"
 
+        if dist.is_initialized() and dist.get_rank() == 0:
+            print("Distributed training initialized on rank 0")
         print("Setting device to", device)
         print("DDP rank: ", ddp_rank)
         print("Local rank: ", ddp_local_rank)
@@ -312,7 +229,7 @@ if __name__ == "__main__":
         seed_offset = ddp_rank  # each process gets a different seed
         # world_size number of processes will be training simultaneously, so we can scale
         # down the desired gradient accumulation iterations per process proportionally
-        assert gradient_accumulation_steps % ddp_world_size == 0, f""
+        assert gradient_accumulation_steps % ddp_world_size == 0
         gradient_accumulation_steps //= ddp_world_size
     else:
         # if not ddp, we are running on a single gpu, and one process
@@ -347,25 +264,46 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img32_v2.pt"
-    checkpoint_dir = root / "CausalMNIST" / "vae_reduction" / model_fname.split(".")[0]
+    # model_fname = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v2.pt"
+    model_fname = "celeba_haircolor_nfon_128flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim8_trainableedges_sep4and8_v2.pt"
+    hcdim = 8
+    checkpoint_model_fname = "celeba_nfon_cyclicbetaresnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
+    model_checkpoint_dir = (
+        root / "CausalCelebA" / "nf_on_vae_reduction" / checkpoint_model_fname.split(".")[0]
+    )
+
+    vae_model_dir = "celeba_cyclicbetal1loss_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1"
+    vae_model_fname = "model_epoch_15670.pt"
+    scm_type = "haircolor"
+    # dataset = "alldata"
+    dataset = "alldata_l1loss"
+
+    # prefix within the filename of embeddings
+    scm_name = "hair" if scm_type == "haircolor" else "eye"
+
+    vae_dir = root / "CausalCelebA" / "vae_reduction" / scm_type / vae_model_dir.split(".")[0]
+    # vae_model = VAE().to(device)
+    vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
+    model_path = vae_dir / vae_model_fname
+    vae_model, _ = load_model(vae_model, model_path, device)
+    vae_model = vae_model.to(device)
 
     # for loaded checkpoints
-    checkpoint_model_fdir = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img32_v2.pt"
-    saved_checkpoint_dir = (
-        root / "CausalMNIST" / "vae_reduction" / checkpoint_model_fdir.split(".")[0]
-    )
-    savedcheckpoint_model_fname = "model_epoch_4990.pt"
+    checkpoint_dir = root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split(".")[0]
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    model = DeepResNetMNISTVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
-    # model.apply(weights_init)
-    model = model.to(ptdtype).to(device)
-    image_dim = 3 * img_size * img_size
-
     # initialize a GradScaler. If enabled=False scaler is a no-op
     scaler = torch.GradScaler(device=device, enabled=(dtype == "float16"))
+
+    model = make_nf_model(
+        K=num_flows,
+        hc_dim=hcdim,
+        trainable_edges=False,
+        debug=debug,
+        trainable_exogenous_weights=True,
+    )
+    model = model.to(device)
 
     # configure optimizers
     optimizer = configure_optimizers(
@@ -374,8 +312,6 @@ if __name__ == "__main__":
         betas=(beta1, beta2),
         weight_decay=1e-4,
     )
-    # Default: create pytorch optimizer
-    # optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
     # compile the model
     if compile:
@@ -385,7 +321,7 @@ if __name__ == "__main__":
     if load_from_checkpoint:
         model, start_epoch = load_model(
             model,
-            saved_checkpoint_dir / savedcheckpoint_model_fname,
+            model_checkpoint_dir / checkpoint_model_fname,
             device,
             optimizer=optimizer,
         )
@@ -410,17 +346,17 @@ if __name__ == "__main__":
 
     top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
 
-    train_loader, val_loader = data_loader(
+    train_loader = data_loader(
         root_dir=root,
+        dataset=dataset,
         graph_type=graph_type,
         num_workers=num_workers,
         batch_size=batch_size,
         img_size=img_size,
+        scm_type=scm_name,
     )
     if master_process:
-        print(
-            f"Train loader has {len(train_loader)} images and val loader {len(val_loader)} images"
-        )
+        print(f"Train loader has {len(train_loader)} images")
 
     # training loop
     # - log the train and val loss every 10 epochs
@@ -443,29 +379,19 @@ if __name__ == "__main__":
         train_iterator = iter(train_loader)
         batch = next(train_iterator)
 
-    # images, target_images, distr_idx, targets, meta_labels = batch
     images, distr_idx, targets, meta_labels = batch
     images = images.to(device=device, dtype=ptdtype)
-    target_images = images
-    target_images = target_images.to(device=device, dtype=ptdtype)
 
     if master_process:
         print(f"Images dtype: {images.dtype}")
         print(f"Model dtype: {next(model.parameters()).dtype}")
 
-    # Initialize Capacity and Scheduler
-    cycle_length = len(train_loader) * 5  # Full cycle over 5 epochs
-
-    # XXX: remove when not doing FFF-VAE
-    # loss_nll = torch.tensor(0.0)
-    # surrogate_loss = torch.tensor(0.0)
     effective_batch_size = batch_size * gradient_accumulation_steps * ddp_world_size
     if master_process:
         print(f"Effective batch size: {effective_batch_size}")
 
     # Training loop
     max_epochs = start_epoch + max_epochs
-    annealing_epochs = annealing_epochs + start_epoch
     if master_process:
         print(f"Starting training loop from epoch {start_epoch} to {max_epochs}")
 
@@ -477,12 +403,8 @@ if __name__ == "__main__":
         # Create an iterator for the DataLoader
         train_iterator = iter(train_loader)
 
-        # Compute cyclic beta, which
-        global_step = epoch * len(train_loader) + step
-        beta = cyclic_beta(global_step, cycle_length)
-
         if master_process:
-            print(f"Epoch: {epoch}, Step: {step}, cycling over {cycle_length} Beta: {beta:.6f}")
+            print(f"Epoch: {epoch}, Step: {step}")
 
         # forward update with optional gradient accumulation
         for micro_step in range(gradient_accumulation_steps):
@@ -493,29 +415,11 @@ if __name__ == "__main__":
             with ctx:
                 # forward pass
                 images = images.to(device)
-                target_images = target_images.to(device)
                 optimizer.zero_grad()
-                reconstructed, latent_mu, latent_logvar = model(images)  # Model forward pass
 
-                # Clamp logvar to prevent numerical instability
-                latent_logvar = torch.clamp_(latent_logvar, -10, 10)
-
-                # Compute log_sigma_x
-                log_sigma_x = get_model_attribute(model, "log_sigma_x")
-
-                # Learning the variance can become unstable in some cases.
-                # Softly limiting log_sigma to a minimum of -6 ensures stable training.
-                log_sigma_x = softclip(log_sigma_x, -6)
-
-                loss = loss_function(
-                    reconstructed,
-                    target_images,
-                    latent_mu,
-                    latent_logvar,
-                    log_sigma_x=log_sigma_x,
-                    capacity=current_capacity,
-                    beta=beta,
-                )  # Custom VAE loss function
+                # print(images.shape, distr_idx, targets.shape)
+                # extract data from tensor to Parameterdict
+                loss = model.forward_kld(images, intervention_targets=targets, distr_idx=distr_idx)
 
                 # scale loss based on how many accumulation steps we take
                 loss = loss / gradient_accumulation_steps
@@ -532,12 +436,8 @@ if __name__ == "__main__":
                 batch = next(train_iterator)
 
             # extract the variables within the batch
-            # images, target_images, distr_idx, targets, meta_labels = batch
             images, distr_idx, targets, meta_labels = batch
-            target_images = images
-            
             images = images.to(device)
-            target_images = target_images.to(device)
 
             # DDP: accumulate loss terms
             train_loss += loss.item()
@@ -581,86 +481,49 @@ if __name__ == "__main__":
 
             # Sample and save reconstructed images
             train_images = images[:8]
-            target_train_images = target_images[:8]
             with torch.no_grad():
-                log_sigma_x = get_model_attribute(model, "log_sigma_x")
-
                 if master_process:
                     print("Iterating through val loader")
-                for batch_idx, (
-                    val_images,
-                    # val_target_images,
-                    distr_idx,
-                    targets,
-                    meta_labels,
-                ) in enumerate(val_loader):
-                    val_images = val_images.to(device)
-                    val_target_images = val_images
-                    val_target_images = val_target_images.to(device)
-                    reconstructed, latent_mu, latent_logvar = model(
-                        val_images
-                    )  # Model forward pass
+                # sample images from normalizing flow
+                for distr_index in train_loader.dataset.distr_idx_list:
+                    sample_embeddings, _ = model.sample(8, distr_idx=distr_index)
 
-                    loss = loss_function(
-                        reconstructed,
-                        val_target_images,
-                        latent_mu,
-                        latent_logvar,
-                        log_sigma_x=log_sigma_x,
-                        capacity=current_capacity,
-                        beta=beta,
-                    )  # Custom VAE loss function
-                    val_loss += loss.item()
+                    # reconstruct images
+                    reconstructed_images = vae_model.decode(sample_embeddings).reshape(
+                        -1, 3, img_size, img_size
+                    )
 
-                    if debug:
-                        break
+                    # clamp said images
+                    # reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
+                    save_image(
+                        reconstructed_images.cpu(),
+                        checkpoint_dir / f"epoch_{epoch}_distr-{distr_index}_samples.png",
+                        nrow=4,
+                        normalize=True,
+                    )
 
-                # pick the first 8 images in the last val batch
-                # sample_images = val_images[:8]  # Pick 8 images for sampling
-                sample_images = train_images[:8]  # Pick 8 images for sampling
+                # reconstruct images using VAE
+                embeddings = images[:8]
+                recon_images = vae_model.decoder(embeddings).reshape(-1, 3, img_size, img_size)
 
-                # Standard VAE
-                reconstructed_images, _, _ = model(sample_images)
-                # reconstructed_images = model.decode(encoding).reshape(-1, 3, img_size, img_size)
-                reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
+                # forward/inverse of flow model
+                recon_embedding = model.forward(model.inverse(embeddings))
 
-                # sample images from VAE
-                # 1. Sample latent variables from standard Gaussian
-                num_samples = 8  # Number of images to generate
-                z = torch.randn(num_samples, latent_dim).to(device)  # Sample z ~ N(0, I)
-
-                # 2. Pass the sampled z through the decoder
-                generated_images = raw_model.decode(z)  # Shape: [num_samples, 3, 128, 128]
-
-                # clamp
-                generated_images = torch.clamp(generated_images, 0, 1)
-
-                # now sample training images and then reconstruct
-                encoding = raw_model.encode(train_images)
-                train_reconstructed_images = raw_model.decode(encoding).reshape(
+                # reconstruct images
+                reconstructed_images = vae_model.decoder(recon_embedding).reshape(
                     -1, 3, img_size, img_size
                 )
-                train_reconstructed_images = torch.clamp(train_reconstructed_images, 0, 1)
 
-            val_loss /= len(val_loader)
-            print(f"====> Epoch: {epoch} Average Val loss: {val_loss:.4f}")
-            sample_images = torch.cat(
-                (
-                    sample_images.cpu(),
+                # clamp said images
+                reconstructed_images = torch.cat([recon_images, reconstructed_images], dim=0)
+                # reconstructed_images = torch.clamp(reconstructed_images, 0, 1)
+
+                save_image(
                     reconstructed_images.cpu(),
-                    generated_images.cpu(),
-                    target_train_images.cpu(),
-                    train_reconstructed_images.cpu(),
-                ),
-                dim=0,
-            )
-            save_image(
-                sample_images,
-                checkpoint_dir / f"epoch_{epoch}_samples.png",
-                nrow=4,
-                normalize=True,
-            )
-
+                    checkpoint_dir / f"epoch_{epoch}_reconstructed_samples.png",
+                    nrow=4,
+                    normalize=True,
+                )
             # Track top 5 models based on validation loss
             # Optionally, remove worse models if there are more than k saved models
             top_k_saver.save_model(raw_model, optimizer, epoch, train_loss)
@@ -691,6 +554,6 @@ if __name__ == "__main__":
 
     # Load back the saved final model and verify that it loads
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    vae_model = DeepResNetMNISTVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage).to(device)
+    nf_model = raw_model.to(device)
     model_path = checkpoint_dir / model_fname
-    vae_model = load_model(vae_model, model_path, device, optimizer=optimizer)
+    nf_model, _ = load_model(nf_model, model_path, device, optimizer=optimizer)
