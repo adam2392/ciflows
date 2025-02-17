@@ -189,7 +189,7 @@ def loss_function(recon_x, x, mu, log_var, log_sigma_x, capacity=0.0, beta=0.000
 
 
 # Beta annealing function (cyclic)
-def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=0.001):
+def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=1.0):
     """Cyclic cosine annealing schedule for beta."""
     cycle_position = step % cycle_length
     fraction = cycle_position / cycle_length
@@ -347,7 +347,7 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img32_v2.pt"
+    model_fname = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img32_v4.pt"
     checkpoint_dir = root / "CausalMNIST" / "vae_reduction" / model_fname.split(".")[0]
 
     # for loaded checkpoints
@@ -355,7 +355,7 @@ if __name__ == "__main__":
     saved_checkpoint_dir = (
         root / "CausalMNIST" / "vae_reduction" / checkpoint_model_fdir.split(".")[0]
     )
-    savedcheckpoint_model_fname = "model_epoch_4990.pt"
+    savedcheckpoint_model_fname = "model_epoch_9155.pt"
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
