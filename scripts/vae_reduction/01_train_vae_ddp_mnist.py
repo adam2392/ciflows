@@ -261,7 +261,7 @@ if __name__ == "__main__":
     # model settings
     n_channels = 3
     out_channels = 3
-    latent_dim = 48
+    latent_dim = 32
     num_blocks_per_stage = 3
 
     beta_max = 1.5
