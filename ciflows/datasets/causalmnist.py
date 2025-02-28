@@ -127,7 +127,7 @@ class CausalDigitBarMNIST(Dataset):
         return self.labels[:, 3]
 
 
-class CausalMNISTAEmbedding(CausalDigitBarMNIST):
+class CausalMNISTEmbedding(CausalDigitBarMNIST):
     def __init__(
         self,
         root,
@@ -145,28 +145,40 @@ class CausalMNISTAEmbedding(CausalDigitBarMNIST):
         dataset = 'alldata'
         if dataset == "alldata":
             dataset_postfix = "alldata_encodings"
-            encoding_fnames = {
-                "obs": f"obs_{dataset_postfix}.pt",
-                f"int_{scm_type}_0": f"int_{scm_type}_0_{dataset_postfix}.pt",
-                f"int_{scm_type}_1": f"int_{scm_type}_1_{dataset_postfix}.pt",
-                f"int_{scm_type}_2": f"int_{scm_type}_2_{dataset_postfix}.pt",
-                # f"int_{scm_type}_3": f"int_{scm_type}_3_{dataset_postfix}.pt",
-                # "int_hair_4": f"int_hair_4_{dataset_postfix}.pt",
-                # "obs": "obs_nonorm_encodings.pt",
-                # "int_hair_0": "int_hair_0_nonorm_encodings.pt",
-                # "int_hair_1": "int_hair_1_nonorm_encodings.pt",
-            }
+            fname = f"{graph_type}_{dataset_postfix}.pt"
 
         print()
         print()
         print(f"Loaded dataset postfix: {dataset_postfix}")
+        self.data = torch.load(fname)
+
+        self.labels = torch.load(
+            root / self.__class__.__name__ / graph_type / f"{graph_type}-labels-train.pt"
+        )
+        if isinstance(self.labels, list):
+            self.labels = torch.vstack(self.labels)
+
+        self.intervention_targets = torch.load(
+            root / self.__class__.__name__ / graph_type / f"{graph_type}-targets-train.pt"
+        )
+        if isinstance(self.intervention_targets, list):
+            self.intervention_targets = torch.vstack(self.intervention_targets)
+
+        if not all(
+            [
+                len(self.data) == len(self.labels),
+                len(self.data) == len(self.intervention_targets),
+            ]
+        ):
+            raise ValueError("Data, labels and intervention targets must have the same length.")
+
         
+
         if fast_dev_run:
             subsample = 100
             self.causal_main_df = self.causal_main_df.iloc[:subsample]
             self.file_list = self.file_list[:subsample]
 
-        self._load_intervention_targets()
 
     def __getitem__(self, index):
         """Get a sample from the image dataset.
@@ -187,17 +199,18 @@ class CausalMNISTAEmbedding(CausalDigitBarMNIST):
         meta_label : list
             List of meta-labels
         """
-        img = self.data[index].squeeze()
+        img, meta_label, target = (
+            self.data[index],
+            self.labels[index],
+            self.intervention_targets[index],
+        )
 
-        meta_label = self.causal_main_df.iloc[index]
-        distr_idx = meta_label["distr_idx"]
-        # XXX: only can handle one type of intervention
-        target = self.intervention_targets[index]
-        # print(meta_label)
-        # print(target)
+        # get the distribution index
+        distr_idx = meta_label[-1]
 
-        # only extract the array
-        # print(meta_label)
-        meta_label = meta_label.values.tolist()
-
+        if self.transform is not None:
+            img = self.transform(img)
+        # doing this so that it is consistent with all other datasets
+        # to return a PIL Image
+        # img = PIL.Image.fromarray(img.numpy(), mode="RGB")
         return img, distr_idx, target, meta_label

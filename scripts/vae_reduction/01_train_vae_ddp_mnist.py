@@ -189,7 +189,7 @@ def loss_function(recon_x, x, mu, log_var, log_sigma_x, capacity=0.0, beta=0.000
 
 
 # Beta annealing function (cyclic)
-def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=1.0):
+def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=0.1):
     """Cyclic cosine annealing schedule for beta."""
     cycle_position = step % cycle_length
     fraction = cycle_position / cycle_length
@@ -248,7 +248,7 @@ if __name__ == "__main__":
     check_samples_every_n_epoch = 5
 
     # adamw optimizer settings
-    max_epochs = 5_000
+    max_epochs = 2_000
     lr = 3e-4
     lr_min = 6e-5
     beta1 = 0.9
@@ -454,7 +454,7 @@ if __name__ == "__main__":
         print(f"Model dtype: {next(model.parameters()).dtype}")
 
     # Initialize Capacity and Scheduler
-    cycle_length = len(train_loader) * 5  # Full cycle over 5 epochs
+    cycle_length = len(train_loader) * 10  # Full cycle over 5 epochs
 
     # XXX: remove when not doing FFF-VAE
     # loss_nll = torch.tensor(0.0)

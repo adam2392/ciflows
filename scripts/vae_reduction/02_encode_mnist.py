@@ -1,13 +1,10 @@
-import os
 from pathlib import Path
-
-import PIL
+from tqdm import tqdm
 import torch
 from torchvision import transforms
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 
 from ciflows.reduction.resnetvae_mnist import DeepResNetMNISTVAE
-
 from ciflows.datasets.causalmnist import CausalDigitBarMNIST
 
 
@@ -38,11 +35,9 @@ if __name__ == "__main__":
 
     data_dir = root / scm_model / graph_type
 
-    model_dir = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img32_v2"
-    model_fname = "model_epoch_8220.pt"
-    vae_model_fpath = (
-        root / "CausalDigitBarMNIST" / "vae_reduction" / model_dir.split(".")[0] / model_fname
-    )
+    model_dir = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img32_v4"
+    model_fname = "model_epoch_11190.pt"
+    vae_model_fpath = root / "CausalMNIST" / "vae_reduction" / model_dir.split(".")[0] / model_fname
     batch_size = 512
     num_workers = 4
 
@@ -93,9 +88,10 @@ if __name__ == "__main__":
         distr_idx,
         targets,
         meta_labels,
-    ) in enumerate(data_loader):
+    ) in tqdm(enumerate(data_loader)):
         with torch.no_grad():
-            embedding = vae_model.encode(images)
+            images = images.to(device)
+            embedding, _ = vae_model.encoder.encode(images)
         # encodings.append(latent_vector.cpu())
         encodings.append(embedding.cpu())
 

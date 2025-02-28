@@ -72,17 +72,15 @@ def configure_optimizers(
 def data_loader(
     root_dir,
     dataset,
-    scm_type,
     graph_type="chain",
     num_workers=4,
     batch_size=32,
     img_size=128,
 ):
-    causal_celeba_dataset = CausalCelebAEmbedding(
+    causal_celeba_dataset = CausalMNISTEmbedding(
         root=root_dir,
         graph_type=graph_type,
         dataset=dataset,
-        scm_type=scm_type,
         img_size=img_size,
         fast_dev_run=False,  # Set to True for debugging
     )
@@ -265,23 +263,21 @@ if __name__ == "__main__":
     # v2: K=8
     # v3: K=8, batch higher
     # model_fname = "celeba_cyclicbeta_eyeglassesscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v2.pt"
-    model_fname = "celeba_haircolor_nfon_128flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim8_trainableedges_sep4and8_v2.pt"
+    model_fname = "mnist_nfon_128flows_alldata_cyclicresnetvaereduction_batch1024_latentdim48_hcdim8_trainableedges_sep4and8_v1.pt"
     hcdim = 8
-    checkpoint_model_fname = "celeba_nfon_cyclicbetaresnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
+    checkpoint_model_fname = "mnist_nfon_cyclicbetaresnetvaereduction_batch1024_latentdim48_trainableedges_sep4and8_v1.pt"
     model_checkpoint_dir = (
-        root / "CausalCelebA" / "nf_on_vae_reduction" / checkpoint_model_fname.split(".")[0]
+        root / "CausalMNIST" / "nf_on_vae_reduction" / checkpoint_model_fname.split(".")[0]
     )
 
-    vae_model_dir = "celeba_cyclicbetal1loss_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1"
-    vae_model_fname = "model_epoch_15670.pt"
-    scm_type = "haircolor"
+    vae_model_dir = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img32_v4"
+    vae_model_fname = "model_epoch_11190.pt"
+
     # dataset = "alldata"
     dataset = "alldata_l1loss"
 
     # prefix within the filename of embeddings
-    scm_name = "hair" if scm_type == "haircolor" else "eye"
-
-    vae_dir = root / "CausalCelebA" / "vae_reduction" / scm_type / vae_model_dir.split(".")[0]
+    vae_dir = root / "CausalMNIST" / "vae_reduction" / vae_model_dir.split(".")[0]
     # vae_model = VAE().to(device)
     vae_model = DeepResNetVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
     model_path = vae_dir / vae_model_fname
@@ -289,7 +285,7 @@ if __name__ == "__main__":
     vae_model = vae_model.to(device)
 
     # for loaded checkpoints
-    checkpoint_dir = root / "CausalCelebA" / "nf_on_vae_reduction" / model_fname.split(".")[0]
+    checkpoint_dir = root / "CausalMNIST" / "nf_on_vae_reduction" / model_fname.split(".")[0]
     if master_process:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
@@ -353,7 +349,6 @@ if __name__ == "__main__":
         num_workers=num_workers,
         batch_size=batch_size,
         img_size=img_size,
-        scm_type=scm_name,
     )
     if master_process:
         print(f"Train loader has {len(train_loader)} images")
