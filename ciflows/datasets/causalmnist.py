@@ -1,5 +1,5 @@
 from pathlib import Path
-
+import pandas as pd
 import PIL
 import torch
 from torch.utils.data import Dataset
@@ -142,7 +142,7 @@ class CausalMNISTEmbedding(CausalDigitBarMNIST):
         root = Path(root)
 
         # load attrs
-        dataset = 'alldata'
+        dataset = "alldata"
         if dataset == "alldata":
             dataset_postfix = "alldata_encodings"
             fname = f"{graph_type}_{dataset_postfix}.pt"
@@ -172,13 +172,10 @@ class CausalMNISTEmbedding(CausalDigitBarMNIST):
         ):
             raise ValueError("Data, labels and intervention targets must have the same length.")
 
-        
-
         if fast_dev_run:
             subsample = 100
             self.causal_main_df = self.causal_main_df.iloc[:subsample]
             self.file_list = self.file_list[:subsample]
-
 
     def __getitem__(self, index):
         """Get a sample from the image dataset.
@@ -214,3 +211,128 @@ class CausalMNISTEmbedding(CausalDigitBarMNIST):
         # to return a PIL Image
         # img = PIL.Image.fromarray(img.numpy(), mode="RGB")
         return img, distr_idx, target, meta_label
+
+
+# Define the dataset loader for digit dataset
+class CausalMNIST(Dataset):
+    def __init__(
+        self,
+        root,
+        graph_type,
+        transform=None,
+        target_transform=None,
+        fast_dev_run=False,
+    ):
+        self.root = root
+        self.transform = transform
+        self.target_transform = target_transform
+        self.graph_type = graph_type
+
+        root = Path(root) / self.__class__.__name__ / graph_type
+
+        self._load_data(root)
+        if fast_dev_run:
+            subsample = 100
+            self.data = self.data[:subsample]
+            self.labels = self.labels[:subsample]
+            self.intervention_targets = self.intervention_targets[:subsample]
+
+    def _load_data(self, root):
+        distr_names = ["observational", "int_colorbar_0", "int_colorbar_1", "int_colordigit_0"]
+        dirs_to_load = [root / name for name in distr_names]
+        for idx, dir_to_load in enumerate(dirs_to_load):
+            imgs = torch.load(dir_to_load / "imgs.pt", weights_only=False)
+            targets = torch.load(dir_to_load / "targets.pt", weights_only=False)
+            causal_attrs = pd.read_csv(dir_to_load / "causal_attrs.csv")
+
+            if idx == 0:
+                self.data = imgs
+                self.causal_attrs = causal_attrs
+                self.intervention_targets = targets
+            else:
+                self.data = torch.vstack([self.data, imgs])
+                self.causal_attrs = pd.concat([self.causal_attrs, causal_attrs])
+                self.intervention_targets = torch.vstack([self.intervention_targets, targets])
+
+        self.causal_attrs = self.causal_attrs[["digit", "color_digit", "color_bar", "distr_idx"]]
+        if not all(
+            [
+                len(self.data) == len(self.causal_attrs),
+                len(self.data) == len(self.intervention_targets),
+            ]
+        ):
+            raise ValueError("Data, labels and intervention targets must have the same length.")
+
+    @property
+    def intervention_targets_per_distr(self):
+        return [
+            [0, 0, 0],
+            [0, 0, 1],
+            [0, 0, 1],
+            [0, 1, 0],
+        ]
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        """Get a sample from the image dataset.
+
+        The target composes of the meta-labeling:
+        - digit
+        - colorbar
+        - colordigit
+        - distr_idx
+        - intervention
+        """
+        img, meta_label, target = (
+            self.data[index],
+            self.causal_attrs.iloc[index,:].values,
+            self.intervention_targets[index],
+        )
+
+        # get the distribution index
+        distr_idx = meta_label[3]
+
+        # img = PIL.Image.fromarray(img.numpy(), mode="RGB")
+        if self.transform is not None:
+            img = self.transform(img)
+
+        return img, distr_idx, target, meta_label
+
+    @property
+    def meta_label_strs(self):
+        """These are the columns of causal_attrs.csv."""
+        return ["digit", "color_digit", "color_bar", "distr_idx", "Intervention"]
+
+    @property
+    def digit_idx(self):
+        return 0
+
+    @property
+    def color_digit_idx(self):
+        return 1
+
+    @property
+    def color_bar_idx(self):
+        return 2
+
+    @property
+    def digit(self):
+        return self.causal_attrs[:, 0]
+
+    @property
+    def color_digit(self):
+        return self.causal_attrs[:, 1]
+
+    @property
+    def color_bar(self):
+        return self.causal_attrs[:, 2]
+
+    @property
+    def latent_dim(self):
+        return self.causal_attrs.shape[1]
+
+    @property
+    def distribution_idx(self):
+        return self.causal_attrs[:, 3]
