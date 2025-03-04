@@ -21,7 +21,7 @@ from tqdm import tqdm
 from albumentations import CoarseDropout, Compose
 from albumentations.pytorch import ToTensorV2
 
-from ciflows.datasets.causalmnist import CausalMNIST
+from ciflows.datasets.causalmnist import CausalDigitBarMNIST
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
 from ciflows.reduction.resnetvae_mnist import DeepResNetMNISTVAE
@@ -104,22 +104,13 @@ def data_loader(
         ]
     )
 
-    # causal_mnist_dataset = CausalDigitBarMNIST(
-    #     root=root_dir,
-    #     graph_type=graph_type,
-    #     transform=image_transform,
-    #     # img_size=img_size,
-    #     fast_dev_run=False,  # Set to True for debugging
-    # )
-
-    causal_mnist_dataset = CausalMNIST(
+    causal_mnist_dataset = CausalDigitBarMNIST(
         root=root_dir,
         graph_type=graph_type,
         transform=image_transform,
         # img_size=img_size,
         fast_dev_run=False,  # Set to True for debugging
     )
-
 
     # Calculate the number of samples for training and validation
     total_len = len(causal_mnist_dataset)
@@ -207,6 +198,147 @@ def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=0.1):
 
 def get_model_attribute(model, attr):
     return getattr(model.module if isinstance(model, DDP) else model, attr)
+
+
+
+import yaml
+
+def load_config(config_path="./vae_config.yml"):
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+    return config
+
+def main(debug):
+    config = load_config()
+
+    lr = config['vae']['lr']
+    max_epochs = config['vae']['max_epochs']
+    batch_size = config['vae']['batch_size']
+    num_workers = config['vae']['num_workers']
+    num_blocks_per_stage = config['vae']['num_blocks_per_stage']
+    gradient_accumulation_steps = config['vae']['gradient_accumulation_steps']
+    
+    if debug:
+        accelerator = "cpu"
+        device = "cpu"
+        max_epochs = 5
+        batch_size = 8
+        check_samples_every_n_epoch = 1
+        num_workers = 2
+        num_blocks_per_stage = 3
+
+        gradient_accumulation_steps = 2
+        fast_dev = True
+
+    # set model 
+    model = DeepResNetMNISTVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
+    model = model.to(ptdtype).to(device)
+    image_dim = 3 * img_size * img_size
+
+    # initialize a GradScaler. If enabled=False scaler is a no-op
+    scaler = torch.GradScaler(device=device, enabled=(dtype == "float16"))
+
+    # configure optimizers
+    optimizer = configure_optimizers(
+        model,
+        learning_rate=lr,
+        betas=(beta1, beta2),
+        weight_decay=1e-4,
+    )
+    # Default: create pytorch optimizer
+    # optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+
+    # compile the model
+    if compile:
+        model = torch.compile(model)
+
+    # load weights from checkpoint + optimizer state
+    if load_from_checkpoint:
+        model, start_epoch = load_model(
+            model,
+            saved_checkpoint_dir / savedcheckpoint_model_fname,
+            device,
+            optimizer=optimizer,
+        )
+        # Synchronize all processes
+        if ddp:
+            torch.distributed.barrier()
+    else:
+        start_epoch = 1
+
+    # Wrap model for distributed training
+    if ddp:
+        model = DDP(model, device_ids=[ddp_local_rank])
+
+    # print the number of parameters in the model
+    if master_process:
+        print(sum(p.numel() for p in model.parameters()) / 1e6, "M parameters")
+
+    # Cosine Annealing Scheduler (adjust the T_max for the number of epochs)
+    scheduler = CosineAnnealingLR(
+        optimizer, T_max=max_epochs, eta_min=lr_min
+    )  # T_max = total epochs
+
+    top_k_saver = TopKModelSaver(checkpoint_dir, k=5)  # Initialize the top-k model saver
+
+    train_loader, val_loader = data_loader(
+        root_dir=root,
+        graph_type=graph_type,
+        num_workers=num_workers,
+        batch_size=batch_size,
+        img_size=img_size,
+    )
+    if master_process:
+        print(
+            f"Train loader has {len(train_loader)} images and val loader {len(val_loader)} images"
+        )
+
+    # training loop
+    # - log the train and val loss every 10 epochs
+    # - sample from the model every 10 epochs, and save the images
+    # - save the top 5 models based on the validation loss
+    # - save the model at the end of training
+
+    t0 = time.time()
+    local_iter_epoch = 0  # number of iterations in the lifetime of this process
+    raw_model = model.module if ddp else model  # unwrap DDP container if needed
+
+    # extract the variables within the batch
+    train_iterator = iter(train_loader)
+
+    # Prefetch next batch asynchronously
+    try:
+        batch = next(train_iterator)
+    except StopIteration:
+        # Reinitialize iterator when dataset is exhausted
+        train_iterator = iter(train_loader)
+        batch = next(train_iterator)
+
+    # images, target_images, distr_idx, targets, meta_labels = batch
+    images, distr_idx, targets, meta_labels = batch
+    images = images.to(device=device, dtype=ptdtype)
+    target_images = images
+    target_images = target_images.to(device=device, dtype=ptdtype)
+
+    if master_process:
+        print(f"Images dtype: {images.dtype}")
+        print(f"Model dtype: {next(model.parameters()).dtype}")
+
+    # Initialize Capacity and Scheduler
+    cycle_length = len(train_loader) * 10  # Full cycle over 5 epochs
+
+    # XXX: remove when not doing FFF-VAE
+    # loss_nll = torch.tensor(0.0)
+    # surrogate_loss = torch.tensor(0.0)
+    effective_batch_size = batch_size * gradient_accumulation_steps * ddp_world_size
+    if master_process:
+        print(f"Effective batch size: {effective_batch_size}")
+
+    # Training loop
+    max_epochs = start_epoch + max_epochs
+    annealing_epochs = annealing_epochs + start_epoch
+    if master_process:
+        print(f"Starting training loop from epoch {start_epoch} to {max_epochs}")
 
 
 if __name__ == "__main__":
@@ -356,11 +488,11 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "causalmnist_exp1.pt"
+    model_fname = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img32_v4.pt"
     checkpoint_dir = root / "CausalMNIST" / "vae_reduction" / model_fname.split(".")[0]
 
     # for loaded checkpoints
-    checkpoint_model_fdir = "causalmnist_exp1.pt"
+    checkpoint_model_fdir = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img32_v2.pt"
     saved_checkpoint_dir = (
         root / "CausalMNIST" / "vae_reduction" / checkpoint_model_fdir.split(".")[0]
     )

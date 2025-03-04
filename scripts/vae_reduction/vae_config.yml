@@ -1,0 +1,37 @@
+experiment_name: "vae_experiment"
+seed: 42
+
+vae:
+  encoder: "resnet18"
+  decoder: "upsample"
+  batch_size: 128
+  epochs: 50
+  learning_rate: 0.001
+  optimizer: "adam"
+  save_path: "experiments/vae_experiment/vae.pth"
+
+  # 
+  batch_size: 128
+  gradient_accumulation_steps: 16  # used to simulate larger batch sizes
+  img_size: 32
+  graph_type: "chain"
+  num_workers: 4
+  check_samples_every_n_epoch: 5
+
+  # adamw optimizer settings
+  max_epochs: 2_000
+  lr: 3e-4
+  beta1: 0.9
+  beta2: 0.95
+  grad_clip: 1.0
+
+  # Learning rate scheduler settings
+  lr_min: 6e-5
+  lr_scheduler: "cosine"
+
+  # model settings
+  n_channels: 3
+  out_channels: 3
+  latent_dim: 32
+  num_blocks_per_stage: 3
+

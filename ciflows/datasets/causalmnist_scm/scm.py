@@ -5,8 +5,7 @@ import torch
 from PIL import Image
 from scipy.stats import truncnorm
 from ciflows.datasets.causalmnist_scm.utils import value_to_rgb
-
-
+from .perturb import apply_perturbation, Thickening, Thinning, Fracture
 
 
 def add_bar(img, color_bar_val=255, start_height=0, height=3, start_width=0, width=None):
@@ -38,9 +37,11 @@ def skewed_normal(mode, skewness, size):
     samples = scipy.stats.skewnorm.rvs(a=alpha, loc=loc, scale=scale, size=size)
     return torch.tensor(samples, dtype=torch.float32)
 
+
 ######################################################################
 # SCMs for the Causal MNIST dataset
 ######################################################################
+
 
 def nonmarkov_scm(intervention_idx, labels):
     """Generate parameters for the SCM of the MNIST dataset with a bar following a nonmarkov structure.
@@ -293,7 +294,7 @@ def chain_scm(intervention_idx, labels):
     color_digit_means = torch.linspace(
         0, 1, 10
     )  # 10 possible digits, evenly spaced means from 0 to 1
-    color_digit_stds = 0.15 * torch.ones(10)  # Standard deviation of 0.15 for each digit
+    color_digit_stds = 0.05 * torch.ones(10)  # Standard deviation of 0.15 for each digit
     color_digit = torch.zeros(n_samples)
 
     # sample the color-digit conditioned on the digit
@@ -306,6 +307,7 @@ def chain_scm(intervention_idx, labels):
         color_digit[mask] = truncated_normal(
             color_digit_means[i], color_digit_stds[i], 0, 1, num_samples
         )
+    snr = 0.2
 
     # Generate color_bar based on the intervention index
     if intervention_idx == 0:
@@ -317,18 +319,18 @@ def chain_scm(intervention_idx, labels):
         # Intervention 1: mean equal to 1 - color-digit
         # color_bar = truncated_normal(1 - color_digit, 0.1, 0, 1, n_samples)
         # Intervention 2: skewed distribution towards 0.9
-        color_bar = skewed_normal(0.1, 1.0 / (color_digit + 0.5), n_samples)
+        color_bar = skewed_normal(snr, 1.0 / (color_digit + 0.5), n_samples)
         causal_labels["intervention_targets"] = torch.Tensor([[0, 0, 1]] * n_samples)
     elif intervention_idx == 2:
         # Intervention 2: skewed distribution towards 0.9
-        color_bar = skewed_normal(0.8, 1.0 / (color_digit + 0.5), n_samples)
+        color_bar = skewed_normal(1.0 - snr, 1.0 / (color_digit + 0.5), n_samples)
         causal_labels["intervention_targets"] = torch.Tensor([[0, 0, 1]] * n_samples)
     elif intervention_idx == 3:
         # Intervention 3: hard normal distribution on color_digit
         n_samples = labels.shape[0]
         color_digit = truncated_normal(0.5, 0.2, 0, 1, n_samples)
         # color_bar = truncated_normal(0.5, 0.2 / (color_digit + 0.5), 0, 1, n_samples)
-        color_bar = truncated_normal(1.0 / (color_digit + 1), 0.1, 0, 1, n_samples)
+        color_bar = truncated_normal(0.75 / (color_digit + 1), 0.1, 0, 1, n_samples)
         causal_labels["intervention_targets"] = torch.Tensor([[0, 1, 0]] * n_samples)
     else:
         raise ValueError("Invalid intervention_idx. Must be 0, 1, 2 or 3.")
@@ -338,6 +340,119 @@ def chain_scm(intervention_idx, labels):
     return causal_labels
 
 
+def chain_style_scm(intervention_idx, labels):
+    """Generate parameters for the SCM of the MNIST dataset with a bar.
+
+    style <- Digit -> Color-Digit -> Color-Bar
+
+    There are four possible distributions that are generated. The first is observational
+    (intervention_idx == 0):
+
+        - digit is just uniformly distributed more or less in the MNIST dataset
+        - color-digit will be a mixture of gaussians, where the mean is evenly
+        spaced from 0 to 1 depending on the digit, and the standard deviation
+        is a default value of 0.1 for each digit
+        - color-bar will be a function of color-digit, sampled from a truncated
+        normal distribution with mean equal to the color-digit value and a standard
+        deviation of 0.1
+
+    Intervention 1 (color-bar) is changed:
+        - color-bar will be sampled from a truncated normal distribution with
+        mean equal to 1 - color-digit and a standard deviation of 0.1
+
+    Intervention 2 (color-bar) is changed:
+        - color-bar will be sampled from a skewed distribution towards
+        0.9.
+
+    Parameters
+    ----------
+    intervention_idx : int
+        The intervention index.
+    labels : tensor of shape (n_samples,)
+        The labels of each of the MNIST digit samples. This corresponds to the
+        digit.
+
+    Returns
+    -------
+    causal_labels : dict
+        A dictionary of:
+            - digit : tensor of shape (n_samples,)
+                The digit label.
+            - color_digit : tensor of shape (n_samples,)
+                The value of the color-digit from [0, 1].
+            - color_bar : tensor of shape (n_samples,)
+                The value of the color-digit from [0, 1].
+            - intervention_targets : tensor of shape (n_samples, 3)
+                The intervention targets for the color-bar. This is a one-hot
+                encoding of the intervention index, where a one indicates
+                which causal variable is intervened on.
+    """
+    n_samples = labels.shape[0]
+    causal_labels = dict()
+
+    # Digit is just uniformly distributed more or less in the MNIST dataset
+    digit = torch.Tensor(labels)
+
+    # Color-digit will be a mixture of gaussians
+    color_digit_means = torch.linspace(
+        0, 1, 10
+    )  # 10 possible digits, evenly spaced means from 0 to 1
+    color_digit_stds = 0.05 * torch.ones(10)  # Standard deviation of 0.15 for each digit
+    color_digit = torch.zeros(n_samples)
+    width = torch.zeros(n_samples)
+    width_means = torch.linspace(-0.75, 0.75, 10)
+    # sample the color-digit conditioned on the digit
+
+    for i in range(10):
+        mask = digit == i
+        num_samples = mask.sum().item()
+        # color_digit[mask] = torch.distributions.Normal(
+        #     color_digit_means[i], color_digit_stds[i]
+        # ).sample((num_samples,))
+        color_digit[mask] = truncated_normal(
+            color_digit_means[i], color_digit_stds[i], 0, 1, num_samples
+        )
+
+        width[mask] = torch.normal(width_means[i], 0.05, size=(num_samples,))
+
+    snr = 0.2
+
+    # Generate color_bar based on the intervention index
+    if intervention_idx == 0:
+        # Observational distribution
+        # color_bar = truncated_normal(0.5, 0.2 / (color_digit + 1), 0, 1, n_samples)
+        color_bar = truncated_normal(1.0 / (color_digit + 1), 0.1, 0, 1, n_samples)
+        causal_labels["intervention_targets"] = torch.Tensor([[0, 0, 0]] * n_samples)
+    elif intervention_idx == 1:
+        # Intervention 1: mean equal to 1 - color-digit
+        # color_bar = truncated_normal(1 - color_digit, 0.1, 0, 1, n_samples)
+        # Intervention 2: skewed distribution towards 0.9
+        color_bar = skewed_normal(snr, 1.0 / (color_digit + 0.5), n_samples)
+        causal_labels["intervention_targets"] = torch.Tensor([[0, 0, 1]] * n_samples)
+    elif intervention_idx == 2:
+        # Intervention 2: skewed distribution towards 0.9
+        color_bar = skewed_normal(1.0 - snr, 1.0 / (color_digit + 0.5), n_samples)
+        causal_labels["intervention_targets"] = torch.Tensor([[0, 0, 1]] * n_samples)
+    elif intervention_idx == 3:
+        # Intervention 3: hard normal distribution on color_digit
+        # n_samples = labels.shape[0]
+        # color_digit = truncated_normal(0.5, 0.2, 0, 1, n_samples)
+        # # color_bar = truncated_normal(0.5, 0.2 / (color_digit + 0.5), 0, 1, n_samples)
+        color_bar = truncated_normal(0.75 / (color_digit + 1), 0.1, 0, 1, n_samples)
+        width = torch.rand(size=(n_samples,)) - 0.5
+        # for i in range(10):
+        #     mask = digit == i
+        #     num_samples = mask.sum().item()
+        #     width[mask] = torch.normal(width_means[-i], 0.1, size=(num_samples,))
+        causal_labels["intervention_targets"] = torch.Tensor([[1, 0, 0, 0]] * n_samples)
+    else:
+        raise ValueError("Invalid intervention_idx. Must be 0, 1, 2 or 3.")
+
+    causal_labels.update(
+        {"digit": digit, "color_digit": color_digit, "color_bar": color_bar, "width": width}
+    )
+
+    return causal_labels
 
 
 # Placeholder for alter_img function
@@ -371,13 +486,11 @@ def causal_mnist_scm(intervention_idx, labels, graph_type="chain"):
     if graph_type == "chain":
         causal_labels = chain_scm(intervention_idx=intervention_idx, labels=labels)
     elif graph_type == "collider":
-        causal_labels = collider_scm(
-            intervention_idx=idx, labels=labels
-        )
+        causal_labels = collider_scm(intervention_idx=idx, labels=labels)
     elif graph_type == "nonmarkov":
-        causal_labels = nonmarkov_scm(
-            intervention_idx=idx, labels=labels
-        )
+        causal_labels = nonmarkov_scm(intervention_idx=idx, labels=labels)
+    elif graph_type == "chain_style":
+        causal_labels = chain_style_scm(intervention_idx=intervention_idx, labels=labels)
     else:
         raise ValueError("Invalid graph_type. Must be chain, collider or nonmarkov.")
     return causal_labels
@@ -405,6 +518,94 @@ def alter_digitbar_img(img, color_digit, color_bar, cmap=None, dtype=None):
         cmap = plt.cm.viridis
     else:
         cmap = plt.get_cmap(cmap)
+
+    # change the color
+    h, w = img.shape
+    color_value = value_to_rgb(color_digit, methods="cmap", cmap=cmap)
+    colored_arr = np.zeros((h, w, 3), dtype=np.uint8)
+    mask = img > 0  # Mask to identify the digit
+    for i in range(3):
+        colored_arr[:, :, i][mask] = color_value[i] * 255  # Apply uniform color to the digit
+    img = colored_arr
+
+    # add bar
+    # color_value = np.array(cmap(color_digit.item())[:3]).squeeze()
+    color_value = value_to_rgb(color_bar, methods="cmap", cmap=cmap)
+    img = add_bar(
+        img,
+        color_bar_val=color_value,
+        start_height=0,
+        height=4,
+        start_width=0,
+        width=None,
+    )
+
+    if dtype == "PIL":
+        img = Image.fromarray(img, mode="RGB")
+    elif dtype == "torch":
+        img = torch.tensor(img, dtype=torch.float32)
+    elif dtype is not None:
+        raise ValueError(f"Invalid dtype: {dtype} Must be PIL or torch or None for numpy array.")
+    return img
+
+
+def alter_digitbar_style_img(
+    img, width, color_digit, color_bar, cmap=None, dtype=None, apply_fracture=False
+):
+    """Alter a MNIST image by changing the color of the digit and adding a color bar.
+
+    Parameters
+    ----------
+    img : Image
+        The MNIST image.
+    color_digit : float
+        The color of the digit in [0, 1].
+    color_bar : float
+        The color of the bar in [0, 1].
+    cmap : str, optional
+        The colormap for the colors to use.
+    apply_fracture : bool
+        Whether to apply a random fracture to the image
+
+    Returns
+    -------
+    img : Image as numpy array, PIL.Image or torch.Tensor of shape (28, 28, 3)
+        The output image.
+    """
+    if cmap is None:
+        cmap = plt.cm.viridis
+    else:
+        cmap = plt.get_cmap(cmap)
+
+    # change the width
+    # Apply transformations to the image based on the parameters
+    # This is just a placeholder, you need to implement the actual transformation logic
+    # apply width changes
+    if width < 0.0:
+        width = np.abs(width)
+        width_func = Thinning(amount=width)
+    else:
+        width_func = Thickening(amount=width)
+
+    img = img.squeeze()
+    img = apply_perturbation(img, perturbation=width_func, convert_dtype=False)
+    img = torch.tensor(img)
+
+    if apply_fracture:
+        thickness = max(1.1, 1.0 - width)
+        fracture_func = Fracture(thickness=thickness, prune=1, num_frac=1)
+        img = apply_perturbation(img, perturbation=fracture_func, convert_dtype=False)
+
+    # Define a function for random rotation
+    from skimage.transform import rotate
+
+    def random_rotation(image, max_angle=20):
+        angle = np.random.uniform(-max_angle, max_angle)
+        rotated_image = rotate(image, angle, resize=False)
+        return rotated_image
+
+    # Apply random rotation
+    img = random_rotation(img)
 
     # change the color
     h, w = img.shape
