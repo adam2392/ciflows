@@ -3,6 +3,7 @@ import pandas as pd
 import PIL
 import torch
 from torch.utils.data import Dataset
+import torchvision.transforms as transforms
 
 
 # Define the dataset loader for digit dataset
@@ -287,7 +288,7 @@ class CausalMNIST(Dataset):
         """
         img, meta_label, target = (
             self.data[index],
-            self.causal_attrs.iloc[index,:].values,
+            self.causal_attrs.iloc[index, :].values,
             self.intervention_targets[index],
         )
 
@@ -295,6 +296,7 @@ class CausalMNIST(Dataset):
         distr_idx = meta_label[3]
 
         # img = PIL.Image.fromarray(img.numpy(), mode="RGB")
+        img = transforms.ToPILImage()(img)
         if self.transform is not None:
             img = self.transform(img)
 

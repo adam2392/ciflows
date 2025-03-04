@@ -49,3 +49,6 @@ pip install -e .
 - Keep updated requirements in setup.py
 - Follow sklearn apis whenever possible
 - Use Huggingface whenever possible, then pytorch
+
+
+pip install numpy scipy pandas tqdm joblib PyYAML scikit-learn normflows lightning torch torchvision torchaudio

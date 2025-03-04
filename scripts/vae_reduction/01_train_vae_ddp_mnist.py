@@ -48,7 +48,8 @@ def configure_optimizers(
     # create optim groups. Any parameters that is 2D will be weight decayed, otherwise no.
     # i.e. all weight tensors in matmuls + embeddings decay, all biases and layernorms don't.
     decay_params = [p for n, p in param_dict.items() if p.dim() >= 2]
-    nodecay_params = [p for n, p in param_dict.items() if p.dim() < 2]
+    nodecay_params = [p for n, 
+                      p in param_dict.items() if p.dim() < 2]
     optim_groups = [
         {"params": decay_params, "weight_decay": weight_decay},
         {"params": nodecay_params, "weight_decay": 0.0},
@@ -212,7 +213,7 @@ def get_model_attribute(model, attr):
 if __name__ == "__main__":
     debug = False
     compile = False
-    load_from_checkpoint = True
+    load_from_checkpoint = False
 
     # System settings
     world_size = torch.cuda.device_count()
