@@ -25,16 +25,19 @@ class CausalDigitBarMNIST(Dataset):
 
         # load data from disc
         self.data = torch.load(
-            root / self.__class__.__name__ / graph_type / f"{graph_type}-imgs-train.pt"
+            root / self.__class__.__name__ / graph_type / f"{graph_type}-imgs-train.pt",
+            weights_only=False,
         )
         self.labels = torch.load(
-            root / self.__class__.__name__ / graph_type / f"{graph_type}-labels-train.pt"
+            root / self.__class__.__name__ / graph_type / f"{graph_type}-labels-train.pt",
+            weights_only=False,
         )
         if isinstance(self.labels, list):
             self.labels = torch.vstack(self.labels)
 
         self.intervention_targets = torch.load(
-            root / self.__class__.__name__ / graph_type / f"{graph_type}-targets-train.pt"
+            root / self.__class__.__name__ / graph_type / f"{graph_type}-targets-train.pt",
+            weights_only=False,
         )
         if isinstance(self.intervention_targets, list):
             self.intervention_targets = torch.vstack(self.intervention_targets)
@@ -128,7 +131,7 @@ class CausalDigitBarMNIST(Dataset):
         return self.labels[:, 3]
 
 
-class CausalMNISTEmbedding(CausalDigitBarMNIST):
+class CausalDigitBarMNISTEmbedding(CausalDigitBarMNIST):
     def __init__(
         self,
         root,
@@ -235,7 +238,7 @@ class CausalMNIST(Dataset):
         if fast_dev_run:
             subsample = 100
             self.data = self.data[:subsample]
-            self.labels = self.labels[:subsample]
+            self.causal_attrs = self.causal_attrs.iloc[:subsample, :]
             self.intervention_targets = self.intervention_targets[:subsample]
 
     def _load_data(self, root):
@@ -338,3 +341,86 @@ class CausalMNIST(Dataset):
     @property
     def distribution_idx(self):
         return self.causal_attrs[:, 3]
+
+
+class CausalMNISTEmbedding(CausalMNIST):
+    def __init__(
+        self,
+        root,
+        graph_type,
+        transform=None,
+        target_transform=None,
+        fast_dev_run=False,
+    ):
+        self.root = root
+        self.graph_type = graph_type
+        self.transform = transform
+        self.target_transform = target_transform
+
+        root = Path(root) / 'CausalMNIST' / graph_type
+
+        # load attrs
+        dataset = "causalmnist_exp2_betamax005"
+        if dataset == "causalmnist_exp2_betamax005":
+            dataset_postfix = "causalmnist_exp2_betamax005"
+            fname = root / f"{dataset_postfix}_encodings.pt"
+
+        print()
+        print()
+        print(f"Loaded dataset postfix: {dataset_postfix}")
+        self.data = torch.load(fname)
+
+        self.intervention_targets = torch.load(root / f"{dataset_postfix}_targets.pt")
+        if isinstance(self.intervention_targets, list):
+            self.intervention_targets = torch.vstack(self.intervention_targets)
+
+        self.causal_attrs = pd.read_csv(root / f"{dataset_postfix}_causal_attrs.csv", index_col=0)
+        self.causal_attrs['distr_idx'] = self.causal_attrs['distr_idx'].astype(int)
+        
+        print("Causal attributes for MNIST embedding: ")
+        print(self.causal_attrs.head())
+        if not all(
+            [
+                len(self.data) == len(self.causal_attrs),
+                len(self.data) == len(self.intervention_targets),
+            ]
+        ):
+            raise ValueError("Data, labels and intervention targets must have the same length.")
+
+        if fast_dev_run:
+            subsample = 100
+            self.causal_attrs = self.causal_attrs.iloc[:subsample, :]
+            self.data = self.data[:subsample]
+
+    def __getitem__(self, index):
+        """Get a sample from the image dataset.
+
+        The target composes of the meta-labeling:
+        - gender
+        - age
+        - haircolor
+
+        Returns
+        -------
+        img : torch.Tensor of shape (C, H, W)
+            Image tensor
+        distr_idx : int
+            Which distribution associated.
+        target : torch.Tensor of shape (latent_dim,)
+            Intervention target with 1's where the intervention is applied.
+        meta_label : list
+            List of meta-labels
+        """
+        img, meta_label, target = (
+            self.data[index],
+            self.causal_attrs.iloc[index, :].values,
+            self.intervention_targets[index],
+        )
+
+        # get the distribution index
+        distr_idx = int(meta_label[3])
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        return img, distr_idx, target, meta_label

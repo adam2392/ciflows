@@ -1,107 +1,140 @@
 from pathlib import Path
-from tqdm import tqdm
+import argparse
+import pandas as pd
+import shutil
+import yaml
 import torch
+from tqdm import tqdm
 from torchvision import transforms
 from torch.utils.data import DataLoader
 
 from ciflows.reduction.resnetvae_mnist import DeepResNetMNISTVAE
-from ciflows.datasets.causalmnist import CausalDigitBarMNIST
+from ciflows.datasets.causalmnist import CausalMNIST
 
 
-if __name__ == "__main__":
-    # Main encoding process
+def load_config(config_path):
+    """Load YAML experiment configuration."""
+    with open(config_path, "r") as f:
+        return yaml.safe_load(f)
+
+
+def find_best_model(checkpoint_dir):
+    """Find the best model checkpoint (assumes highest epoch is best)."""
+    model_checkpoints = sorted(checkpoint_dir.glob("model_epoch_*.pt"))
+    if (checkpoint_dir / "final_model.pt").exists():
+        return checkpoint_dir / "final_model.pt"
+    if not model_checkpoints:
+        raise FileNotFoundError(f"No model checkpoints found in {checkpoint_dir}")
+
+    best_model = model_checkpoints[-1]  # Assumes highest epoch is best
+    return best_model
+
+
+def main(exp_path):
+    """Load the best VAE model, encode dataset images, and save embeddings."""
+    # Ensure experiment directory exists
+    exp_path = Path(exp_dir)
+    if not exp_path.exists():
+        raise FileNotFoundError(f"Experiment directory {exp_path} not found!")
+
+    # Load experiment config
+    config_path = exp_path / "experiment_config.yaml"
+    if not config_path.exists():
+        raise FileNotFoundError(f"Experiment config file {config_path} not found!")
+
+    config = load_config(config_path)
+    print(f"Loaded config from {config_path}")
+
+    # Set up device
     if torch.cuda.is_available():
         device = torch.device("cuda")
-        accelerator = "cuda"
     elif torch.backends.mps.is_available():
         device = torch.device("mps")
-        accelerator = "mps"
     else:
         device = torch.device("cpu")
-        accelerator = "cpu"
-
     print(f"Using device: {device}")
-    print(f"Using accelerator: {accelerator}")
 
-    graph_type = "chain"
-    debug = False
-    if debug:
-        root = Path("/Users/adam2392/pytorch_data/")
-    else:
-        root = Path("/home/adam2392/projects/data/")
-        root = Path("/local/eb/adam2392/")
+    # Define model parameters
+    latent_dim = config["model"]["latent_dim"]
+    num_blocks_per_stage = config["model"]["num_blocks_per_stage"]
 
-    scm_model = "CausalDigitBarMNIST"
+    # Locate best model checkpoint
+    checkpoint_dir = exp_path
+    best_model_path = find_best_model(checkpoint_dir)
+    print(f"Using best model: {best_model_path}")
 
-    data_dir = root / scm_model / graph_type
-
-    model_dir = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img32_v4"
-    model_fname = "model_epoch_11190.pt"
-    vae_model_fpath = root / "CausalMNIST" / "vae_reduction" / model_dir.split(".")[0] / model_fname
-    batch_size = 512
-    num_workers = 4
-
-    # vae_model = VAE()  # Replace with loading logic
-    latent_dim = 48
-    num_blocks_per_stage = 3
+    # Load the VAE model
     vae_model = DeepResNetMNISTVAE(latent_dim, num_blocks_per_stage=num_blocks_per_stage)
-    vae_model.load_state_dict(torch.load(vae_model_fpath, map_location=device)["model_state_dict"])
+    vae_model.load_state_dict(torch.load(best_model_path, map_location=device)["model_state_dict"])
+    vae_model.to(device)
     vae_model.eval()
+    print("Model loaded successfully.")
 
-    # Define preprocessing for images
-    image_size = 32  # Adjust based on model input
+    # Load dataset
+    root_dir = Path(config["data"]["root_dir"])
+    graph_type = config["data"]["graph_type"]
+    batch_size = config["data"]["batch_size"]
+    num_workers = config["data"]["num_workers"]
+    img_size = config["data"]["img_size"]
+
+    data_dir = root_dir / "CausalMNIST" / graph_type
     transform = transforms.Compose(
         [
-            transforms.Resize((image_size, image_size)),  # Resize images to 128x128
-            transforms.CenterCrop(image_size),  # Ensure square crop
-            transforms.ToTensor(),  # Convert images to PyTorch tensors
+            transforms.Resize((img_size, img_size)),
+            transforms.CenterCrop(img_size),
+            transforms.ToTensor(),
         ]
     )
-    vae_model.to(device)
-
-    data_to_encode = data_dir / "chain-imgs-train.pt"
-    causal_mnist_dataset = CausalDigitBarMNIST(
-        root=root,
-        graph_type=graph_type,
-        transform=transform,
-        # img_size=img_size,
-        fast_dev_run=False,  # Set to True for debugging
+    dataset = CausalMNIST(
+        root=root_dir, graph_type=graph_type, transform=transform, fast_dev_run=False
     )
     data_loader = DataLoader(
-        dataset=causal_mnist_dataset,
-        batch_size=batch_size,
-        drop_last=False,
-        shuffle=False,
-        # shuffle=True,  # Shuffle data during training
-        num_workers=num_workers,
-        pin_memory=True,  # Enable if using a GPU
-        persistent_workers=True,
+        dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True
     )
-    data_tensor = torch.load(data_to_encode)
 
-    n_images = len(data_tensor)
+    # Encode dataset
     encodings = []
-    img_idx = 0
-
-    for batch_idx, (
-        images,
-        distr_idx,
-        targets,
-        meta_labels,
-    ) in tqdm(enumerate(data_loader)):
+    meta_df = pd.DataFrame(columns=["digit", "color_digit", "color_bar", "distr_idx"])
+    target_tensor = []
+    for batch_idx, (images, distr_idx, target, meta_label) in tqdm(enumerate(data_loader), desc="Encoding Images"):
         with torch.no_grad():
             images = images.to(device)
             embedding, _ = vae_model.encoder.encode(images)
-        # encodings.append(latent_vector.cpu())
+        
+        meta_df = pd.concat((meta_df, pd.DataFrame(meta_label, columns=["digit", "color_digit", "color_bar", "distr_idx"])), axis=0)
+        target_tensor.append(target)
         encodings.append(embedding.cpu())
 
+    target_tensor = torch.cat(target_tensor, dim=0)
+    # Save embeddings
     latent_vectors = torch.cat(encodings, dim=0)
+    print(target_tensor.shape)
     print(latent_vectors.shape)
-
-    # Save the tensor
-    # v2 nonorm encodings = sample from latent, rather than the mean
-    # output_path = f"{directory.name}_cyclicbeta_noimgaug_encodings.pt"
-    output_path = f"chain_alldata_encodings.pt"
-    torch.save(latent_vectors, data_dir / output_path)
+    output_path = data_dir / f"{config['exp_name']}_encodings.pt"
+    torch.save(latent_vectors, output_path)
+    output_path = data_dir / f"{config['exp_name']}_targets.pt"
+    torch.save(target_tensor, output_path)
+    output_path = data_dir / f"{config['exp_name']}_causal_attrs.csv"
+    meta_df.to_csv(output_path)
     print(f"Saved encodings to: {output_path}")
-    print("Encoding process completed.")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Encode dataset using a trained VAE model.")
+    parser.add_argument(
+        "--exp_dir",
+        required=False,
+        default=None,
+        type=str,
+        help="Path to experiment directory containing experiment.yaml and model checkpoints",
+    )
+    args = parser.parse_args()
+
+    if args.exp_dir is None:
+        exp_dir = (
+            Path("/local/eb/adam2392/CausalMNIST/vae_reduction/") / "causalmnist_exp1_betamax01"
+        )
+    else:
+        exp_dir = args.exp_dir
+
+    main(exp_dir)

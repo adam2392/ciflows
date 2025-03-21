@@ -4,7 +4,7 @@
 debug: false
 compile: false
 load_from_checkpoint: false
-exp_name: "causalmnist_exp2"
+exp_name: "causalmnist_exp2_betamax005"
 
 system:
   device: "cuda"          # or "cpu", "mps", etc.
@@ -14,6 +14,7 @@ system:
 
 data:
   root_dir: "/local/eb/adam2392/"
+  model_dir: "/local/eb/adam2392/CausalMNIST/vae_reduction/"
   batch_size: 128
   num_workers: 4
   img_size: 32
@@ -29,7 +30,7 @@ training:
   max_epochs: 2000
   grad_accum_steps: 16
   check_samples_every_n_epoch: 5
-  cycle_length: 5
+  cycle_length: 10
 
 model:
   latent_dim: 32
@@ -41,4 +42,4 @@ scheduler:
 
 beta:
   beta_min: 0.00025
-  beta_max: 1.5
+  beta_max: 0.005

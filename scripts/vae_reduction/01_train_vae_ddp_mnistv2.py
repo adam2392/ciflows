@@ -118,7 +118,7 @@ def gaussian_nll(recon_x, log_sigma, x):
     first_term = 0.5 * torch.pow((x - recon_x) / log_sigma.exp(), 2)
     return first_term + log_sigma + 0.5 * np.log(2 * np.pi)
 
-def loss_function(recon_x, x, mu, log_var, log_sigma_x, capacity=0.0, beta=0.00025):
+def loss_function(recon_x, x, mu, log_var, capacity=0.0, beta=0.00025):
     rec_loss = F.mse_loss(recon_x, x)
     KLD = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
     kl_loss = KLD if capacity == 0 else torch.max(KLD - capacity, torch.tensor(0.0).cuda())
@@ -142,7 +142,7 @@ def main(config_fpath):
     # Load general configuration values
     debug = config.get("debug", False)
     compile_model = config.get("compile", False)
-    load_from_checkpoint = config.get("load_from_checkpoint", True)
+    load_from_checkpoint = config.get("load_from_checkpoint", False)
     
     # System settings
     sys_cfg = config["system"]
@@ -254,6 +254,8 @@ def main(config_fpath):
     ctx = nullcontext() if device == "cpu" else torch.autocast(device_type=accelerator, dtype=ptdtype)
     ctx = nullcontext()  # Disable autocast if not needed
 
+    raw_model = model.module if ddp else model  # unwrap DDP container if needed
+
     # Training loop
     t0 = time.time()
     for epoch in tqdm(range(start_epoch, max_epochs), desc="Epochs"):
@@ -323,14 +325,23 @@ def main(config_fpath):
                     val_images, _, _, _ = val_batch
                     val_images = val_images.to(device, dtype=ptdtype)
                     reconstructed, mu, logvar = model(val_images)
-                    log_sigma_x = get_model_attribute(model, "log_sigma_x")
-                    loss = loss_function(reconstructed, val_images, mu, logvar, log_sigma_x, capacity=config["capacity"]["initial"], beta=beta)
+                    loss = loss_function(reconstructed, val_images, mu, logvar, beta=beta)
                     val_loss += loss.item()
+
+                # sample images from VAE
+                # 1. Sample latent variables from standard Gaussian
+                num_samples = 16  # Number of images to generate
+                z = torch.randn(num_samples, latent_dim).to(device)  # Sample z ~ N(0, I)
+                generated_images = raw_model.decode(z)  # Shape: [num_samples, 3, 128, 128]
+                generated_images = torch.clamp(generated_images, 0, 1)
+            
+            saved_imgs = torch.cat((reconstructed.cpu(), generated_images.cpu()), axis=0)
+            
             val_loss /= len(val_loader)
             print(f"Epoch {epoch}: Average Val Loss: {val_loss:.4f}")
             # Save sample images and checkpoint
             sample_path = checkpoint_dir / f"epoch_{epoch}_samples.png"
-            save_image(reconstructed.cpu(), sample_path, nrow=4, normalize=True)
+            save_image(saved_imgs, sample_path, nrow=4, normalize=True)
             top_k_saver.save_model(model, optimizer, epoch, train_loss)
             delete_old_checkpoints(checkpoint_dir, keep_top_k=5)
 

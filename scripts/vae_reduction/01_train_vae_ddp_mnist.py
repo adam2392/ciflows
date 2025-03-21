@@ -177,7 +177,7 @@ def gaussian_nll(recon_x, log_sigma, x):
 
 
 # Reconstruction + KL divergence losses summed over all elements and batch
-def loss_function(recon_x, x, mu, log_var, log_sigma_x, capacity=0.0, beta=0.00025):
+def loss_function(recon_x, x, mu, log_var, capacity=0.0, beta=0.00025):
     # print(recon_x.shape, x.shape)
     rec_loss = F.mse_loss(recon_x, x)
     # print(recon_x.shape, x.shape, mu.shape, log_var.shape)
@@ -199,7 +199,7 @@ def loss_function(recon_x, x, mu, log_var, log_sigma_x, capacity=0.0, beta=0.000
 
 
 # Beta annealing function (cyclic)
-def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=0.1):
+def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=0.0005):
     """Cyclic cosine annealing schedule for beta."""
     cycle_position = step % cycle_length
     fraction = cycle_position / cycle_length
@@ -357,11 +357,11 @@ if __name__ == "__main__":
     # v1: K=32
     # v2: K=8
     # v3: K=8, batch higher
-    model_fname = "causalmnist_exp1.pt"
+    model_fname = "causalmnist_exp1v2.pt"
     checkpoint_dir = root / "CausalMNIST" / "vae_reduction" / model_fname.split(".")[0]
 
     # for loaded checkpoints
-    checkpoint_model_fdir = "causalmnist_exp1.pt"
+    checkpoint_model_fdir = "causalmnist_exp1v2.pt"
     saved_checkpoint_dir = (
         root / "CausalMNIST" / "vae_reduction" / checkpoint_model_fdir.split(".")[0]
     )
@@ -515,15 +515,15 @@ if __name__ == "__main__":
 
                 # Learning the variance can become unstable in some cases.
                 # Softly limiting log_sigma to a minimum of -6 ensures stable training.
-                log_sigma_x = softclip(log_sigma_x, -6)
-
+                # log_sigma_x = softclip(log_sigma_x, -6)
+# 
                 loss = loss_function(
                     reconstructed,
                     target_images,
                     latent_mu,
                     latent_logvar,
-                    log_sigma_x=log_sigma_x,
-                    capacity=current_capacity,
+                    # log_sigma_x=log_sigma_x,
+                    # capacity=current_capacity,
                     beta=beta,
                 )  # Custom VAE loss function
 
@@ -616,8 +616,8 @@ if __name__ == "__main__":
                         val_target_images,
                         latent_mu,
                         latent_logvar,
-                        log_sigma_x=log_sigma_x,
-                        capacity=current_capacity,
+                        # log_sigma_x=log_sigma_x,
+                        # capacity=current_capacity,
                         beta=beta,
                     )  # Custom VAE loss function
                     val_loss += loss.item()
