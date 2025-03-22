@@ -26,14 +26,14 @@ optimizer:
 training:
   max_epochs: 2000
   grad_accum_steps: 4
-  check_samples_every_n_epoch: 10
-  cycle_length: 10
-  save_every: 5
-  grad_clip: 1.0
+  save_every: 10
   n_log_steps: 10
+  grad_clip: 1.0
+  use_amp: False
 
 model:
-  num_flows: 12
+  num_flows: 128
+  trainable_edges: False
 
 scheduler:
   type: "cosine"
