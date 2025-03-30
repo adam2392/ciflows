@@ -1,8 +1,9 @@
 # General settings
-debug: True
+debug: False
 compile: false
-load_from_checkpoint: false
-exp_name: "causalmnist_nf_exp3"   # NF-specific experiment name
+load_from_checkpoint: False
+checkpoint_file: "model_epoch_850.pt"
+exp_name: "causalmnist_nf_exp7"   # NF-specific experiment name
 
 system:
   device: "cuda"
@@ -12,8 +13,8 @@ system:
 data:
   root_dir: "/local/eb/adam2392/"
   model_dir: "/local/eb/adam2392/CausalMNIST/nf_reduction/"
-  batch_size: 1024
-  num_workers: 8
+  batch_size: 512
+  num_workers: 24
   img_size: 32
   graph_type: "chain"
   val_split: 0.1
@@ -25,22 +26,22 @@ optimizer:
 
 training:
   max_epochs: 2000
-  grad_accum_steps: 4
+  grad_accum_steps: 2
   save_every: 10
   n_log_steps: 10
-  grad_clip: 1.0
-  use_amp: False
+  grad_clip: 2.0
+  use_amp: True
 
 model:
-  num_flows: 128
-  trainable_edges: False
+  num_flows: 64
+  trainable_edges: True
 
 scheduler:
   type: "cosine"
   lr_min: 6e-5
 
 vae:
-  experiment_name: "causalmnist_exp2_betamax005"   # Identifier for linking to the VAE config
+  experiment_name: "causalmnist_exp1_betamax005"   # Identifier for linking to the VAE config
   checkpoint_dir: "/local/eb/adam2392/CausalMNIST/vae_reduction/"
   latent_dim: 32
   vae_checkpoint_fname: "final_model.pt"

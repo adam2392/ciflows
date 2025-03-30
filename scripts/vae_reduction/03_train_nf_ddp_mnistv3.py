@@ -195,7 +195,7 @@ if __name__ == "__main__":
         num_blocks_per_stage=vae_config["model"]["num_blocks_per_stage"],
     )
     vae_model, _ = load_model(vae_model, vae_checkpoint_file, device)
-    vae_model.to(device).eval()
+    vae_model.to(device)
 
     # Initialize NF Model
     nf_model = make_mnist_nf_model(
@@ -203,8 +203,14 @@ if __name__ == "__main__":
     ).to(device)
 
     # Optimizer and Scheduler
-    optimizer = configure_optimizers(
+    optimizer_nf = configure_optimizers(
         nf_model,
+        learning_rate=nf_config["optimizer"]["lr"],
+        betas=tuple(nf_config["optimizer"]["betas"]),
+        weight_decay=nf_config["optimizer"]["weight_decay"],
+    )
+    optimizer_vae = configure_optimizers(
+        vae_model,
         learning_rate=nf_config["optimizer"]["lr"],
         betas=tuple(nf_config["optimizer"]["betas"]),
         weight_decay=nf_config["optimizer"]["weight_decay"],
@@ -215,7 +221,7 @@ if __name__ == "__main__":
     start_epoch = 1
     if nf_config.get("load_from_checkpoint", False):
         nf_checkpoint_file = nf_checkpoint_dir / nf_config["checkpoint_file"]
-        nf_model, start_epoch = load_model(nf_model, nf_checkpoint_file, device, optimizer=optimizer)
+        nf_model, start_epoch = load_model(nf_model, nf_checkpoint_file, device, optimizer=optimizer_nf)
         print(f"Loaded model from {nf_checkpoint_file} and starting from {start_epoch} epoch")
 
         # Synchronize all processes
@@ -224,8 +230,9 @@ if __name__ == "__main__":
 
     # Model Saving Utility
     top_k_saver = TopKModelSaver(nf_checkpoint_dir, k=5)
+    top_k_saver_vae = TopKModelSaver(nf_checkpoint_dir, k=5)
     scheduler = CosineAnnealingLR(
-        optimizer, T_max=nf_config["training"]["max_epochs"], eta_min=1e-5
+        optimizer_nf, T_max=nf_config["training"]["max_epochs"], eta_min=1e-5
     )
 
     # Enable mixed precision training if AMP is enabled
@@ -236,6 +243,7 @@ if __name__ == "__main__":
     # Wrap with DDP if needed
     if ddp:
         nf_model = DDP(nf_model, device_ids=[ddp_local_rank])
+        vae_model = DDP(vae_model, device_ids=[ddp_local_rank])
 
     # DataLoader
     train_loader, orig_train_loader = data_loader(
@@ -257,42 +265,67 @@ if __name__ == "__main__":
     for epoch in tqdm(range(start_epoch, max_epochs), desc="Epochs"):
         nf_model.train()
         total_loss = 0.0
-        train_iterator = iter(train_loader)
+        total_vae_loss = 0.0
+        train_iterator = iter(orig_train_loader)
 
         for step, batch in enumerate(train_iterator):
             with ctx:
-                latent_embeddings, distr_idx, targets, meta_labels = batch
-                latent_embeddings = latent_embeddings.to(device)
+                imgs, distr_idx, targets, meta_labels = batch
+                imgs = imgs.to(device)
+                distr_idx = distr_idx.to(device)
+                targets = targets.to(device)
                 if isinstance(nf_model, torch.nn.parallel.DistributedDataParallel):
-                    loss = nf_model.module.forward_kld(
+                    latent_embeddings = vae_model.module.encode(imgs)
+                    ll_loss = nf_model.module.forward_kld(
                         latent_embeddings, intervention_targets=targets, distr_idx=distr_idx
                     )
+                    inv_latent = nf_model.module.inverse(latent_embeddings)
+                    inv_latent += torch.randn_like(inv_latent).to(device) * 1e-5
+                    recon_latent_embeddings = nf_model.module.forward(inv_latent)
+                    recon_imgs = vae_model.module.decode(recon_latent_embeddings)
+
+                    # Compute the reconstruction loss.
+                    rec_loss = F.mse_loss(recon_imgs, imgs)
                 else:
-                    loss = nf_model.forward_kld(
+                    latent_embeddings = vae_model.encode(imgs)
+                    ll_loss = nf_model.forward_kld(
                         latent_embeddings, intervention_targets=targets, distr_idx=distr_idx
                     )
-                loss /= grad_accum_steps  # Scale loss for gradient accumulation
+                    inv_latent = nf_model.inverse(latent_embeddings)
+                    inv_latent += torch.randn_like(inv_latent).to(device) * 1e-5
+                    recon_latent_embeddings = nf_model.forward(inv_latent)
+                    recon_imgs = vae_model.decode(recon_latent_embeddings)
+
+                    # Compute the reconstruction loss.
+                    rec_loss = F.mse_loss(recon_imgs, imgs)
+
+                total_vae_loss = ll_loss + rec_loss
+                total_vae_loss /= grad_accum_steps  # Scale loss for gradient accumulation
 
             # Backpropagation with AMP
-            scaler.scale(loss).backward()
-
+            scaler.scale(total_vae_loss).backward(retain_graph=True)
+            
             if (step + 1) % grad_accum_steps == 0:
                 if grad_clip != 0.0 and scaler.is_enabled():
-                    scaler.unscale_(optimizer)
+                    scaler.unscale_(optimizer_nf)
+                    scaler.unscale_(optimizer_vae)
                 torch.nn.utils.clip_grad_norm_(nf_model.parameters(), grad_clip)
-                scaler.step(optimizer)
+                scaler.step(optimizer_nf)
+                scaler.step(optimizer_vae)
                 scaler.update()
-                optimizer.zero_grad()
+                optimizer_nf.zero_grad()
+                optimizer_vae.zero_grad()
 
-            total_loss += loss.item()
+            total_loss += total_vae_loss.item()
 
         scheduler.step()
 
         # Save model periodically
         if master_process and epoch % nf_config["training"]["save_every"] == 0:
             # torch.save(nf_model.state_dict(), nf_checkpoint_dir / f"checkpoint_epoch_{epoch}.pt")
-            top_k_saver.save_model(nf_model, optimizer, epoch, total_loss)
-            delete_old_checkpoints(nf_checkpoint_dir, keep_top_k=5)
+            top_k_saver.save_model(nf_model, optimizer_nf, epoch, total_loss)
+            top_k_saver_vae.save_model(vae_model, optimizer_vae, epoch, total_loss)
+            delete_old_checkpoints(nf_checkpoint_dir, keep_top_k=10)
             print(f"Checkpoint saved at {nf_checkpoint_dir}")
 
         # Image Generation & Latent Visualization
@@ -331,9 +364,25 @@ if __name__ == "__main__":
                 else:
                     sample_nf_latents, _ = nf_model.sample(8, distr_idx=0)
                 sample_nf = vae_model.decode(sample_nf_latents).reshape(-1, 3, img_size, img_size)
-
                 # Stack generated samples vertically
                 sample_stack = torch.cat([sample_vae, sample_nf], dim=0)
+
+                if isinstance(nf_model, torch.nn.parallel.DistributedDataParallel):
+                    sample_nf_latents, _ = nf_model.module.sample(8, distr_idx=1)
+                else:
+                    sample_nf_latents, _ = nf_model.sample(8, distr_idx=1)
+                sample_nf = vae_model.decode(sample_nf_latents).reshape(-1, 3, img_size, img_size)
+                # Stack generated samples vertically
+                sample_stack = torch.cat([sample_stack, sample_nf], dim=0)
+
+                if isinstance(nf_model, torch.nn.parallel.DistributedDataParallel):
+                    sample_nf_latents, _ = nf_model.module.sample(8, distr_idx=2)
+                else:
+                    sample_nf_latents, _ = nf_model.sample(8, distr_idx=2)
+                sample_nf = vae_model.decode(sample_nf_latents).reshape(-1, 3, img_size, img_size)
+                # Stack generated samples vertically
+                sample_stack = torch.cat([sample_stack, sample_nf], dim=0)
+                
                 save_image(
                     sample_stack.cpu(),
                     nf_checkpoint_dir / f"epoch_{epoch}_samples.png",
@@ -360,232 +409,6 @@ if __name__ == "__main__":
     # Save Final Model
     if master_process:
         torch.save(nf_model.state_dict(), nf_checkpoint_dir / "final_model.pt")
+        torch.save(vae_model.state_dict(), nf_checkpoint_dir / "final_vae_model.pt")
 
     print("Training Complete!")
-    # root = Path("/local/eb/adam2392/CausalMNIST/")
-
-    # # Load NF Configuration
-    # nf_config_path = "/home/adam2392/projects/ciflows/scripts/vae_reduction/nf_experiment.yml"
-    # nf_config = load_experiment_config(nf_config_path)
-    # load_from_checkpoint = nf_config.get("load_from_checkpoint", False)
-
-    # # Load VAE Configuration
-    # vae_checkpoint_dir = (
-    #     Path(nf_config["vae"]["checkpoint_dir"]) / nf_config["vae"]["experiment_name"]
-    # )
-    # vae_config_path = vae_checkpoint_dir / "experiment_config.yaml"
-    # vae_config = load_experiment_config(vae_config_path)
-
-    # # Extract experiment settings
-    # exp_name = nf_config["exp_name"]
-    # model_root = root / "nf_reduction" / exp_name
-    # model_root.mkdir(parents=True, exist_ok=True)
-
-    # # tensorboard writer...
-    # writer = SummaryWriter(log_dir=str(model_root / "logs"))
-
-    # max_epochs = nf_config["training"]["max_epochs"]
-
-    # # Save a copy of the NF config
-    # config_save_path = model_root / "experiment_config.yaml"
-    # shutil.copy(nf_config_path, config_save_path)
-
-    # # Device Setup
-    # world_size = torch.cuda.device_count()
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # dtype = "float32"
-    # ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[
-    #     dtype
-    # ]
-
-    # # DDP Setup
-    # ddp = int(os.environ.get("RANK", -1)) != -1
-    # if ddp:
-    #     dist.init_process_group(backend="nccl")
-    #     ddp_rank = int(os.environ["RANK"])
-    #     ddp_world_size = int(os.environ["WORLD_SIZE"])
-    #     ddp_local_rank = int(os.environ["LOCAL_RANK"])
-    #     device = f"cuda:{ddp_local_rank}"
-    #     torch.cuda.set_device(device)
-    #     master_process = ddp_rank == 0
-    #     gradient_accumulation_steps = nf_config["training"]["grad_accum_steps"] // ddp_world_size
-    # else:
-    #     master_process = True
-    #     gradient_accumulation_steps = nf_config["training"]["grad_accum_steps"]
-
-    # # Load Pretrained VAE Model from VAE Config
-    # vae_checkpoint_file = vae_checkpoint_dir / nf_config["vae"]["vae_checkpoint_fname"]
-    # vae_model = DeepResNetMNISTVAE(
-    #     latent_dim=vae_config["model"]["latent_dim"],
-    #     num_blocks_per_stage=vae_config["model"]["num_blocks_per_stage"],
-    # )
-    # print(f"Loading from {vae_checkpoint_file}")
-    # vae_model, _ = load_model(vae_model, vae_checkpoint_file, device)
-    # vae_model.to(device).eval()
-
-    # # Initialize NF Model
-    # nf_model = make_mnist_nf_model(
-    #     K=nf_config["model"]["num_flows"],
-    # ).to(device)
-
-    # # Load NF Checkpoint if Available
-    # nf_checkpoint_dir = root / "nf_reduction" / nf_config["exp_name"]
-    # nf_checkpoint_dir.mkdir(exist_ok=True, parents=True)
-    # start_epoch = 1
-    # if load_from_checkpoint:
-    #     nf_checkpoint_file = nf_checkpoint_dir / nf_config["training"]["checkpoint_file"]
-    #     nf_model, start_epoch = load_model(nf_model, nf_checkpoint_file, device)
-
-    # # Optimizer and Scheduler
-    # optimizer = configure_optimizers(
-    #     nf_model,
-    #     learning_rate=nf_config["optimizer"]["lr"],
-    #     betas=tuple(nf_config["optimizer"]["betas"]),
-    #     weight_decay=nf_config["optimizer"]["weight_decay"],
-    # )
-    # scheduler = CosineAnnealingLR(
-    #     optimizer,
-    #     T_max=max_epochs,
-    #     eta_min=float(nf_config["scheduler"]["lr_min"]),
-    # )
-
-    # # Wrap NF Model with DDP if needed
-    # if ddp:
-    #     nf_model = DDP(nf_model, device_ids=[ddp_local_rank])
-
-    # # Model Saving Utility
-    # top_k_saver = TopKModelSaver(nf_checkpoint_dir, k=5)
-
-    # # DataLoader
-    # train_loader = data_loader(
-    #     root_dir=nf_config["data"]["root_dir"],
-    #     dataset=nf_config["data"]["graph_type"],
-    #     graph_type=nf_config["data"]["graph_type"],
-    #     num_workers=nf_config["data"]["num_workers"],
-    #     batch_size=nf_config["data"]["batch_size"],
-    #     img_size=nf_config["data"]["img_size"],
-    # )
-
-    # if master_process:
-    #     total_params = sum(p.numel() for p in nf_model.parameters() if p.requires_grad)
-    #     print(f"Total trainable parameters in NF model: {total_params:,}")
-
-    # # Training Loop
-    # for epoch in tqdm(range(start_epoch, max_epochs), desc="Epochs"):
-    #     nf_model.train()
-    #     total_loss = 0.0
-    #     train_iterator = iter(train_loader)
-
-    #     for step, batch in enumerate(train_iterator):
-    #         latent_embeddings, distr_idx, targets, meta_labels = batch
-    #         latent_embeddings = latent_embeddings.to(device)
-
-    #         # print(f"Inside training: ", distr_idx)
-    #         # Encode images with VAE
-    #         # with torch.no_grad():
-    #         #     latent_embeddings = vae_model.encode(images)
-
-    #         optimizer.zero_grad()
-    #         if isinstance(nf_model, torch.nn.parallel.DistributedDataParallel):
-    #             loss = nf_model.module.forward_kld(
-    #                 latent_embeddings, intervention_targets=targets, distr_idx=distr_idx
-    #             )
-    #         else:
-    #             loss = nf_model.forward_kld(
-    #                 latent_embeddings, intervention_targets=targets, distr_idx=distr_idx
-    #             )
-
-    #         loss.backward()
-
-    #         torch.nn.utils.clip_grad_norm_(
-    #             nf_model.parameters(), max_norm=nf_config["training"]["grad_clip"]
-    #         )
-    #         optimizer.step()
-    #         total_loss += loss.item()
-
-    #     scheduler.step()
-
-    #     if master_process:
-    #         print(f"Epoch [{epoch}/{nf_config['training']['max_epochs']}] - Loss: {total_loss:.4f}")
-
-    #         # Save Checkpoints
-    #         if epoch % nf_config["training"]["save_every"] == 0:
-    #             top_k_saver.save_model(nf_model, optimizer, epoch, total_loss)
-    #             delete_old_checkpoints(nf_checkpoint_dir, keep_top_k=5)
-    #             print(f"Checkpoint saved at {nf_checkpoint_dir}")
-
-    #         # Generate and Save Samples
-    #         nf_model.eval()
-    #         with torch.no_grad():
-    #             if isinstance(nf_model, torch.nn.parallel.DistributedDataParallel):
-    #                 sample_embeddings, _ = nf_model.module.sample(8, distr_idx=0)
-    #             else:
-    #                 sample_embeddings, _ = nf_model.sample(8, distr_idx=0)
-    #             reconstructed_images = vae_model.decode(sample_embeddings).reshape(
-    #                 -1, 3, nf_config["data"]["img_size"], nf_config["data"]["img_size"]
-    #             )
-    #             save_image(
-    #                 reconstructed_images.cpu(),
-    #                 nf_checkpoint_dir / f"epoch_{epoch}_samples.png",
-    #                 nrow=4,
-    #                 normalize=True,
-    #             )
-
-    #         top_k_saver.save_model(nf_model, optimizer, epoch, total_loss)
-    #         delete_old_checkpoints(nf_checkpoint_dir, keep_top_k=5)
-
-    #         # write to tensorboard
-    #         if epoch % nf_config["training"]["n_log_steps"] == 0:
-    #             # nf_model.eval()
-    #             with torch.no_grad():
-    #                 # Compute log-probability on a fixed batch from the training and get the log probability
-    #                 if isinstance(nf_model, torch.nn.parallel.DistributedDataParallel):
-    #                     log_prob = nf_model.module.log_prob(
-    #                         latent_embeddings, intervention_targets=targets, distr_idx=distr_idx
-    #                     )
-    #                 else:
-    #                     log_prob = nf_model.log_prob(
-    #                         latent_embeddings, intervention_targets=targets, distr_idx=distr_idx
-    #                     )
-    #                 mean_log_prob = log_prob.mean().item()
-    #                 writer.add_scalar("LogProb/Mean", mean_log_prob, epoch)
-
-    #                 # Generate new images from samples
-    #                 if isinstance(nf_model, torch.nn.parallel.DistributedDataParallel):
-    #                     sample_latents, _ = nf_model.module.sample(8, distr_idx=0)
-    #                 else:
-    #                     sample_latents, _ = nf_model.sample(8, distr_idx=0)
-    #                 generated_images = vae_model.decode(sample_latents).reshape(
-    #                     -1, 3, nf_config["data"]["img_size"], nf_config["data"]["img_size"]
-    #                 )
-    #                 writer.add_images(
-    #                     "Generated_Images - 0", generated_images, epoch, dataformats="NCHW"
-    #                 )
-
-    #                 # Generate new images from samples
-    #                 if isinstance(nf_model, torch.nn.parallel.DistributedDataParallel):
-    #                     sample_latents, _ = nf_model.module.sample(8, distr_idx=1)
-    #                 else:
-    #                     sample_latents, _ = nf_model.sample(8, distr_idx=1)
-    #                 generated_images = vae_model.decode(sample_latents).reshape(
-    #                     -1, 3, nf_config["data"]["img_size"], nf_config["data"]["img_size"]
-    #                 )
-    #                 writer.add_images(
-    #                     "Generated_Images - 1", generated_images, epoch, dataformats="NCHW"
-    #                 )
-
-    #                 # Generate new images from samples
-    #                 if isinstance(nf_model, torch.nn.parallel.DistributedDataParallel):
-    #                     sample_latents, _ = nf_model.module.sample(8, distr_idx=2)
-    #                 else:
-    #                     sample_latents, _ = nf_model.sample(8, distr_idx=2)
-    #                 generated_images = vae_model.decode(sample_latents).reshape(
-    #                     -1, 3, nf_config["data"]["img_size"], nf_config["data"]["img_size"]
-    #                 )
-    #                 writer.add_images(
-    #                     "Generated_Images - 2", generated_images, epoch, dataformats="NCHW"
-    #                 )
-
-    # # Save Final Model
-    # torch.save(nf_model.state_dict(), nf_checkpoint_file)
-    # print(f"Final model saved at {nf_checkpoint_file}")

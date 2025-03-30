@@ -2,6 +2,7 @@ import normflows as nf
 import torch
 
 from ciflows.distributions.pgm import LinearGaussianDag
+from ciflows.distributions.pgmv2 import LinearGaussianDag as LinearGaussianDagV2
 from ciflows.flows.model import CausalNormalizingFlow
 
 
@@ -153,9 +154,9 @@ def make_mnist_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False, trai
         2: torch.ones(node_dimensions[2]) * 1.5,
     }
     intervened_node_means = [
-        {2: torch.ones(node_dimensions[2]) + 1},  # 0
-        {2: torch.ones(node_dimensions[2]) - 1},  # 1
-        {2: torch.ones(node_dimensions[2]) + 3},  # 2
+        {2: torch.ones(node_dimensions[2]) + 2},  # 0
+        {2: torch.ones(node_dimensions[2]) - 3},  # 1
+        {2: torch.ones(node_dimensions[2]) + 5},  # 2
         # {2: torch.ones(node_dimensions[2]) + 3},  # 3
         # {2: torch.ones(node_dimensions[2]) + 6},  # 4
     ]
@@ -170,7 +171,7 @@ def make_mnist_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False, trai
     confounded_list = []
 
     # independent noise with causal prior
-    q0 = LinearGaussianDag(
+    q0 = LinearGaussianDagV2(
         node_dimensions=node_dimensions,
         edge_list=edge_list,
         noise_means=noise_means,

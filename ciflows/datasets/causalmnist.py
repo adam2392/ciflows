@@ -296,7 +296,7 @@ class CausalMNIST(Dataset):
         )
 
         # get the distribution index
-        distr_idx = meta_label[3]
+        distr_idx = int(meta_label[3])
 
         # img = PIL.Image.fromarray(img.numpy(), mode="RGB")
         img = transforms.ToPILImage()(img)
