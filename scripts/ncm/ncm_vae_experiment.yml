@@ -12,8 +12,8 @@ system:
 
 data:
   model_dir: "CausalMNIST/ncm/"
-  batch_size: 32 #512
-  num_workers: 3 # 24
+  batch_size: 512
+  num_workers: 24
   img_size: 32
   graph_type: "chain"
   val_split: 0.1
