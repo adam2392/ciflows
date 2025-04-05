@@ -241,6 +241,7 @@ def train_wgan_gp(
     checkpoint_dir="./checkpoints",
     master_process=True,
     tensorboard_log_dir=None,
+    vae_model=None,
     debug=False,
 ):
     """
@@ -299,8 +300,6 @@ def train_wgan_gp(
                 optimizer_critic.zero_grad()
 
                 for distr_ind in range(len(gan_model.delta_v_list)):
-                    print(distr_ind)
-                    print(np.argwhere(distr_idx == distr_ind))
                     dist_real_imgs = real_imgs[np.argwhere(distr_idx == distr_ind).squeeze(), ...]
                     dist_batch_size = dist_real_imgs.size(0)
 
@@ -413,6 +412,9 @@ def train_wgan_gp(
                         # Generate samples for the current distribution index
                         sample_imgs = gan_model.sample_mixture(n=16, idx=[idx])[0]
 
+                        # use VAE to decode the images
+                        sample_imgs = vae_model.decode(sample_imgs)
+
                         # Create grid of images
                         grid = torchvision.utils.make_grid(sample_imgs, normalize=True, nrow=4)
 
@@ -440,9 +442,9 @@ def train_wgan_gp(
 if __name__ == "__main__":
     # Load configuration
     root = Path("/local/eb/adam2392/")
-    root = Path("/Users/adam2392/pytorch_data/")
+    # root = Path("/Users/adam2392/pytorch_data/")
     ncm_config_path = "/home/adam2392/projects/ciflows/scripts/ncm/ncm_vae_experiment.yml"
-    ncm_config_path = "/Users/adam2392/Documents/ciflows/scripts/ncm/ncm_vae_experiment.yml"
+    # ncm_config_path = "/Users/adam2392/Documents/ciflows/scripts/ncm/ncm_vae_experiment.yml"
     ncm_config = load_experiment_config(ncm_config_path)
 
     # Load VAE Configuration
@@ -624,6 +626,7 @@ if __name__ == "__main__":
         checkpoint_dir=ncm_checkpoint_dir,
         tensorboard_log_dir=ncm_checkpoint_dir / "logs",
         debug=ncm_config["debug"],
+        vae_model=vae_model,
     )
 
     # Save Final Model

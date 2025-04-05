@@ -151,9 +151,9 @@ class CausalDigitBarMNISTEmbedding(CausalDigitBarMNIST):
             dataset_postfix = "alldata_encodings"
             fname = f"{graph_type}_{dataset_postfix}.pt"
 
-        print()
-        print()
-        print(f"Loaded dataset postfix: {dataset_postfix}")
+        # print()
+        # print()
+        # print(f"Loaded dataset postfix: {dataset_postfix}")
         self.data = torch.load(fname)
 
         self.labels = torch.load(
@@ -365,9 +365,9 @@ class CausalMNISTEmbedding(CausalMNIST):
             dataset_postfix = "causalmnist_exp2_betamax005"
             fname = root / f"{dataset_postfix}_encodings.pt"
 
-        print()
-        print()
-        print(f"Loaded dataset postfix: {dataset_postfix}")
+        # print()
+        # print()
+        # print(f"Loaded dataset postfix: {dataset_postfix}")
         self.data = torch.load(fname, weights_only=False)
 
         self.intervention_targets = torch.load(
@@ -379,8 +379,8 @@ class CausalMNISTEmbedding(CausalMNIST):
         self.causal_attrs = pd.read_csv(root / f"{dataset_postfix}_causal_attrs.csv", index_col=0)
         self.causal_attrs["distr_idx"] = self.causal_attrs["distr_idx"].astype(int)
 
-        print("Causal attributes for MNIST embedding: ")
-        print(self.causal_attrs.head())
+        # print("Causal attributes for MNIST embedding: ")
+        # print(self.causal_attrs.head())
         if not all(
             [
                 len(self.data) == len(self.causal_attrs),
