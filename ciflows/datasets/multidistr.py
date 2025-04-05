@@ -1,5 +1,5 @@
 import numpy as np
-from torch.utils.data import DataLoader, Dataset, Sampler
+from torch.utils.data import Dataset, Sampler
 
 
 class StratifiedSampler(Sampler):

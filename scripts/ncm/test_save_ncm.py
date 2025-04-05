@@ -1,10 +1,9 @@
 import os
+
 import torch
-import torch.nn as nn
-import normflows as nf  # Ensure normflows is installed
+
+from ciflows.ncm import GAN_NF_NCM
 from ciflows.ncm.cg import CausalGraph  # Adjust the import based on your project structure
-from ciflows.ncm import GAN_NCM, GAN_NF_NCM
-from ciflows.ncm.utils import expand_do
 
 if __name__ == "__main__":
     # Create a dummy causal graph.
@@ -19,7 +18,7 @@ if __name__ == "__main__":
         "neural-pu": False,
         "single-disc": True,
         "do-var-list": ["A", "B"],  # two intervention settings
-        "K": 8  # number of flows (use a small number for testing)
+        "K": 8,  # number of flows (use a small number for testing)
     }
 
     # Instantiate the GAN_NF_NCM model.
@@ -79,11 +78,14 @@ if __name__ == "__main__":
 
     # Define a function to check if two models have identical parameters
     def compare_models(model1, model2):
-        for (name1, param1), (name2, param2) in zip(model1.named_parameters(), model2.named_parameters()):
+        for (name1, param1), (name2, param2) in zip(
+            model1.named_parameters(), model2.named_parameters()
+        ):
             if name1 != name2 or not torch.equal(param1, param2):
                 print(f"Mismatch found in parameter: {name1}")
                 return False
         return True
+
     # Instantiate a new model and load the saved checkpoint
     reloaded_gan_nf_ncm = GAN_NF_NCM(cg, hyperparams=hyperparams)
     checkpoint = torch.load(checkpoint_path, weights_only=True, map_location=torch.device("cpu"))

@@ -1,9 +1,9 @@
 from pathlib import Path
+
 import pandas as pd
-import PIL
 import torch
-from torch.utils.data import Dataset
 import torchvision.transforms as transforms
+from torch.utils.data import Dataset
 
 
 # Define the dataset loader for digit dataset
@@ -357,7 +357,7 @@ class CausalMNISTEmbedding(CausalMNIST):
         self.transform = transform
         self.target_transform = target_transform
 
-        root = Path(root) / 'CausalMNIST' / graph_type
+        root = Path(root) / "CausalMNIST" / graph_type
 
         # load attrs
         dataset = "causalmnist_exp2_betamax005"
@@ -368,15 +368,17 @@ class CausalMNISTEmbedding(CausalMNIST):
         print()
         print()
         print(f"Loaded dataset postfix: {dataset_postfix}")
-        self.data = torch.load(fname)
+        self.data = torch.load(fname, weights_only=False)
 
-        self.intervention_targets = torch.load(root / f"{dataset_postfix}_targets.pt")
+        self.intervention_targets = torch.load(
+            root / f"{dataset_postfix}_targets.pt", weights_only=False
+        )
         if isinstance(self.intervention_targets, list):
             self.intervention_targets = torch.vstack(self.intervention_targets)
 
         self.causal_attrs = pd.read_csv(root / f"{dataset_postfix}_causal_attrs.csv", index_col=0)
-        self.causal_attrs['distr_idx'] = self.causal_attrs['distr_idx'].astype(int)
-        
+        self.causal_attrs["distr_idx"] = self.causal_attrs["distr_idx"].astype(int)
+
         print("Causal attributes for MNIST embedding: ")
         print(self.causal_attrs.head())
         if not all(

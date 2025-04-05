@@ -10,7 +10,6 @@ import numpy as np
 import torch
 import torch.distributed
 import torch.distributed as dist
-import torch.nn.functional as F
 import torch.version
 from torch import nn
 from torch.distributed import init_process_group
@@ -23,8 +22,8 @@ from tqdm import tqdm
 
 from ciflows.datasets.causalceleba import CausalCelebA, CausalCelebAEyeGlasses
 from ciflows.datasets.multidistr import StratifiedSampler
-from ciflows.eval import load_model
 from ciflows.distributions.pgm import LinearGaussianDag
+from ciflows.eval import load_model
 from ciflows.flows.glow import GlowBlock, InjectiveGlowBlock, ReshapeFlow, Squeeze
 from ciflows.flows.model import CausalInjectiveFlow
 from ciflows.reduction.resnetvae import DeepResNetVAE

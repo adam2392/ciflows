@@ -9,7 +9,7 @@ def load_model(model, model_path, device, optimizer=None, compiled=False):
         model_state_dict = state_dict["model_state_dict"]
         try:
             model_state_dict = {k.replace("_orig_mod.", ""): v for k, v in model_state_dict.items()}
-        except Exception as e:
+        except Exception:
             print("loading uncompiled weights...")
             model.load_state_dict(model_state_dict)
     else:

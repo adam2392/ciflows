@@ -1,7 +1,8 @@
-import torch
 import os
+
+import torch
 from PIL import Image
-from transformers import CLIPProcessor, CLIPModel
+from transformers import CLIPModel, CLIPProcessor
 
 
 def label_by_pretrained(

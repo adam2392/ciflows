@@ -34,12 +34,17 @@ class CausalGraph:
         self.cc = self._c_components()
         self.v2cc = {v: next(c for c in self.cc if v in c) for v in self.v}
         self.pap = {
-            v: sorted(set(itertools.chain.from_iterable(
-                self.pa[v2] + [v2]
-                for v2 in self.v2cc[v]
-                if self.v2i[v2] <= self.v2i[v])) - {v},
-                      key=self.v2i.get)
-            for v in self.v}
+            v: sorted(
+                set(
+                    itertools.chain.from_iterable(
+                        self.pa[v2] + [v2] for v2 in self.v2cc[v] if self.v2i[v2] <= self.v2i[v]
+                    )
+                )
+                - {v},
+                key=self.v2i.get,
+            )
+            for v in self.v
+        }
         self.c2 = self._maximal_cliques()
         self.v2c2 = {v: [c for c in self.c2 if v in c] for v in self.v}
 
@@ -57,10 +62,16 @@ class CausalGraph:
         assert V_cut_back.issubset(self.set_v)
         assert V_cut_front.issubset(self.set_v)
 
-        new_de = [(V1, V2) for V1, V2 in self.de
-                  if V1 in V_sub and V2 in V_sub and V2 not in V_cut_back and V1 not in V_cut_front]
-        new_be = [(V1, V2) for V1, V2 in self.be
-                  if V1 in V_sub and V2 in V_sub and V1 not in V_cut_back and V2 not in V_cut_back]
+        new_de = [
+            (V1, V2)
+            for V1, V2 in self.de
+            if V1 in V_sub and V2 in V_sub and V2 not in V_cut_back and V1 not in V_cut_front
+        ]
+        new_be = [
+            (V1, V2)
+            for V1, V2 in self.be
+            if V1 in V_sub and V2 in V_sub and V1 not in V_cut_back and V2 not in V_cut_back
+        ]
 
         return CausalGraph(V_sub, new_de, new_be)
 
@@ -72,7 +83,7 @@ class CausalGraph:
             if marks[v] == 2:
                 return
             if marks[v] == 1:
-                raise ValueError('Not a DAG.')
+                raise ValueError("Not a DAG.")
 
             marks[v] = 1
             for c in self.ch[v]:
@@ -117,9 +128,7 @@ class CausalGraph:
             p = set(p)
             x = set(x)
             for v in list(p):
-                bron_kerbosch(r.union({v}),
-                              p.intersection(self.ne[v]),
-                              x.intersection(self.ne[v]))
+                bron_kerbosch(r.union({v}), p.intersection(self.ne[v]), x.intersection(self.ne[v]))
                 p.remove(v)
                 x.add(v)
 
@@ -127,9 +136,7 @@ class CausalGraph:
         p = set(self.v)
         x = set()
         for v in o:
-            bron_kerbosch({v},
-                          p.intersection(self.ne[v]),
-                          x.intersection(self.ne[v]))
+            bron_kerbosch({v}, p.intersection(self.ne[v]), x.intersection(self.ne[v]))
             p.remove(v)
             x.add(v)
 
@@ -167,36 +174,36 @@ class CausalGraph:
             bidirected_edges = []
             try:
                 for i, line in enumerate(map(str.strip, file), 1):
-                    if line == '':
+                    if line == "":
                         continue
 
-                    m = re.match('<([A-Z]+)>', line)
+                    m = re.match("<([A-Z]+)>", line)
                     if m:
                         mode = m.groups()[0]
                         continue
 
-                    if mode == 'NODES':
+                    if mode == "NODES":
                         if line.isidentifier():
                             V.append(line)
                         else:
-                            raise ValueError('invalid identifier')
-                    elif mode == 'EDGES':
-                        if '<->' in line:
-                            v1, v2 = map(str.strip, line.split('<->'))
+                            raise ValueError("invalid identifier")
+                    elif mode == "EDGES":
+                        if "<->" in line:
+                            v1, v2 = map(str.strip, line.split("<->"))
                             bidirected_edges.append((v1, v2))
-                        elif '->' in line:
-                            v1, v2 = map(str.strip, line.split('->'))
+                        elif "->" in line:
+                            v1, v2 = map(str.strip, line.split("->"))
                             directed_edges.append((v1, v2))
                         else:
-                            raise ValueError('invalid edge type')
+                            raise ValueError("invalid edge type")
                     else:
-                        raise ValueError('unknown mode')
+                        raise ValueError("unknown mode")
             except Exception as e:
-                raise ValueError(f'Error parsing line {i}: {e}: {line}')
+                raise ValueError(f"Error parsing line {i}: {e}: {line}")
             return cls(V, directed_edges, bidirected_edges)
 
     def save(self, filename):
-        with open(filename, 'w') as file:
+        with open(filename, "w") as file:
             lines = ["<NODES>\n"]
             for V in self.v:
                 lines.append("{}\n".format(V))

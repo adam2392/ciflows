@@ -1,15 +1,15 @@
-from pathlib import Path
 import argparse
-import pandas as pd
-import shutil
-import yaml
-import torch
-from tqdm import tqdm
-from torchvision import transforms
-from torch.utils.data import DataLoader
+from pathlib import Path
 
-from ciflows.reduction.resnetvae_mnist import DeepResNetMNISTVAE
+import pandas as pd
+import torch
+import yaml
+from torch.utils.data import DataLoader
+from torchvision import transforms
+from tqdm import tqdm
+
 from ciflows.datasets.causalmnist import CausalMNIST
+from ciflows.reduction.resnetvae_mnist import DeepResNetMNISTVAE
 
 
 def load_config(config_path):
@@ -96,12 +96,22 @@ def main(exp_path):
     encodings = []
     meta_df = pd.DataFrame(columns=["digit", "color_digit", "color_bar", "distr_idx"])
     target_tensor = []
-    for batch_idx, (images, distr_idx, target, meta_label) in tqdm(enumerate(data_loader), desc="Encoding Images"):
+    for batch_idx, (images, distr_idx, target, meta_label) in tqdm(
+        enumerate(data_loader), desc="Encoding Images"
+    ):
         with torch.no_grad():
             images = images.to(device)
             embedding, _ = vae_model.encoder.encode(images)
-        
-        meta_df = pd.concat((meta_df, pd.DataFrame(meta_label, columns=["digit", "color_digit", "color_bar", "distr_idx"])), axis=0)
+
+        meta_df = pd.concat(
+            (
+                meta_df,
+                pd.DataFrame(
+                    meta_label, columns=["digit", "color_digit", "color_bar", "distr_idx"]
+                ),
+            ),
+            axis=0,
+        )
         target_tensor.append(target)
         encodings.append(embedding.cpu())
 

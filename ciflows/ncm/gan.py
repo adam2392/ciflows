@@ -1,12 +1,12 @@
-import numpy as np
+import normflows as nf
 import torch
 import torch.nn as nn
-import normflows as nf
 
-from ciflows.ncm.distribution import UniformDistribution, NeuralDistribution
+from ciflows.ncm.cg import CausalGraph
+from ciflows.ncm.distribution import NeuralDistribution, UniformDistribution
+from ciflows.ncm.mlp import MLP
 from ciflows.ncm.scm import SCM
 from ciflows.ncm.utils import expand_do
-from ciflows.ncm.mlp import MLP
 
 
 class GAN_NCM(SCM):
@@ -58,8 +58,11 @@ class GAN_NCM(SCM):
         Discriminator(s) for adversarial training.
     single_disc : bool
         Whether to use a single discriminator or multiple discriminators.
-    do_set_count : int
-        Number of intervention variables in `do-var-list`.
+    delta_v_list : list of dict
+        List of difference in distribution setups per variable. Key is variable name,
+        value is 'conditional', or 'hard', where 'conditional' means the variable is
+        generated conditionally its existing parents, and 'hard' means the variable is
+        generated independently of its parents only using the latent exogenous noise.
 
     Methods
     -------
@@ -73,7 +76,8 @@ class GAN_NCM(SCM):
 
     def __init__(
         self,
-        cg,
+        cg: CausalGraph,
+        delta_v_list=[{}],
         v_size={},
         default_v_size=1,
         u_size={},
@@ -94,6 +98,7 @@ class GAN_NCM(SCM):
 
         self.gen_use_sigmoid = gen_use_sigmoid
 
+        # initialize the generative model
         gens = nn.ModuleDict(
             {
                 v: (
@@ -113,24 +118,70 @@ class GAN_NCM(SCM):
             }
         )
 
+        # define list of endogenous variable functions that are defined differently
+        # for each distribution
+        list_delta_f_funcs = []
+        for idx in range(len(delta_v_list)):
+            dict_delta_f_funcs = dict()
+            delta_vs = delta_v_list[idx]
+            for v, change_type in delta_vs.items():
+                # if the variable is not in the causal graph, skip it
+                if v not in cg:
+                    raise ValueError(f"Variable {v} in delta_v_list is not in the causal graph.")
+
+                if change_type == "conditional":
+                    dict_delta_f_funcs[v] = default_gen_module(
+                        {k: self.v_size[k] for k in self.cg.pa[v]},
+                        {k: self.u_size[k] for k in self.cg.v2c2[v]},
+                        self.v_size[v],
+                        h_layers=hyperparams.get("h-layers", 2),
+                        h_size=hyperparams.get("h-size", 128),
+                        use_layer_norm=hyperparams.get("layer-norm", False),
+                        use_sigmoid=gen_use_sigmoid,
+                    )
+                elif change_type == "hard":
+                    dict_delta_f_funcs[v] = default_gen_module(
+                        {},
+                        {k: self.u_size[k] for k in self.cg.v2c2[v]},
+                        self.v_size[v],
+                        h_layers=hyperparams.get("h-layers", 2),
+                        h_size=hyperparams.get("h-size", 128),
+                        use_layer_norm=hyperparams.get("layer-norm", False),
+                        use_sigmoid=gen_use_sigmoid,
+                    )
+                else:
+                    raise ValueError(
+                        f"Invalid change_type '{change_type}' for variable '{v}'. "
+                        "Expected 'conditional' or 'hard'."
+                    )
+            dic_delta_f = nn.ModuleDict(dict_delta_f_funcs)
+            list_delta_f_funcs.append(dic_delta_f)
+        list_delta_f_funcs = nn.ModuleList(list_delta_f_funcs)
+
+        # initialize the latent exogenous distributions
         pu_dist = (
             NeuralDistribution(self.cg.c2, self.u_size, hyperparams)
             if hyperparams.get("neural-pu", False)
             else UniformDistribution(self.cg.c2, self.u_size)
         )
 
-        super().__init__(v=list(cg), f=gens, pu=pu_dist)
+        super().__init__(
+            v=list(cg), f=gens, pu=pu_dist, delta_v_list=delta_v_list, delta_f=list_delta_f_funcs
+        )
 
         self.single_disc = hyperparams.get("single-disc", False)
-        self.do_set_count = len(hyperparams.get("do-var-list", []))
 
+        # initialize discriminator(s)
+        self._init_discriminator(disc_module, disc_use_sigmoid, hyperparams)
+
+    def _init_discriminator(self, disc_module, disc_use_sigmoid, hyperparams):
         if self.single_disc:
             disc_sizes = {k: v for (k, v) in self.v_size.items()}
-            disc_sizes["_delta_choice"] = self.do_set_count
+            disc_sizes["_delta_choice"] = len(self.delta_v_list)
             self.f_disc = disc_module(
-                disc_sizes,
-                {},
-                1,
+                pa_size=disc_sizes,
+                u_size={},
+                o_size=1,
                 h_layers=hyperparams.get("h-layers", 2),
                 h_size=len(self.v_size) * hyperparams.get("h-size", 128),
                 use_sigmoid=disc_use_sigmoid,
@@ -148,7 +199,7 @@ class GAN_NCM(SCM):
                         use_sigmoid=disc_use_sigmoid,
                         use_layer_norm=hyperparams.get("layer-norm", False),
                     )
-                    for _ in range(self.do_set_count)
+                    for _ in range(self.delta_v_list)
                 ]
             )
 
@@ -242,7 +293,7 @@ class GAN_NCM(SCM):
             sample = next(iter(samples))
             n = len(samples[sample])
 
-            one_hot_do = torch.zeros(self.do_set_count, device=self.device_param.device)
+            one_hot_do = torch.zeros(self.delta_v_list, device=self.device_param.device)
             one_hot_do[index] = 1
             inp = {k: v for k, v in samples.items()}
             inp["_delta_choice"] = expand_do(one_hot_do, n)
@@ -268,6 +319,7 @@ class GAN_NF_NCM(GAN_NCM):
     def __init__(
         self,
         cg,
+        delta_v_list=[{}],
         v_size={},
         default_v_size=1,
         u_size={},
@@ -279,8 +331,15 @@ class GAN_NF_NCM(GAN_NCM):
         gen_use_sigmoid=True,
         disc_use_sigmoid=True,
     ):
+        # get the size of the output generation, which is the sum of the sizes of
+        # the variables in the causal graph generated
+        self.v_size = {k: v_size.get(k, default_v_size) for k in cg}
+        self.x_size = sum(self.v_size.values())
+
+        # initialize the rest of the GAN model
         super().__init__(
             cg,
+            delta_v_list,
             v_size,
             default_v_size,
             u_size,
@@ -293,10 +352,6 @@ class GAN_NF_NCM(GAN_NCM):
             disc_use_sigmoid,
         )
 
-        # get the size of the output generation, which is the sum of the sizes of
-        # the variables in the causal graph generated
-        self.x_size = sum(self.v_size.values())
-
         net_hidden_layers = hyperparams.get("h-layers", 2)
         net_hidden_dim = hyperparams.get("h-size", 128)
         K_flows = hyperparams.get("K", 32)
@@ -308,6 +363,36 @@ class GAN_NF_NCM(GAN_NCM):
                 )
             ]
         self.f_X = nn.ModuleList(flows)
+
+    def _init_discriminator(self, disc_module, disc_use_sigmoid, hyperparams):
+        """Discriminator operates over X."""
+        if self.single_disc:
+            disc_sizes = {"X": self.x_size}
+            disc_sizes["_delta_choice"] = len(self.delta_v_list)
+            self.f_disc = disc_module(
+                pa_size=disc_sizes,
+                u_size={},
+                o_size=1,
+                h_layers=hyperparams.get("h-layers", 2),
+                h_size=len(self.v_size) * hyperparams.get("h-size", 128),
+                use_sigmoid=disc_use_sigmoid,
+                use_layer_norm=hyperparams.get("layer-norm", False),
+            )
+        else:
+            self.f_disc = nn.ModuleList(
+                [
+                    disc_module(
+                        {"X": self.x_size},
+                        {},
+                        1,
+                        h_layers=hyperparams.get("h-layers", 2),
+                        h_size=len(self.v_size) * hyperparams.get("h-size", 128),
+                        use_sigmoid=disc_use_sigmoid,
+                        use_layer_norm=hyperparams.get("layer-norm", False),
+                    )
+                    for _ in range(self.delta_v_list)
+                ]
+            )
 
     def apply_mixing_function(self, v):
         """
@@ -328,7 +413,7 @@ class GAN_NF_NCM(GAN_NCM):
             x, _ = flow(x)
         return x
 
-    def get_disc_outputs(self, samples, index, include_inp=False):
+    def get_disc_outputs(self, samples, index, include_inp=False, debug=False):
         """
         Computes the discriminator outputs for given samples in the NF setting.
 
@@ -351,13 +436,16 @@ class GAN_NF_NCM(GAN_NCM):
             Discriminator output for the provided samples.
         """
         if self.single_disc:
-            n = len(samples[next(iter(samples))])
+            # get the number of samples
+            sample = next(iter(samples))
+            n = len(samples[sample])
+
             one_hot_do = [0 for _ in range(len(self.delta_v_list))]
             one_hot_do[index] = 1
             one_hot_do = torch.FloatTensor(one_hot_do).to(self.device_param)
             inp = {k: v for (k, v) in samples.items()}
             inp["_delta_choice"] = expand_do(one_hot_do, n)
-            return self.f_disc(inp, {}, include_inp=include_inp)
+            return self.f_disc(inp, {}, include_inp=include_inp, debug=debug)
         else:
             return self.f_disc[index](samples, {}, include_inp=include_inp)
 

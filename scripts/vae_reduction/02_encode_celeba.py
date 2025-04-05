@@ -17,7 +17,7 @@ def encode_images_in_directory(
         [f for f in os.listdir(directory) if f.endswith(".jpg")],
         key=lambda x: int(x.split("_")[1].split(".")[0]),  # Extract the numeric part
     )
-    print('First few files: ', [Path(x).name for x in image_files[:5]])
+    print("First few files: ", [Path(x).name for x in image_files[:5]])
     if debug:
         print(image_files[:5])
         assert False
@@ -82,9 +82,7 @@ if __name__ == "__main__":
     latent_vectors_per_directory = {}
 
     # model_dir = "celeba_alldata_cyclicbeta_noimageaug_vaeresnetreduction_batch1024_norm01_latentdim48_img128_v1.pt"
-    model_dir = (
-        "celeba_cyclicbetal1loss_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1"
-    )
+    model_dir = "celeba_cyclicbetal1loss_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1"
     model_fname = "model_epoch_15670.pt"
     scm_type = "haircolor"
 

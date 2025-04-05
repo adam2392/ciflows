@@ -1,36 +1,33 @@
-import shutil
 import os
-import time
-import yaml
-import torch
-import numpy as np
-from pathlib import Path
+import shutil
 from contextlib import nullcontext
-from tqdm import tqdm
-import torchvision
-import torch.nn.functional as F
-from torchvision.utils import save_image
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.utils.data import DataLoader
-import torch.distributed as dist
-from torchvision import transforms
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.distributed import init_process_group
-from torch.utils.tensorboard import SummaryWriter
-import torch.autograd as autograd
-import lightning as pl
+from pathlib import Path
 
-from ciflows.datasets.causalmnist import CausalMNISTEmbedding, CausalMNIST
+import lightning as pl
+import numpy as np
+import torch
+import torch.autograd as autograd
+import torch.nn.functional as F
+import torchvision
+import yaml
+from torch.distributed import init_process_group
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+from torchvision import transforms
+from tqdm import tqdm
+
+from ciflows.datasets.causalmnist import CausalMNIST, CausalMNISTEmbedding
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
+from ciflows.ncm import GAN_NF_NCM, MLP, CausalGraph, log
 from ciflows.reduction.resnetvae_mnist import DeepResNetMNISTVAE
-from ciflows.ncm import GAN_NCM, CausalGraph, MLP, GAN_NF_NCM, log
-from ciflows.training import TopKModelSaver, delete_old_checkpoints
+from ciflows.training import TopKModelSaver
 
 
 def make_gan_ncm_model(
     latent_dim=32,
-) -> GAN_NCM:
+) -> GAN_NF_NCM:
     V_list = ["style", "digit", "digit-color", "bar-color"]
     default_u_size = int(latent_dim / len(V_list))
     default_v_size = int(latent_dim / len(V_list))
@@ -40,8 +37,15 @@ def make_gan_ncm_model(
         "layer-norm": False,
         "neural-pu": False,
         "single-disc": True,
-        "do-var-list": ["digit-color", "bar-color", "bar-color"],
+        # "do-var-list": ["digit-color", "bar-color", "bar-color"],
     }
+
+    delta_v_list = [
+        {},
+        {"bar-color": "conditional"},
+        {"bar-color": "conditional"},
+        {"digit-color": "hard"},
+    ]
 
     directed_edges = [
         ("digit", "digit-color"),
@@ -53,8 +57,9 @@ def make_gan_ncm_model(
     ]
     cg = CausalGraph(V_list, directed_edges=directed_edges, bidirected_edges=bidirected_edges)
 
-    gan_model = GAN_NCM(
+    gan_model = GAN_NF_NCM(
         cg=cg,
+        delta_v_list=delta_v_list,
         default_u_size=default_u_size,
         default_v_size=default_v_size,
         # f=
@@ -149,23 +154,61 @@ def data_loader(root_dir, dataset, graph_type, num_workers, batch_size, img_size
 # ---------------------------
 # Gradient Penalty Function for WGAN-GP
 # ---------------------------
-def compute_gradient_penalty(critic, real_samples, fake_samples, device, lambda_gp=10):
-    """Calculates the gradient penalty loss for WGAN GP"""
-    batch_size = real_samples.size(0)
-    # Random weight term for interpolation between real and fake samples
-    epsilon = torch.rand(batch_size, 1, 1, 1, device=device)
-    # Create interpolated samples
-    interpolates = epsilon * real_samples + ((1 - epsilon) * fake_samples)
-    interpolates.requires_grad_(True)
+def compute_gradient_penalty(
+    ncm_model: GAN_NF_NCM,
+    real_samples,
+    fake_samples,
+    distr_index,
+    device,
+    lambda_gp=10,
+    grad_clamp=1.0,
+):
+    """
+    Computes the gradient penalty for WGAN-GP using interpolated inputs between real and fake samples.
 
-    # Get critic output for the interpolated images
-    d_interpolates = critic(interpolates)
+    This encourages the discriminator (critic) to have gradients with norm at most `grad_clamp`,
+    which enforces the Lipschitz constraint required for stable WGAN training.
+
+    Parameters
+    ----------
+    ncm_model : Callable
+        The discriminator model that outputs scores for input samples.
+    real_samples : dict[str, torch.Tensor]
+        Dictionary mapping variable names to real sample tensors.
+    fake_samples : dict[str, torch.Tensor]
+        Dictionary mapping variable names to fake sample tensors.
+    distr_indx : int
+        Index of the distribution to use (if multiple discriminators are present).
+    device : torch.device
+        Device to run computations on.
+    lambda_gp : float, optional
+        Gradient penalty weight (default is 10.0).
+    grad_clamp : float, optional
+        Threshold for gradient norm (default is 1.0). Penalty is applied if norm exceeds this.
+
+    Returns
+    -------
+    torch.Tensor
+        Scalar tensor representing the gradient penalty loss.
+    """
+    batch_size = next(iter(real_samples.values())).size(0)
+
+    # Random weight term for interpolation between real and fake samples
+    alpha = torch.rand(batch_size, 1, requires_grad=True).to(device)
+
+    interpolates = {}
+    for key in real_samples.keys():
+        key_alpha = alpha.expand_as(real_samples[key])
+        interpolates[key] = key_alpha * real_samples[key] + ((1 - key_alpha) * fake_samples[key])
+
+    # get the discriminator outputs for the interpolated images
+    d_interpolates, d_inp = ncm_model.get_disc_outputs(interpolates, distr_index, include_inp=True)
 
     # For each sample, compute gradients of outputs with respect to inputs
     grad_outputs = torch.ones(d_interpolates.size(), device=device)
     gradients = autograd.grad(
         outputs=d_interpolates,
-        inputs=interpolates,
+        inputs=d_inp,
         grad_outputs=grad_outputs,
         create_graph=True,
         retain_graph=True,
@@ -173,8 +216,11 @@ def compute_gradient_penalty(critic, real_samples, fake_samples, device, lambda_
     )[0]
     gradients = gradients.view(batch_size, -1)
     grad_norm = gradients.norm(2, dim=1)
-    # Compute penalty: (||gradients||_2 - 1)^2
-    gradient_penalty = lambda_gp * ((grad_norm - 1) ** 2).mean()
+
+    # Compute ReLU penalty: only penalize if norm > grad_clamp
+    penalty = torch.relu(grad_norm - grad_clamp) ** 2
+    gradient_penalty = lambda_gp * penalty.mean()
+
     return gradient_penalty
 
 
@@ -228,12 +274,22 @@ def train_wgan_gp(
     if debug:
         max_epochs = 5
         save_interval = 1
+        print()
+        print()
 
     # Begin training loop
     for epoch in tqdm(range(1, max_epochs + 1), desc="Epochs"):
-        for batch_idx, (real_imgs, _) in enumerate(dataloader):
+        for batch_idx, (real_imgs, distr_idx, target, meta_label) in tqdm(
+            enumerate(dataloader), leave=False, desc="Batches"
+        ):
             batch_size = real_imgs.size(0)
             real_imgs = real_imgs.to(device)
+
+            # create list of dictionaries
+            batch_x_list = []
+            for i in range(len(real_imgs)):
+                batch_x = {"X": real_imgs[i].unsqueeze(0)}
+                batch_x_list.append(batch_x)
 
             total_loss_critic = 0.0
             # -----------------------------
@@ -242,20 +298,55 @@ def train_wgan_gp(
             for d_iter in range(n_critic):
                 optimizer_critic.zero_grad()
 
-                for i in range(len(gan_model.delta_v_list)):
+                for distr_ind in range(len(gan_model.delta_v_list)):
+                    print(distr_ind)
+                    print(np.argwhere(distr_idx == distr_ind))
+                    dist_real_imgs = real_imgs[np.argwhere(distr_idx == distr_ind).squeeze(), ...]
+                    dist_batch_size = dist_real_imgs.size(0)
+
                     # Generate fake images using the generator from distribution index i
                     # and obtain the mixture X
-                    sample_mixture = gan_model.sample_mixture(n=batch_size, idx=[i], include_v=True)
+                    sample_mixture = gan_model.sample_mixture(
+                        n=dist_batch_size, idx=[distr_ind], include_v=True
+                    )
                     fake_imgs_batch = sample_mixture[0]
                     sampled_v_latents = sample_mixture[1:]
 
+                    #
+                    cut_batch_size = dist_batch_size // n_critic
+                    start = d_iter * cut_batch_size
+                    if d_iter == n_critic - 1:
+                        # Last critic takes the leftovers too
+                        end = dist_batch_size
+                    else:
+                        end = start + cut_batch_size
+                    dist_real_imgs_dict = {"X": dist_real_imgs[start:end].float()}
+
                     # Critic outputs for real and fake images.
-                    real_validity = gan_model.get_disc_outputs(real_imgs, index=i)
-                    fake_validity = gan_model.get_disc_outputs(fake_imgs_batch, index=i)
+                    real_validity = gan_model.get_disc_outputs(
+                        dist_real_imgs_dict, index=distr_ind, debug=debug
+                    )
+                    fake_validity = gan_model.get_disc_outputs(
+                        fake_imgs_batch, index=distr_ind, debug=debug
+                    )
+
+                    if debug:
+                        print("About to compute gradient penalty")
+                        print(dist_real_imgs_dict.keys())
+                        print(dist_real_imgs.shape)
+                        print(lambda_gp)
+                        print(fake_imgs_batch.keys())
+                        print(device)
 
                     # Compute gradient penalty.
                     gp = compute_gradient_penalty(
-                        critic, real_imgs.data, fake_imgs_batch.data, device, lambda_gp
+                        gan_model,
+                        dist_real_imgs_dict,
+                        fake_imgs_batch,
+                        distr_index=distr_ind,
+                        device=device,
+                        lambda_gp=lambda_gp,
+                        grad_clamp=grad_clip,
                     )
 
                     # Wasserstein critic loss
@@ -278,9 +369,11 @@ def train_wgan_gp(
             # ---------------------
             total_loss_gen = 0.0
             optimizer_generator.zero_grad()
-            for g_iter in range(len(gan_model.delta_v_list)):
-                ncm_batch = gan_model.sample_mixture(n=batch_size, idx=[g_iter])[0]
-                ncm_disc_fake_output = gan_model.get_disc_outputs(ncm_batch, index=g_iter)
+            for distr_ind in range(len(gan_model.delta_v_list)):
+                ncm_batch = gan_model.sample_mixture(
+                    n=batch_size // len(gan_model.delta_v_list), idx=[distr_ind]
+                )[0]
+                ncm_disc_fake_output = gan_model.get_disc_outputs(ncm_batch, index=distr_ind)
 
                 if gan_mode == "wgan" or gan_mode == "wgan-gp":
                     loss_generator = -torch.mean(ncm_disc_fake_output)
@@ -301,7 +394,7 @@ def train_wgan_gp(
             # Print training status every few iterations.
             if batch_idx % 50 == 0 and master_process:
                 print(
-                    f"[Epoch {epoch}/{max_epochs}] [Batch {i}/{len(dataloader)}] "
+                    f"[Epoch {epoch}/{max_epochs}] [Batch {distr_ind}/{len(dataloader)}] "
                     f"[D loss: {loss_critic.item():.4f}] [G loss: {loss_generator.item():.4f}]"
                 )
 
@@ -484,10 +577,12 @@ if __name__ == "__main__":
     lr = ncm_config["optimizer"]["lr"]
     if ncm_config["optimizer"]["gan_mode"] == "wgan":
         optim_func = torch.optim.RMSprop
+        kwargs = dict()
     else:
         optim_func = torch.optim.Adam
-    optimizer_critic = optim_func(gan_model.discriminator_parameters(), lr=lr, betas=(0.0, 0.9))
-    optimizer_generator = optim_func(gan_model.generator_parameters(), lr=lr, betas=(0.0, 0.9))
+        kwargs = {"betas": (0.0, 0.9)}
+    optimizer_critic = optim_func(gan_model.discriminator_parameters(), lr=lr, **kwargs)
+    optimizer_generator = optim_func(gan_model.generator_parameters(), lr=lr, **kwargs)
     # scheduler = CosineAnnealingLR(
     #     optimizer_nf, T_max=ncm_config["training"]["max_epochs"], eta_min=1e-5
     # )
@@ -518,7 +613,7 @@ if __name__ == "__main__":
 
     train_wgan_gp(
         gan_model,
-        orig_train_loader,
+        train_loader,
         device,
         max_epochs=max_epochs,
         optimizer_critic=optimizer_critic,
@@ -530,149 +625,6 @@ if __name__ == "__main__":
         tensorboard_log_dir=ncm_checkpoint_dir / "logs",
         debug=ncm_config["debug"],
     )
-    # for epoch in tqdm(range(start_epoch, max_epochs), desc="Epochs"):
-    #     nf_model.train()
-    #     total_loss = 0.0
-    #     total_vae_loss = 0.0
-    #     train_iterator = iter(orig_train_loader)
-
-    #     for step, batch in enumerate(train_iterator):
-    #         with ctx:
-    #             imgs, distr_idx, targets, meta_labels = batch
-    #             imgs = imgs.to(device)
-    #             distr_idx = distr_idx.to(device)
-    #             targets = targets.to(device)
-    #             if isinstance(nf_model, torch.nn.parallel.DistributedDataParallel):
-    #                 latent_embeddings = vae_model.module.encode(imgs)
-    #                 ll_loss = nf_model.module.forward_kld(
-    #                     latent_embeddings, intervention_targets=targets, distr_idx=distr_idx
-    #                 )
-    #                 inv_latent = nf_model.module.inverse(latent_embeddings)
-    #                 inv_latent += torch.randn_like(inv_latent).to(device) * 1e-5
-    #                 recon_latent_embeddings = nf_model.module.forward(inv_latent)
-    #                 recon_imgs = vae_model.module.decode(recon_latent_embeddings)
-
-    #                 # Compute the reconstruction loss.
-    #                 rec_loss = F.mse_loss(recon_imgs, imgs)
-    #             else:
-    #                 latent_embeddings = vae_model.encode(imgs)
-    #                 ll_loss = nf_model.forward_kld(
-    #                     latent_embeddings, intervention_targets=targets, distr_idx=distr_idx
-    #                 )
-    #                 inv_latent = nf_model.inverse(latent_embeddings)
-    #                 inv_latent += torch.randn_like(inv_latent).to(device) * 1e-5
-    #                 recon_latent_embeddings = nf_model.forward(inv_latent)
-    #                 recon_imgs = vae_model.decode(recon_latent_embeddings)
-
-    #                 # Compute the reconstruction loss.
-    #                 rec_loss = F.mse_loss(recon_imgs, imgs)
-
-    #             total_vae_loss = ll_loss + rec_loss
-    #             total_vae_loss /= grad_accum_steps  # Scale loss for gradient accumulation
-
-    #         # Backpropagation with AMP
-    #         scaler.scale(total_vae_loss).backward(retain_graph=True)
-
-    #         if (step + 1) % grad_accum_steps == 0:
-    #             if grad_clip != 0.0 and scaler.is_enabled():
-    #                 scaler.unscale_(optimizer_nf)
-    #                 scaler.unscale_(optimizer_vae)
-    #             torch.nn.utils.clip_grad_norm_(nf_model.parameters(), grad_clip)
-    #             scaler.step(optimizer_nf)
-    #             scaler.step(optimizer_vae)
-    #             scaler.update()
-    #             optimizer_nf.zero_grad()
-    #             optimizer_vae.zero_grad()
-
-    #         total_loss += total_vae_loss.item()
-
-    #     scheduler.step()
-
-    #     # Save model periodically
-    #     if master_process and epoch % ncm_config["training"]["save_every"] == 0:
-    #         # torch.save(nf_model.state_dict(), nf_checkpoint_dir / f"checkpoint_epoch_{epoch}.pt")
-    #         top_k_saver.save_model(nf_model, optimizer_nf, epoch, total_loss)
-    #         top_k_saver_vae.save_model(vae_model, optimizer_vae, epoch, total_loss)
-    #         delete_old_checkpoints(ncm_checkpoint_dir, keep_top_k=10)
-    #         print(f"Checkpoint saved at {ncm_checkpoint_dir}")
-
-    #     # Image Generation & Latent Visualization
-    #     if master_process and epoch % ncm_config["training"]["n_log_steps"] == 0:
-    #         nf_model.eval()
-    #         with torch.no_grad():
-    #             # 1 & 2. Training images reconstructed using VAE and NF+VAE
-    #             recon_vae = vae_model.decode(latent_embeddings[:8]).reshape(
-    #                 -1, 3, img_size, img_size
-    #             )
-    #             if isinstance(nf_model, torch.nn.parallel.DistributedDataParallel):
-    #                 nf_recon_latents = nf_model.module.forward(
-    #                     nf_model.module.inverse(latent_embeddings[:8])
-    #                 )
-    #             else:
-    #                 nf_recon_latents = nf_model.forward(nf_model.inverse(latent_embeddings[:8]))
-    #             recon_nf_vae = vae_model.decode(nf_recon_latents).reshape(-1, 3, img_size, img_size)
-
-    #             # Stack reconstructions vertically
-    #             recon_stack = torch.cat(
-    #                 [recon_vae, recon_nf_vae], dim=0
-    #             )  # Stacking along batch dimension
-    #             save_image(
-    #                 recon_stack.cpu(),
-    #                 ncm_checkpoint_dir / f"epoch_{epoch}_reconstructions.png",
-    #                 nrow=8,
-    #                 normalize=True,
-    #             )
-
-    #             # 3 & 4. Sample images from VAE and NF decoded by VAE
-    #             sample_latents = torch.randn((8, 32), device=device)
-    #             sample_vae = vae_model.decode(sample_latents).reshape(-1, 3, img_size, img_size)
-
-    #             if isinstance(nf_model, torch.nn.parallel.DistributedDataParallel):
-    #                 sample_nf_latents, _ = nf_model.module.sample(8, distr_idx=0)
-    #             else:
-    #                 sample_nf_latents, _ = nf_model.sample(8, distr_idx=0)
-    #             sample_nf = vae_model.decode(sample_nf_latents).reshape(-1, 3, img_size, img_size)
-    #             # Stack generated samples vertically
-    #             sample_stack = torch.cat([sample_vae, sample_nf], dim=0)
-
-    #             if isinstance(nf_model, torch.nn.parallel.DistributedDataParallel):
-    #                 sample_nf_latents, _ = nf_model.module.sample(8, distr_idx=1)
-    #             else:
-    #                 sample_nf_latents, _ = nf_model.sample(8, distr_idx=1)
-    #             sample_nf = vae_model.decode(sample_nf_latents).reshape(-1, 3, img_size, img_size)
-    #             # Stack generated samples vertically
-    #             sample_stack = torch.cat([sample_stack, sample_nf], dim=0)
-
-    #             if isinstance(nf_model, torch.nn.parallel.DistributedDataParallel):
-    #                 sample_nf_latents, _ = nf_model.module.sample(8, distr_idx=2)
-    #             else:
-    #                 sample_nf_latents, _ = nf_model.sample(8, distr_idx=2)
-    #             sample_nf = vae_model.decode(sample_nf_latents).reshape(-1, 3, img_size, img_size)
-    #             # Stack generated samples vertically
-    #             sample_stack = torch.cat([sample_stack, sample_nf], dim=0)
-
-    #             save_image(
-    #                 sample_stack.cpu(),
-    #                 ncm_checkpoint_dir / f"epoch_{epoch}_samples.png",
-    #                 nrow=8,
-    #                 normalize=True,
-    #             )
-
-    #             # 5. Visualizing NF Latent Distribution
-    #             if isinstance(nf_model, torch.nn.parallel.DistributedDataParallel):
-    #                 nf_latent_distr = nf_model.module.inverse(latent_embeddings)
-    #             else:
-    #                 nf_latent_distr = nf_model.inverse(latent_embeddings)
-    #             for dim in range(32):
-    #                 writer.add_histogram(
-    #                     f"NF_Latents/dim_{dim}",
-    #                     nf_latent_distr[:, dim].cpu().numpy().squeeze(),
-    #                     epoch,
-    #                 )
-
-    #     # TensorBoard Logging
-    #     if master_process:
-    #         writer.add_scalar("Loss/Train", total_loss, epoch)
 
     # Save Final Model
     if master_process:

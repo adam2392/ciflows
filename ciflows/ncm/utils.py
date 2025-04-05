@@ -1,5 +1,6 @@
 import torch
 
+
 def log(x):
     """
     Computes the natural logarithm of `x`, adding a small epsilon for numerical stability.

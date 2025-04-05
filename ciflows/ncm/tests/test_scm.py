@@ -1,6 +1,3 @@
-import torch
-import torch.nn as nn
-import numpy as np
 from ciflows.ncm.distribution import UniformDistribution  # Assuming this is in your library
 from ciflows.ncm.scm import SCM  # Replace with actual module name where SCM is defined
 

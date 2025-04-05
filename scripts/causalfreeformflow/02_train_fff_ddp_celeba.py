@@ -23,7 +23,6 @@ from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.distributions.pgm import LinearGaussianDag
 from ciflows.eval import load_model
 from ciflows.flows.freeform import ResnetFreeformflow
-from ciflows.loss import volume_change_surrogate
 from ciflows.training import TopKModelSaver, delete_old_checkpoints
 
 

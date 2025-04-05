@@ -1,8 +1,9 @@
 import numpy as np
-from skimage import draw, morphology, transform
 from PIL import Image
-from .skeleton import LocationSampler, get_angle
+from skimage import draw, morphology, transform
+
 from .morpho import ImageMorphology
+from .skeleton import LocationSampler, get_angle
 
 
 def apply_perturbation(image, perturbation, convert_dtype=True):

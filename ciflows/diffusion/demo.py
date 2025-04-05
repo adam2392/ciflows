@@ -2,7 +2,6 @@ from copy import copy
 from pathlib import Path
 
 import lightning as pl
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 

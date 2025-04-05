@@ -1,10 +1,10 @@
-from .utils import log, expand_do, check_equal, soft_equals, cross_entropy_compare
+from .cg import CausalGraph
 from .distribution import (
     Distribution,
-    UniformDistribution,
-    StandardNormalDistribution,
     NeuralDistribution,
+    StandardNormalDistribution,
+    UniformDistribution,
 )
-from .mlp import MLP
 from .gan import GAN_NCM, GAN_NF_NCM
-from .cg import CausalGraph
+from .mlp import MLP
+from .utils import check_equal, cross_entropy_compare, expand_do, log, soft_equals

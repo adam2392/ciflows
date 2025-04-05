@@ -6,7 +6,9 @@ from ciflows.distributions.pgmv2 import LinearGaussianDag as LinearGaussianDagV2
 from ciflows.flows.model import CausalNormalizingFlow
 
 
-def make_celeba_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False, trainable_exogenous_weights=True):
+def make_celeba_nf_model(
+    K=32, hc_dim=4, debug=False, trainable_edges=False, trainable_exogenous_weights=True
+):
     """Make normalizing flow model."""
     # Define list of flows
     if debug:
@@ -56,7 +58,7 @@ def make_celeba_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False, tra
     }
     noise_variances = {
         0: torch.ones(node_dimensions[0]),
-        1: torch.ones(node_dimensions[1]) * 2.,
+        1: torch.ones(node_dimensions[1]) * 2.0,
         2: torch.ones(node_dimensions[2]) * 1.5,
     }
     intervened_node_means = [
@@ -86,7 +88,7 @@ def make_celeba_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False, tra
         intervened_node_means=intervened_node_means,
         intervened_node_vars=intervened_node_vars,
         trainable_edges=trainable_edges,
-        trainable_exogenous_weights=trainable_exogenous_weights
+        trainable_exogenous_weights=trainable_exogenous_weights,
     )
 
     # Construct flow model with the multiscale architecture
@@ -94,7 +96,9 @@ def make_celeba_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False, tra
     return model
 
 
-def make_mnist_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False, trainable_exogenous_weights=True):
+def make_mnist_nf_model(
+    K=32, hc_dim=4, debug=False, trainable_edges=False, trainable_exogenous_weights=True
+):
     """Make normalizing flow model."""
     # Define list of flows
     latent_dim = 32
@@ -107,7 +111,6 @@ def make_mnist_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False, trai
         # K = 32  # v2
         net_hidden_layers = 3
         net_hidden_dim = 128
-
 
     flows = []
     for i in range(K):
@@ -150,7 +153,7 @@ def make_mnist_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False, trai
     }
     noise_variances = {
         0: torch.ones(node_dimensions[0]),
-        1: torch.ones(node_dimensions[1]) * 2.,
+        1: torch.ones(node_dimensions[1]) * 2.0,
         2: torch.ones(node_dimensions[2]) * 1.5,
     }
     intervened_node_means = [
@@ -180,7 +183,7 @@ def make_mnist_nf_model(K=32, hc_dim=4, debug=False, trainable_edges=False, trai
         intervened_node_means=intervened_node_means,
         intervened_node_vars=intervened_node_vars,
         trainable_edges=trainable_edges,
-        trainable_exogenous_weights=trainable_exogenous_weights
+        trainable_exogenous_weights=trainable_exogenous_weights,
     )
 
     # Construct flow model with the multiscale architecture

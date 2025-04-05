@@ -1,12 +1,13 @@
 import pytest
 import torch
-from ciflows.ncm import (
-    log,
-    expand_do,
+
+from ciflows.ncm import (  # Replace `your_module` with actual module name
     check_equal,
-    soft_equals,
     cross_entropy_compare,
-)  # Replace `your_module` with actual module name
+    expand_do,
+    log,
+    soft_equals,
+)
 
 
 def test_log():

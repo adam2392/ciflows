@@ -3,8 +3,6 @@ from typing import Tuple
 import numpy as np
 from scipy.ndimage import filters
 from skimage import morphology, transform
-import numpy as np
-from skimage import morphology, transform
 
 _SKEL_LEN_MASK = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.0], [np.sqrt(2.0), 1.0, np.sqrt(2.0)]])
 

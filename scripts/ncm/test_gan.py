@@ -1,6 +1,7 @@
-import torch as T
 import torch
-from ciflows.ncm import CausalGraph, GAN_NCM  # Assuming the causal graph class is in this module
+import torch as T
+
+from ciflows.ncm import GAN_NCM, CausalGraph  # Assuming the causal graph class is in this module
 from ciflows.ncm.mlp import MLP
 
 
@@ -49,7 +50,9 @@ def test_gan_ncm():
     gan_model = make_gan_ncm_model(latent_dim=32)
 
     # Ensure model is on the correct device
-    device = T.device("cuda" if T.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+    device = T.device(
+        "cuda" if T.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+    )
     gan_model.to(device)
 
     # Generate samples

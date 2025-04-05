@@ -77,7 +77,7 @@ class LinearGaussianDag(MultidistrCausalFlow):
         self.distr_idx_map = dict()
         self.distr_idx_map[0] = set()
 
-        # Each exogenous weight is a vector that 
+        # Each exogenous weight is a vector that
         self.exogenous_weights = nn.ParameterDict()
 
         # Create a topological ordering of nodes
@@ -87,7 +87,7 @@ class LinearGaussianDag(MultidistrCausalFlow):
             if node not in self.graph.nodes:
                 self.graph.add_node(node)
 
-            # register buffer for the node's noise mean and variance, which is a 
+            # register buffer for the node's noise mean and variance, which is a
             # normal distribution N(0, 1).
             self.register_buffer(f"exog_mean_{node}_0", noise_means.get(node, torch.tensor(0.0)))
             self.register_buffer(
@@ -247,7 +247,9 @@ class LinearGaussianDag(MultidistrCausalFlow):
                 )
 
             # exogenous noise - # Gaussian noise with non-zero mean scaled by means and std
-            noise = (noise_mean + noise_std * torch.randn(batch_size, node_dim).to(device)) * exogenous_weight
+            noise = (
+                noise_mean + noise_std * torch.randn(batch_size, node_dim).to(device)
+            ) * exogenous_weight
 
             # print("inside forward: ")
             # print(node)
@@ -438,7 +440,7 @@ def test_main():
     }
     noise_variances = {
         0: torch.ones(node_dimensions[0]),
-        1: torch.ones(node_dimensions[1]) * 2.,
+        1: torch.ones(node_dimensions[1]) * 2.0,
         2: torch.ones(node_dimensions[2]) * 1.5,
     }
     intervened_node_means = [
@@ -469,7 +471,7 @@ def test_main():
         intervened_node_means=intervened_node_means,
         intervened_node_vars=intervened_node_vars,
         trainable_edges=False,
-        trainable_exogenous_weights=True
+        trainable_exogenous_weights=True,
     )
     return q0
 

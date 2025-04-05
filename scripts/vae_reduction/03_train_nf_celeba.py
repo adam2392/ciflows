@@ -144,9 +144,11 @@ if __name__ == "__main__":
     # vae_model_fname = "model_epoch_9595.pt"
     # scm_type = "eyeglass"
 
-    vae_model_dir = 'celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1'
+    vae_model_dir = (
+        "celeba_cyclicbeta_haircolorscm_vaeresnetreduction_batch128_gradaccum_latentdim48_img128_v1"
+    )
     vae_model_fname = "model_epoch_8540.pt"
-    scm_type = 'haircolor'
+    scm_type = "haircolor"
     dataset = "alldata"
 
     # prefix within the filename of embeddings

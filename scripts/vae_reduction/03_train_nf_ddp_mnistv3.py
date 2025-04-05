@@ -1,24 +1,23 @@
-import shutil
 import os
-import time
-import yaml
-import torch
-import numpy as np
-from pathlib import Path
+import shutil
 from contextlib import nullcontext
-from tqdm import tqdm
+from pathlib import Path
+
+import lightning as pl
+import numpy as np
+import torch
 import torch.nn.functional as F
-from torchvision.utils import save_image
+import yaml
+from torch.distributed import init_process_group
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
-import torch.distributed as dist
-from torchvision import transforms
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.distributed import init_process_group
 from torch.utils.tensorboard import SummaryWriter
-import lightning as pl
+from torchvision import transforms
+from torchvision.utils import save_image
+from tqdm import tqdm
 
-from ciflows.datasets.causalmnist import CausalMNISTEmbedding, CausalMNIST
+from ciflows.datasets.causalmnist import CausalMNIST, CausalMNISTEmbedding
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
 from ciflows.reduction import make_mnist_nf_model
@@ -182,7 +181,7 @@ if __name__ == "__main__":
     print(f"Training NF model with {world_size} GPUs on {device} with dtype {dtype}")
     print(f"Batch size: {nf_config['data']['batch_size']}")
     print(f"Gradient accumulation steps: {grad_accum_steps}")
-    
+
     # Load Pretrained VAE Model
     vae_checkpoint_dir = (
         Path(nf_config["vae"]["checkpoint_dir"]) / nf_config["vae"]["experiment_name"]
@@ -221,7 +220,9 @@ if __name__ == "__main__":
     start_epoch = 1
     if nf_config.get("load_from_checkpoint", False):
         nf_checkpoint_file = nf_checkpoint_dir / nf_config["checkpoint_file"]
-        nf_model, start_epoch = load_model(nf_model, nf_checkpoint_file, device, optimizer=optimizer_nf)
+        nf_model, start_epoch = load_model(
+            nf_model, nf_checkpoint_file, device, optimizer=optimizer_nf
+        )
         print(f"Loaded model from {nf_checkpoint_file} and starting from {start_epoch} epoch")
 
         # Synchronize all processes
@@ -304,7 +305,7 @@ if __name__ == "__main__":
 
             # Backpropagation with AMP
             scaler.scale(total_vae_loss).backward(retain_graph=True)
-            
+
             if (step + 1) % grad_accum_steps == 0:
                 if grad_clip != 0.0 and scaler.is_enabled():
                     scaler.unscale_(optimizer_nf)
@@ -382,7 +383,7 @@ if __name__ == "__main__":
                 sample_nf = vae_model.decode(sample_nf_latents).reshape(-1, 3, img_size, img_size)
                 # Stack generated samples vertically
                 sample_stack = torch.cat([sample_stack, sample_nf], dim=0)
-                
+
                 save_image(
                     sample_stack.cpu(),
                     nf_checkpoint_dir / f"epoch_{epoch}_samples.png",

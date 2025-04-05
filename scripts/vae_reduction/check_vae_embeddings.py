@@ -1,10 +1,11 @@
+from pathlib import Path
+
+import numpy as np
 import torch
 import yaml
-import numpy as np
-from pathlib import Path
-from torchvision.utils import save_image
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
+from torchvision.utils import save_image
 
 from ciflows.datasets.causalmnist import CausalMNIST, CausalMNISTEmbedding
 from ciflows.eval import load_model

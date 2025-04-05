@@ -4,8 +4,10 @@ import scipy.stats
 import torch
 from PIL import Image
 from scipy.stats import truncnorm
+
 from ciflows.datasets.causalmnist_scm.utils import value_to_rgb
-from .perturb import apply_perturbation, Thickening, Thinning, Fracture
+
+from .perturb import Fracture, Thickening, Thinning, apply_perturbation
 
 
 def add_bar(img, color_bar_val=255, start_height=0, height=3, start_width=0, width=None):

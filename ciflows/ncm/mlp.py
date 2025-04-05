@@ -42,7 +42,10 @@ class MLP(nn.Module):
         if type(m) == nn.Linear:
             T.nn.init.xavier_normal_(m.weight, gain=T.nn.init.calculate_gain("relu"))
 
-    def forward(self, pa, u, include_inp=False):
+    def forward(self, pa, u, include_inp=False, debug=False):
+        if debug:
+            print(pa.keys(), u.keys())
+
         if len(u.keys()) == 0:
             inp = T.cat([pa[k] for k in self.pa], dim=1)
         elif len(pa.keys()) == 0 or len(set(pa.keys()).intersection(self.set_pa)) == 0:

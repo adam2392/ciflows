@@ -1,7 +1,7 @@
 import pytest
 import torch
-import numpy as np
-from ciflows.ncm import NeuralDistribution, UniformDistribution, StandardNormalDistribution, MLP
+
+from ciflows.ncm import MLP, NeuralDistribution, StandardNormalDistribution, UniformDistribution
 
 
 def test_uniform_distribution_sample():

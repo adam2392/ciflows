@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import PIL
@@ -411,7 +412,7 @@ class CausalCelebAEmbedding(CausalCelebA):
                 # "int_hair_0": "int_hair_0_nonorm_encodings.pt",
                 # "int_hair_1": "int_hair_1_nonorm_encodings.pt",
             }
-        elif dataset == 'alldata_l1loss':
+        elif dataset == "alldata_l1loss":
             dataset_postfix = "alldata_l1loss_encodings"
             encoding_fnames = {
                 "obs": f"obs_{dataset_postfix}.pt",

@@ -1,12 +1,7 @@
-from collections import defaultdict
-
 import networkx as nx
-import numpy as np
-import torch
 import normflows as nf
+import torch
 from normflows.distributions import DiagGaussian
-from normflows.core import ConditionalNormalizingFlow
-from numpy.testing import assert_array_equal
 from torch import nn
 
 from ciflows.distributions.multidistr import MultidistrCausalFlow
@@ -14,17 +9,17 @@ from ciflows.distributions.multidistr import MultidistrCausalFlow
 
 class MultiDistrDAGNode(nn.Module):
     def __init__(
-            self, dim, q0=None, parent_dims=None,
-                 interv_indices=None, hard_interventions=None
-                 ):
+        self, dim, q0=None, parent_dims=None, interv_indices=None, hard_interventions=None
+    ):
         super().__init__()
         if interv_indices is None:
             interv_indices = []
         if hard_interventions is None:
             hard_interventions = [False for _ in range(len(interv_indices))]
         if len(interv_indices) != len(hard_interventions):
-            raise ValueError("Interventions and hard interventions must be same length "
-                             "if specified")
+            raise ValueError(
+                "Interventions and hard interventions must be same length " "if specified"
+            )
 
         # create normalizing flow for each parent
         if parent_dims is not None:
@@ -33,14 +28,16 @@ class MultiDistrDAGNode(nn.Module):
 
             for distr_idx in interv_indices:
                 self.multi_distr_flows[distr_idx] = nn.ModuleDict()
-                
+
                 for parent_name, parent_dim in parent_dims.items:
-                    self.multi_distr_flows[distr_idx][parent_name] = nf.flows.AutoregressiveRationalQuadraticSpline(
-                        parent_dim, 3, 128
+                    self.multi_distr_flows[distr_idx][parent_name] = (
+                        nf.flows.AutoregressiveRationalQuadraticSpline(parent_dim, 3, 128)
                     )
                     total_dim += parent_dim
             if total_dim != dim:
-                raise ValueError(f"Sum of parent dimensions {total_dim} must equal node dimension {dim}")
+                raise ValueError(
+                    f"Sum of parent dimensions {total_dim} must equal node dimension {dim}"
+                )
 
         if q0 is None:
             q0 = DiagGaussian(shape=dim)
@@ -88,28 +85,28 @@ class DAGFlow(MultidistrCausalFlow):
         self.endog_graph = nx.DiGraph()
         self.endog_graph.add_edges_from(edge_list)
 
-
         # create an initial normalizing flow from the input
         # and then feed in wrt DAG
         self.nodes = nn.ModuleDict()
         for node_name, node_dim in node_dimensions.items():
             if node_name not in self.endog_graph.nodes:
                 raise ValueError(f"Node {node_name} must be in the endogenous graph")
-            
+
             # create a DAGNode for each node
             dagnode = MultiDistrDAGNode(
                 dim=node_dim,
                 q0=DiagGaussian(shape=node_dim),
-                parent_dims={src: node_dimensions[src] for src in self.endog_graph.predecessors(node_name)},
+                parent_dims={
+                    src: node_dimensions[src] for src in self.endog_graph.predecessors(node_name)
+                },
             )
             self.nodes[node_name] = dagnode
-        
 
     def sample(self, num_samples=1, **kwargs):
         return super().sample(num_samples, **kwargs)
-    
+
     def forward(self, num_samples=1):
         return super().forward(num_samples)
-    
-    def log_prob(self, v, e, intervention_targets, hard_interventions = None):
+
+    def log_prob(self, v, e, intervention_targets, hard_interventions=None):
         return super().log_prob(v, e, intervention_targets, hard_interventions)

@@ -1,6 +1,8 @@
 import itertools
+
 import torch
 import torch.nn as nn
+
 from .distribution import Distribution
 
 
@@ -19,13 +21,13 @@ class SCM(nn.Module):
     delta_v_list : list of dict, optional
         A list of dictionaries specifying interventions or domain shifts on observed variables.
         Each dictionary represents a specific intervention setup:
-        - If a variable is mapped to "hard", it undergoes a hard intervention, meaning its 
+        - If a variable is mapped to "hard", it undergoes a hard intervention, meaning its
           generative process is overridden.
-        - If mapped to "conditional", the variable's value depends on other variables via 
+        - If mapped to "conditional", the variable's value depends on other variables via
           an intervention-specific function.
         - If mapped to a constant, the variable is directly assigned that value.
     delta_f : list of dict, optional
-        A list of dictionaries specifying modified generative functions corresponding to 
+        A list of dictionaries specifying modified generative functions corresponding to
         interventions in `delta_v_list`. If a variable undergoes an intervention, `delta_f`
         provides the function that defines its value under that intervention.
 
@@ -106,7 +108,9 @@ class SCM(nn.Module):
         list of dict
             A list of sampled dictionaries, each corresponding to one intervention setup.
         """
-        assert (n is None) != (u is None), "Specify either `n` (for new samples) or `u` (for given noise)."
+        assert (n is None) != (
+            u is None
+        ), "Specify either `n` (for new samples) or `u` (for given noise)."
         assert (idx is None) or (isinstance(idx, list) and max(idx) < len(self.delta_v_list))
 
         if idx is None:
@@ -127,7 +131,7 @@ class SCM(nn.Module):
 
             for k in self.v:
                 if k in delta.keys():  # Check if the variable is affected by an intervention
-                    if delta[k] == "hard":  
+                    if delta[k] == "hard":
                         # Hard intervention: override generative function with a new sampled value
                         u_tmp = self.pu.sample(n)
                         v[k] = self.delta_f[i][k]({}, u_tmp)

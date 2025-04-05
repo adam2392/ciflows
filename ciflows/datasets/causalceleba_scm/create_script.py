@@ -1,30 +1,14 @@
-import os
-import re
-from copy import copy
 from pathlib import Path
-from collections import Counter
 
-from joblib import Parallel, delayed
-from tqdm import tqdm
-
-from tqdm_joblib import tqdm_joblib
-
-import numpy as np
-from numpy.testing import assert_allclose
 import pandas as pd
-import torch
-from albumentations import CoarseDropout, Compose, HorizontalFlip, OneOf, RandomCrop
-from albumentations.pytorch import ToTensorV2
-from PIL import Image
 from torchvision import transforms
 from torchvision.datasets import CelebA
-from tqdm import tqdm
 
 from ciflows.datasets.causalceleba_scm.sampling import (
-    obs_sample_img_indices,
-    get_joint_probability_table,
     celeba_scm,
+    get_joint_probability_table,
     interventional_sample_img_indices,
+    obs_sample_img_indices,
 )
 
 

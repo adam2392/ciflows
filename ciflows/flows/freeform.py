@@ -2,7 +2,6 @@ import torch
 from torch import nn
 
 from ciflows.distributions.pgm import LinearGaussianDag
-from ciflows.loss import volume_change_surrogate
 from ciflows.reduction.resnetvae import DeepResNetDecoder, ResNetEncoder
 
 

@@ -11,6 +11,8 @@ import torch.distributed
 import torch.distributed as dist
 import torch.nn.functional as F
 import torch.version
+from albumentations import CoarseDropout, Compose
+from albumentations.pytorch import ToTensorV2
 from torch.distributed import init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -18,10 +20,7 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.utils import save_image
 from tqdm import tqdm
-from albumentations import CoarseDropout, Compose
-from albumentations.pytorch import ToTensorV2
 
-from ciflows.datasets.causalmnist import CausalDigitBarMNIST
 from ciflows.datasets.causalceleba import CausalCelebA, CausalCelebAEyeGlasses
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
@@ -329,7 +328,7 @@ if __name__ == "__main__":
         seed_offset = ddp_rank  # each process gets a different seed
         # world_size number of processes will be training simultaneously, so we can scale
         # down the desired gradient accumulation iterations per process proportionally
-        assert gradient_accumulation_steps % ddp_world_size == 0, f""
+        assert gradient_accumulation_steps % ddp_world_size == 0, ""
         gradient_accumulation_steps //= ddp_world_size
     else:
         # if not ddp, we are running on a single gpu, and one process

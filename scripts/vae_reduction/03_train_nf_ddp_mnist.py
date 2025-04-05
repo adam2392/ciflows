@@ -1,4 +1,3 @@
-import math
 import os
 import time
 from contextlib import nullcontext
@@ -14,12 +13,9 @@ import torch.version
 from torch.distributed import init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.utils.data import DataLoader, random_split
-from torchvision import transforms
+from torch.utils.data import DataLoader
 from torchvision.utils import save_image
 from tqdm import tqdm
-from albumentations import CoarseDropout, Compose
-from albumentations.pytorch import ToTensorV2
 
 from ciflows.datasets.causalmnist import CausalMNISTEmbedding
 from ciflows.datasets.multidistr import StratifiedSampler
@@ -270,7 +266,9 @@ if __name__ == "__main__":
         root / "CausalMNIST" / "nf_on_vae_reduction" / checkpoint_model_fname.split(".")[0]
     )
 
-    vae_model_dir = "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img32_v4"
+    vae_model_dir = (
+        "mnist_cyclicbetal1loss_vaeresnetreduction_batch128_gradaccum_latentdim48_img32_v4"
+    )
     vae_model_fname = "model_epoch_11190.pt"
 
     # dataset = "alldata"

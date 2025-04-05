@@ -1,16 +1,17 @@
 import argparse
 import math
 import os
+import shutil
 import time
 from contextlib import nullcontext
 from pathlib import Path
-import shutil
-import yaml
+
 import lightning as pl
 import numpy as np
 import torch
 import torch.distributed as dist
 import torch.nn.functional as F
+import yaml
 from torch.distributed import init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -18,8 +19,6 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torchvision.utils import save_image
 from tqdm import tqdm
-from albumentations import CoarseDropout, Compose
-from albumentations.pytorch import ToTensorV2
 
 from ciflows.datasets.causalmnist import CausalMNIST
 from ciflows.datasets.multidistr import StratifiedSampler
@@ -31,13 +30,16 @@ from ciflows.training import TopKModelSaver, delete_old_checkpoints
 # Helper functions
 # -------------------
 
+
 def load_config(config_path):
     with open(config_path, "r") as f:
         return yaml.safe_load(f)
 
+
 def softclip(tensor, min_val):
     """Clips the tensor values at the minimum value min_val in a soft way."""
     return min_val + F.softplus(tensor - min_val)
+
 
 def configure_optimizers(model, learning_rate, betas, weight_decay=0.0):
     # Collect parameters that require gradients
@@ -53,6 +55,7 @@ def configure_optimizers(model, learning_rate, betas, weight_decay=0.0):
     print("Using fused AdamW")
     return optimizer
 
+
 def data_loader(config):
     # Load data-related parameters from config
     data_cfg = config["data"]
@@ -64,11 +67,13 @@ def data_loader(config):
     root_dir = Path(data_cfg["root_dir"])
 
     # Define image transformations
-    image_transform = transforms.Compose([
-        transforms.Resize((img_size, img_size)),
-        transforms.CenterCrop(img_size),
-        transforms.ToTensor(),
-    ])
+    image_transform = transforms.Compose(
+        [
+            transforms.Resize((img_size, img_size)),
+            transforms.CenterCrop(img_size),
+            transforms.ToTensor(),
+        ]
+    )
 
     # Initialize the dataset (replace with your desired dataset settings)
     dataset = CausalMNIST(
@@ -89,7 +94,9 @@ def data_loader(config):
         distr_labels = [x[1] for x in ds]
         unique_distrs = len(np.unique(distr_labels))
         if batch_size < unique_distrs:
-            raise ValueError(f"Batch size must be at least {unique_distrs} for stratified sampling.")
+            raise ValueError(
+                f"Batch size must be at least {unique_distrs} for stratified sampling."
+            )
         return StratifiedSampler(distr_labels, batch_size)
 
     train_sampler = create_sampler(train_dataset)
@@ -114,9 +121,11 @@ def data_loader(config):
     )
     return train_loader, val_loader
 
+
 def gaussian_nll(recon_x, log_sigma, x):
     first_term = 0.5 * torch.pow((x - recon_x) / log_sigma.exp(), 2)
     return first_term + log_sigma + 0.5 * np.log(2 * np.pi)
+
 
 def loss_function(recon_x, x, mu, log_var, capacity=0.0, beta=0.00025):
     rec_loss = F.mse_loss(recon_x, x)
@@ -124,17 +133,21 @@ def loss_function(recon_x, x, mu, log_var, capacity=0.0, beta=0.00025):
     kl_loss = KLD if capacity == 0 else torch.max(KLD - capacity, torch.tensor(0.0).cuda())
     return rec_loss + beta * kl_loss
 
+
 def cyclic_beta(step, cycle_length, beta_min=0.00025, beta_max=0.1):
     cycle_position = step % cycle_length
     fraction = cycle_position / cycle_length
     return beta_min + (beta_max - beta_min) * (1 - math.cos(math.pi * fraction)) / 2
 
+
 def get_model_attribute(model, attr):
     return getattr(model.module if isinstance(model, DDP) else model, attr)
+
 
 # -------------------
 # Main training loop
 # -------------------
+
 
 def main(config_fpath):
     config = load_config(config_fpath)
@@ -143,7 +156,7 @@ def main(config_fpath):
     debug = config.get("debug", False)
     compile_model = config.get("compile", False)
     load_from_checkpoint = config.get("load_from_checkpoint", False)
-    
+
     # System settings
     sys_cfg = config["system"]
     seed = sys_cfg.get("seed", 1234)
@@ -161,7 +174,9 @@ def main(config_fpath):
 
     # Set dtype (example, you may refine this based on config)
     dtype = "float32"
-    ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[dtype]
+    ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[
+        dtype
+    ]
 
     # DDP settings
     ddp = int(os.environ.get("RANK", -1)) != -1
@@ -205,7 +220,9 @@ def main(config_fpath):
 
     # Optimizer settings
     opt_cfg = config["optimizer"]
-    optimizer = configure_optimizers(model, opt_cfg["lr"], tuple(opt_cfg["betas"]), opt_cfg["weight_decay"])
+    optimizer = configure_optimizers(
+        model, opt_cfg["lr"], tuple(opt_cfg["betas"]), opt_cfg["weight_decay"]
+    )
 
     if compile_model:
         model = torch.compile(model)
@@ -213,7 +230,7 @@ def main(config_fpath):
     # Load from checkpoint if required
     start_epoch = 1
     root = Path(config["data"]["root_dir"])
-    checkpoint_dir = root / "CausalMNIST" / "vae_reduction" / config['exp_name']
+    checkpoint_dir = root / "CausalMNIST" / "vae_reduction" / config["exp_name"]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     if load_from_checkpoint:
         checkpoint_fname = config.get("checkpoint_fname", "latest.pt")
@@ -223,7 +240,7 @@ def main(config_fpath):
             if ddp:
                 dist.barrier()
             print(f"Loaded checkpoint from epoch {start_epoch}")
-        
+
         # XXX: check if there is an existing checkpoint here
 
     # Save a copy of the config file in the checkpoint directory
@@ -245,13 +262,15 @@ def main(config_fpath):
     # Set up additional training parameters
     grad_accum_steps = training_cfg["grad_accum_steps"]
     check_samples_every_n_epoch = training_cfg["check_samples_every_n_epoch"]
-    cycle_length = len(train_loader) * training_cfg['cycle_length']  # Adjust as needed
+    cycle_length = len(train_loader) * training_cfg["cycle_length"]  # Adjust as needed
 
     top_k_saver = TopKModelSaver(checkpoint_dir, k=5)
 
     # For mixed precision (if desired)
     scaler = torch.GradScaler(device=device, enabled=(dtype == "float16"))
-    ctx = nullcontext() if device == "cpu" else torch.autocast(device_type=accelerator, dtype=ptdtype)
+    ctx = (
+        nullcontext() if device == "cpu" else torch.autocast(device_type=accelerator, dtype=ptdtype)
+    )
     ctx = nullcontext()  # Disable autocast if not needed
 
     raw_model = model.module if ddp else model  # unwrap DDP container if needed
@@ -271,14 +290,14 @@ def main(config_fpath):
 
         for micro_step in range(grad_accum_steps):
             if ddp:
-                model.require_backward_grad_sync = (micro_step == grad_accum_steps - 1)
+                model.require_backward_grad_sync = micro_step == grad_accum_steps - 1
 
             try:
                 batch = next(train_iterator)
             except StopIteration:
                 train_iterator = iter(train_loader)
                 batch = next(train_iterator)
-            
+
             images, distr_idx, targets, meta_labels = batch
             images = images.to(device, dtype=ptdtype)
             target_images = images  # In this case, target images are the same
@@ -314,7 +333,9 @@ def main(config_fpath):
         t0 = time.time()
         current_lr = scheduler.get_last_lr()[0]
         if master_process:
-            print(f"Epoch {epoch} took {dt*1000:.2f}ms, train_loss: {train_loss:.4f}, LR: {current_lr:.6f}")
+            print(
+                f"Epoch {epoch} took {dt*1000:.2f}ms, train_loss: {train_loss:.4f}, LR: {current_lr:.6f}"
+            )
 
         # Validation and checkpointing (sample images, save model, etc.)
         if (epoch % check_samples_every_n_epoch == 0) and master_process:
@@ -334,9 +355,9 @@ def main(config_fpath):
                 z = torch.randn(num_samples, latent_dim).to(device)  # Sample z ~ N(0, I)
                 generated_images = raw_model.decode(z)  # Shape: [num_samples, 3, 128, 128]
                 generated_images = torch.clamp(generated_images, 0, 1)
-            
+
             saved_imgs = torch.cat((reconstructed.cpu(), generated_images.cpu()), axis=0)
-            
+
             val_loss /= len(val_loader)
             print(f"Epoch {epoch}: Average Val Loss: {val_loss:.4f}")
             # Save sample images and checkpoint
@@ -348,16 +369,20 @@ def main(config_fpath):
     # Save final model
     if master_process:
         final_ckpt = checkpoint_dir / "final_model.pt"
-        torch.save({
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "epoch": epoch,
-        }, final_ckpt)
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "epoch": epoch,
+            },
+            final_ckpt,
+        )
         print(f"Training complete. Final model saved at {final_ckpt}.")
 
     if ddp:
         dist.barrier()
         dist.destroy_process_group()
+
 
 # -------------------
 # Entry point
@@ -365,7 +390,9 @@ def main(config_fpath):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train model with YAML configuration")
-    parser.add_argument("--config", type=str, default="experiment.yml", help="Path to YAML config file")
+    parser.add_argument(
+        "--config", type=str, default="experiment.yml", help="Path to YAML config file"
+    )
     args = parser.parse_args()
-    
+
     main(args.config)

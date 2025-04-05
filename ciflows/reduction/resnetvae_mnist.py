@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torchvision import models
 from torchvision.models.resnet import ResNet18_Weights
 
+
 class ResNetEncoder(nn.Module):
     def __init__(self, latent_dim):
         super(ResNetEncoder, self).__init__()
@@ -45,9 +46,13 @@ class ResNetEncoder(nn.Module):
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(ResidualBlock, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(
+            in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False
+        )
         self.bn1 = nn.BatchNorm2d(out_channels)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv2 = nn.Conv2d(
+            out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False
+        )
         self.bn2 = nn.BatchNorm2d(out_channels)
 
         self.shortcut = nn.Sequential()
@@ -72,8 +77,8 @@ class DeepResNetDecoder(nn.Module):
         # Upsampling stages
         self.stage1 = self._make_stage(512, 256, num_blocks_per_stage)  # 2x2 -> 4x4
         self.stage2 = self._make_stage(256, 128, num_blocks_per_stage)  # 4x4 -> 8x8
-        self.stage3 = self._make_stage(128, 64, num_blocks_per_stage)   # 8x8 -> 16x16
-        self.stage4 = self._make_stage(64, 32, num_blocks_per_stage)    # 16x16 -> 32x32
+        self.stage3 = self._make_stage(128, 64, num_blocks_per_stage)  # 8x8 -> 16x16
+        self.stage4 = self._make_stage(64, 32, num_blocks_per_stage)  # 16x16 -> 32x32
 
         self.final_conv = nn.Conv2d(32, 3, kernel_size=3, stride=1, padding=1)
 
@@ -81,7 +86,7 @@ class DeepResNetDecoder(nn.Module):
         layers = [
             nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
         ]
         for _ in range(num_blocks):
             layers.append(ResidualBlock(out_channels, out_channels))
@@ -127,9 +132,11 @@ class DeepResNetMNISTVAE(nn.Module):
         return mu + eps * std
 
     def loss_function(self, recon_x, x, mu, logvar):
-        BCE = F.binary_cross_entropy(recon_x.view(-1, 3 * self.img_size * self.img_size), 
-                                     x.view(-1, 3 * self.img_size * self.img_size), 
-                                     reduction="sum")
+        BCE = F.binary_cross_entropy(
+            recon_x.view(-1, 3 * self.img_size * self.img_size),
+            x.view(-1, 3 * self.img_size * self.img_size),
+            reduction="sum",
+        )
         KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
         return BCE + KLD
 
