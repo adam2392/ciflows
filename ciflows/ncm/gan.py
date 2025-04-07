@@ -4,7 +4,7 @@ import torch.nn as nn
 
 from ciflows.ncm.cg import CausalGraph
 from ciflows.ncm.distribution import NeuralDistribution, UniformDistribution
-from ciflows.ncm.mlp import MLP
+from ciflows.ncm.nn.mlp import MLP
 from ciflows.ncm.scm import SCM
 from ciflows.ncm.utils import expand_do
 

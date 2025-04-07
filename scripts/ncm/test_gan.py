@@ -2,7 +2,7 @@ import torch
 import torch as T
 
 from ciflows.ncm import GAN_NCM, CausalGraph  # Assuming the causal graph class is in this module
-from ciflows.ncm.mlp import MLP
+from ciflows.ncm.nn.mlp import MLP
 
 
 def make_gan_ncm_model(

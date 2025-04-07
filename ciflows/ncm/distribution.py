@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from .mlp import MLP
+from .nn.mlp import MLP
 
 
 class Distribution(nn.Module):
