@@ -435,8 +435,8 @@ def train_wgan_gp(
                 with torch.no_grad():
                     for idx, delta_v in enumerate(gan_model.delta_v_list):
                         # Generate samples for the current distribution index
-                        sample_imgs = gan_model.sample_mixture(n=16, idx=[idx])[0]
-
+                        sample_imgs = gan_model.sample_mixture(n=16, idx=[idx])[0]['X']
+        
                         # use VAE to decode the images
                         sample_imgs = vae_model.decode(sample_imgs)
 

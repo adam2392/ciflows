@@ -9,7 +9,7 @@ LOG_DIR="/home/adam2392/projects/logs/"
 # cd "$SCRIPT_DIR"
 
 # Calculate the GPU index to use for this job
-GPU_INDEX=6
+GPU_INDEX=0
 
 # Specify the GPUs to use
 # GPU_INDICES="0,1,2"  # Adjust this as per available GPUs and your requirement
@@ -19,7 +19,7 @@ NUM_GPUS=2
 
 # Set the environment variable for the GPU
 export CUDA_VISIBLE_DEVICES=$GPU_INDEX
-LOG_FILE="ncm_nf_exp3_${SCRIPT_NAME}_${GPU_INDEX}gpus.log"
+LOG_FILE="ncm_nf_exp1_${SCRIPT_NAME}_${GPU_INDEX}gpus.log"
 CMD="python3 $SCRIPT_NAME"
 #  --config ./experiment.yml" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 

@@ -1,5 +1,5 @@
 # General settings
-debug: True
+debug: False
 compile: false
 load_from_checkpoint: False
 checkpoint_file: "model_epoch_850.pt"
@@ -33,9 +33,9 @@ training:
   use_amp: False
 
 model:
-  K: 32
+  K: 64
   latent_dim: 32
-  h_layers: 2
+  h_layers: 3
   h_size: 128
 
 scheduler:
