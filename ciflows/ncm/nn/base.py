@@ -79,8 +79,8 @@ class SCMFunc(nn.Module):
         torch.Tensor or tuple of (torch.Tensor, torch.Tensor)
             Output of the neural network. If `include_inp` is True, also returns the input tensor used.
         """
-        if debug:
-            print(pa.keys(), u.keys())
+        # if debug:
+        #     print("In SCM func: ", pa.keys(), u.keys())
 
         if len(u.keys()) == 0:
             inp = torch.cat([pa[k] for k in self.pa], dim=1)

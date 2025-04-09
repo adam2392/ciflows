@@ -1,9 +1,9 @@
 # General settings
-debug: False
+debug: True
 compile: false
 load_from_checkpoint: False
 checkpoint_file: "model_epoch_850.pt"
-exp_name: "causalmnist_ncm_vae_exp2"   # NF-specific experiment name
+exp_name: "causalmnist_ncm_vae_exp1"   # NF-specific experiment name
 
 system:
   device: "cuda"
@@ -33,7 +33,7 @@ training:
   use_amp: False
 
 model:
-  K: 6
+  K: 32
   latent_dim: 32
   h_layers: 2
   h_size: 128

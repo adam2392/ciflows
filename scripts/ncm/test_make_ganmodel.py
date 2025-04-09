@@ -87,7 +87,7 @@ def visualize_images(imgs, title="Generated Images", nrow=4):
     plt.show()
 
 
-def test_gan_ncm_generation_and_discrimination(model: GAN_NF_NCM, batch_size=4):
+def test_ganv2_ncm_generation_and_discrimination(model: GAN_NF_NCM, batch_size=4):
     model.eval()
 
     # --- Step 1: Generate samples ---
@@ -100,7 +100,7 @@ def test_gan_ncm_generation_and_discrimination(model: GAN_NF_NCM, batch_size=4):
 
         # produce mixture
         generated_samples = model.sample_mixture(generated_samples)
-        
+
         img = generated_samples[0] # bar-color is your image node
         print("Generated image tensor shape:", img['X'].shape)  # Should be [B, 3, 128, 128]
 
@@ -124,6 +124,41 @@ def test_gan_ncm_generation_and_discrimination(model: GAN_NF_NCM, batch_size=4):
     # Optionally compare scores
     print("Avg score on generated:", disc_out.mean().item())
     print("Avg score on 'real':", real_disc_out.mean().item())
+
+
+def test_gan_ncm_generation_and_discrimination(model: GAN_NF_NCM, batch_size=4):
+    model.eval()
+
+    # --- Step 1: Generate samples using sample_mixture ---
+    with torch.no_grad():
+        mixed_samples = model.sample_mixture(n=batch_size, idx=[0])  # base mixture
+
+        for i, sample in enumerate(mixed_samples):
+            print(f"[Sample {i}] Keys: {list(sample.keys())}")
+
+        imgs = torch.stack([d["X"] for d in mixed_samples])  # shape [B, 3, 128, 128]
+        print("Mixed output image tensor shape:", imgs.shape)
+
+        # Visualize
+        visualize_images(imgs, title="Generated Mixed Samples from GAN_NCM")
+
+    # --- Step 2: Run discriminator on generated samples ---
+    disc_out_fake = model.get_disc_outputs(mixed_samples, index=0)
+    print("Discriminator output on generated (mixed) data:", disc_out_fake)
+
+    # --- Step 3: Create fake real samples for comparison ---
+    real_samples = {
+        "bar-color": torch.rand(batch_size, 3, 128, 128),  # image node
+        "digit": torch.randint(0, 10, (batch_size, 1)).float(),
+        "digit-color": torch.rand(batch_size, 3),
+        "style": torch.rand(batch_size, 5),
+    }
+    disc_out_real = model.get_disc_outputs(real_samples, index=0)
+    print("Discriminator output on real (random) data:", disc_out_real)
+
+    # --- Step 4: Print summary stats ---
+    print(f"Avg discriminator score on generated (mixed): {disc_out_fake.mean().item():.4f}")
+    print(f"Avg discriminator score on fake 'real': {disc_out_real.mean().item():.4f}")
 
 
 if __name__ == "__main__":

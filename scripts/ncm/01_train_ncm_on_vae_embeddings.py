@@ -340,13 +340,13 @@ def train_wgan_gp(
                         fake_imgs_batch, index=distr_ind, debug=debug
                     )
 
-                    if debug:
-                        print("About to compute gradient penalty")
-                        print(dist_real_imgs_dict.keys())
-                        print(dist_real_imgs.shape)
-                        print(lambda_gp)
-                        print(fake_imgs_batch.keys())
-                        print(device)
+                    # if debug:
+                        # print("About to compute gradient penalty")
+                        # print(dist_real_imgs_dict.keys())
+                        # print(dist_real_imgs.shape)
+                        # print(lambda_gp)
+                        # print(fake_imgs_batch.keys())
+                        # print(device)
 
                     # Compute gradient penalty.
                     gp = compute_gradient_penalty(

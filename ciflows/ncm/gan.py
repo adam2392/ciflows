@@ -12,96 +12,7 @@ from normflows import MultiscaleFlow
 from normflows.flows import GlowBlock, Squeeze, Merge
 from normflows.distributions import DiagGaussian
 
-from ciflows.ncm.flow import GlowFlowBlock1D, GlowFlowBlock2D
-
-# ========= Example A: For images of shape (3, 32, 32) =========
-
-def build_glow_image_model():
-    # Settings similar to the example on the normflows page:
-    L = 3              # number of scales
-    K = 16             # number of Glow blocks per scale
-    torch.manual_seed(0)
-    
-    input_shape = (3, 32, 32)
-    channels = input_shape[0]      # for images, channels = 3
-    hidden_channels = 256
-    split_mode = 'channel'
-    scale = True
-    num_classes = 10               # for class‐conditional models
-
-    q0 = []     # base distributions per scale
-    merges = [] # merge operations at scales > 1
-    flows = []  # list of flows per scale
-
-    for i in range(L):
-        flows_i = []
-        # Create K GlowBlocks at each scale.
-        for j in range(K):
-            # The number of channels increases at coarser scales.
-            num_channels = channels * 2 ** (L + 1 - i)
-            flows_i += [GlowBlock(num_channels, hidden_channels,
-                                  split_mode=split_mode, scale=scale)]
-        # At the end of the scale, apply a squeeze (spatial downsampling)
-        flows_i += [Squeeze()]
-        flows.append(flows_i)
-        
-        # For scales i > 0, a merge operation is applied.
-        if i > 0:
-            merges += [Merge()]
-            latent_shape = (input_shape[0] * 2 ** (L - i),
-                            input_shape[1] // 2 ** (L - i),
-                            input_shape[2] // 2 ** (L - i))
-        else:
-            latent_shape = (input_shape[0] * 2 ** (L + 1),
-                            input_shape[1] // 2 ** L,
-                            input_shape[2] // 2 ** L)
-        q0 += [DiagGaussian(latent_shape)]
-    
-    # Construct the multiscale flow model.
-    model = MultiscaleFlow(q0, flows, merges)
-    return model
-
-# ========= Example B: For a “vector” output/input =========
-# Here we assume the vector is of length 32. To use the same multiscale Glow architecture,
-# we reshape it as a 1-channel “image” of size (32,1). Note that spatial operations like Squeeze
-# require the spatial dimensions to be even. For simplicity we use a single-scale (L=1) model without squeezing.
-
-def build_glow_vector_model():
-    # We redefine the input shape as a 1-channel “image” of size (32, 1)
-    # even if the intended data is a 32-dimensional vector.
-    input_shape = (1, 32, 1)  # channels=1, height=32, width=1
-    L = 1      # Use a single scale; squeezing might be problematic if width==1
-    K = 4      # Fewer Glow blocks are typically enough for low-dimensional data
-    torch.manual_seed(0)
-    
-    channels = input_shape[0]     # Here, channels = 1
-    hidden_channels = 64          # Smaller hidden dimension for low-dimensional data
-    split_mode = 'channel'
-    scale = True
-    num_classes = None            # For unconditional flows, or set to an integer if class-conditioning is desired
-
-    q0 = []
-    merges = []  # With a single scale, no merges are applied.
-    flows = []
-
-    # For L==1, we can simply build a list of GlowBlocks.
-    flows_i = []
-    for j in range(K):
-        # For a single scale, the number of channels remains the same.
-        num_channels = channels * 2 ** (L + 1)  # following the convention from the image example
-        flows_i += [GlowBlock(num_channels, hidden_channels,
-                              split_mode=split_mode, scale=scale)]
-    # For vector data, we typically skip the Squeeze operation.
-    flows.append(flows_i)
-    
-    # Compute latent shape according to the same convention.
-    latent_shape = (input_shape[0] * 2 ** (L + 1),
-                    input_shape[1] // 2 ** L,
-                    input_shape[2] // 2 ** L)
-    q0 += [DiagGaussian(latent_shape)]  # if num_classes is None, the distribution may be unconditional.
-
-    model = MultiscaleFlow(q0, flows, merges)
-    return model
+from ciflows.ncm.flows import make_flow_model, make_img_flow_model
 
 
 class GAN_NCM(SCM):
@@ -450,7 +361,7 @@ class GAN_NF_NCM(GAN_NCM):
         # initialize a set of normalizing flow blocks
         net_hidden_layers = hyperparams.get("h-layers", 2)
         net_hidden_dim = hyperparams.get("h-size", 128)
-        K_flows = hyperparams.get("K", 16)
+        K_flows = hyperparams.get("K", 32)
         # flows = []
         # for i in range(K_flows):
         #     flows += [
@@ -459,17 +370,13 @@ class GAN_NF_NCM(GAN_NCM):
         #         )
         #     ]
         # self.f_X = nn.ModuleList(flows)
-        flows = []
-        for _ in range(K_flows):
-            # Create either a 1D or 2D Glow flow block depending on flow_input_shape
-            if len(self.flow_input_shape) == 1:
-                flows.append(GlowFlowBlock1D(self.flow_input_shape[0], net_hidden_dim, num_steps=num_steps))
-            elif len(self.flow_input_shape) == 3:
-                # Here self.flow_input_shape[0] is channels.
-                flows.append(GlowFlowBlock2D(self.flow_input_shape[0], net_hidden_dim, num_steps=num_steps))
-            else:
-                raise ValueError("Unsupported flow_input_shape: {}".format(self.flow_input_shape))
-        self.f_X = nn.ModuleList(flows)
+
+        self.f_X = make_flow_model(
+            input_dim=self.x_size,
+            num_layers=K_flows,
+            hidden_dim=net_hidden_dim,
+            num_hidden_layers=net_hidden_layers,
+        )
 
     def _init_discriminator(self, disc_module, disc_use_sigmoid, hyperparams):
         """Discriminator operates over X."""
@@ -516,8 +423,9 @@ class GAN_NF_NCM(GAN_NCM):
             Mixed samples.
         """
         x = torch.cat([v[k] for k in v], dim=1)
-        for flow in self.f_X:
-            x, _ = flow(x)
+        # for flow in self.f_X:
+        #     x, _ = flow(x)
+        x, _ = self.f_X.inverse_and_log_det(x)
         return x
 
     def get_disc_outputs(self, samples, index, include_inp=False, debug=False):
@@ -605,42 +513,33 @@ class GAN_NF_NCM(GAN_NCM):
 # =======================
 def test_nf_models():
     # Example for 1D: Suppose we want to mix a (B, 1) tensor.
-    hyperparams_1d = {
-        "h-size": 64,
-        "num_glow_steps": 2,
-        "K": 4,
-        "flow_input_shape": (1,)
-    }
+    hyperparams_1d = {"h-size": 64, "num_glow_steps": 2, "K": 4, "flow_input_shape": (1,)}
     # Create a dummy causal graph (details depend on your implementation)
     # cg = {'var1': 1}
     # # Dummy causal graph
     cg = CausalGraph({"A": [], "B": ["A"], "C": ["A", "B"]})
 
     # v_size here: variable "var1" is size 1
-    model_1d = GAN_NF_NCM(cg, v_size={'var1': 1}, hyperparams=hyperparams_1d)
+    model_1d = GAN_NF_NCM(cg, v_size={"var1": 1}, hyperparams=hyperparams_1d)
     # Create dummy samples: dictionary with key 'var1', tensor shape (batch, 1)
-    samples_1d = {'var1': torch.randn(32, 1)}
+    samples_1d = {"var1": torch.randn(32, 1)}
     mixed_1d = model_1d.apply_mixing_function(samples_1d)
     print("Mixed 1D shape:", mixed_1d.shape)  # expected (32, 1)
 
     # Example for 2D: Suppose we want to mix images of shape (3, 32, 32).
-    hyperparams_2d = {
-        "h-size": 64,
-        "num_glow_steps": 2,
-        "K": 4,
-        "flow_input_shape": (3, 32, 32)
-    }
+    hyperparams_2d = {"h-size": 64, "num_glow_steps": 2, "K": 4, "flow_input_shape": (3, 32, 32)}
     # For images, assume our causal graph outputs already have the 3 channels.
-    model_2d = GAN_NF_NCM(cg, v_size={'var1': 3*32*32}, hyperparams=hyperparams_2d)
+    model_2d = GAN_NF_NCM(cg, v_size={"var1": 3 * 32 * 32}, hyperparams=hyperparams_2d)
     # Create dummy samples: here we mimic an image stored under key 'var1'
     # We need shape (B, 3, 32, 32): so create random tensor and make sure that the
     # concatenation in apply_mixing_function recovers that shape.
     images = torch.randn(32, 3, 32, 32)
     # Here we wrap the image tensor in a dict. (In your application each variable may
     # be a slice or part of the final image.)
-    samples_2d = {'var1': images}
+    samples_2d = {"var1": images}
     mixed_2d = model_2d.apply_mixing_function(samples_2d)
     print("Mixed 2D shape:", mixed_2d.shape)  # expected (32, 3, 32, 32)
+
 
 if __name__ == "__main__":
     # test_nf_models()
