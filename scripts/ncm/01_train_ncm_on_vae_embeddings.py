@@ -1,5 +1,6 @@
 import os
 import shutil
+import time
 from contextlib import nullcontext
 from pathlib import Path
 
@@ -25,18 +26,24 @@ from ciflows.reduction.resnetvae_mnist import DeepResNetMNISTVAE
 from ciflows.training import TopKModelSaver
 
 
-def make_gan_ncm_model(
-    latent_dim=32,
-) -> GAN_NF_NCM:
+def make_gan_ncm_model(config) -> GAN_NF_NCM:
     V_list = ["style", "digit", "digit-color", "bar-color"]
+    latent_dim = config["model"]["latent_dim"]
+    h_layers = config["model"].get("h_layers", 2)
+    h_size = config["model"].get("h_size", 128)
+    
+    # number of normalizing flow blocks
+    K = config["model"].get("K", 16)  
+
     default_u_size = int(latent_dim / len(V_list))
     default_v_size = int(latent_dim / len(V_list))
     hyperparams = {
-        "h-layers": 2,
-        "h-size": 128,
+        "h-layers": h_layers,
+        "h-size": h_size,
         "layer-norm": False,
         "neural-pu": False,
         "single-disc": True,
+        "K": K,
         # "do-var-list": ["digit-color", "bar-color", "bar-color"],
     }
 
@@ -243,6 +250,7 @@ def train_wgan_gp(
     tensorboard_log_dir=None,
     vae_model=None,
     debug=False,
+    n_print_output_epochs=10,
 ):
     """
     Train the GAN_NCM model using the Wasserstein GAN loss with gradient penalty.
@@ -263,11 +271,6 @@ def train_wgan_gp(
     # Setup TensorBoard writer if logging is enabled
     writer = SummaryWriter(log_dir=tensorboard_log_dir) if tensorboard_log_dir else None
 
-    # Assume that the discriminator is accessible via gan_model.f_disc
-    # and the generator via gan_model.gens.
-    # For simplicity, we assume a single critic (single_disc=True).
-    critic = gan_model.f_disc
-
     # Set models to training mode and move to device
     gan_model.to(device).train()
     # generator.to(device).train()
@@ -279,10 +282,17 @@ def train_wgan_gp(
         print()
 
     # Begin training loop
-    for epoch in tqdm(range(1, max_epochs + 1), desc="Epochs"):
+    for epoch in tqdm(range(1, max_epochs + 1), leave=False, desc="Epochs"):
+        epoch_start_time = time.time()
+        batch_times = []
+        critic_times = []
+        generator_times = []
+
         for batch_idx, (real_imgs, distr_idx, target, meta_label) in tqdm(
             enumerate(dataloader), leave=False, desc="Batches"
         ):
+            batch_start_time = time.time()
+
             batch_size = real_imgs.size(0)
             real_imgs = real_imgs.to(device)
 
@@ -297,6 +307,7 @@ def train_wgan_gp(
             #  Train Critic / Discriminator
             # -----------------------------
             for d_iter in range(n_critic):
+                critic_start = time.time()
                 optimizer_critic.zero_grad()
 
                 for distr_ind in range(len(gan_model.delta_v_list)):
@@ -363,10 +374,14 @@ def train_wgan_gp(
                 # update the critic with backprop
                 optimizer_critic.step()
 
+            critic_end = time.time()
+            critic_times.append(critic_end - critic_start)
+
             # ---------------------
             #  Train Generator
             # ---------------------
             total_loss_gen = 0.0
+            generator_start = time.time()
             optimizer_generator.zero_grad()
             for distr_ind in range(len(gan_model.delta_v_list)):
                 ncm_batch = gan_model.sample_mixture(
@@ -389,12 +404,22 @@ def train_wgan_gp(
 
             # Update generator with backprop
             optimizer_generator.step()
+            generator_end = time.time()
+            generator_times.append(generator_end - generator_start)
 
+            batch_times.append(time.time() - batch_start_time)
             # Print training status every few iterations.
             if batch_idx % 50 == 0 and master_process:
-                print(
+                tqdm.write(
                     f"[Epoch {epoch}/{max_epochs}] [Batch {distr_ind}/{len(dataloader)}] "
                     f"[D loss: {loss_critic.item():.4f}] [G loss: {loss_generator.item():.4f}]"
+                )
+                avg_batch_time = sum(batch_times) / len(batch_times)
+                avg_critic_time = sum(critic_times) / len(critic_times)
+                avg_generator_time = sum(generator_times) / len(generator_times)
+                tqdm.write(
+                    f"Avg Batch: {avg_batch_time:.2f}s | "
+                    f"Critic: {avg_critic_time:.2f}s | Generator: {avg_generator_time:.2f}s"
                 )
 
         # TensorBoard Logging
@@ -433,7 +458,24 @@ def train_wgan_gp(
                 },
                 checkpoint_path,
             )
-            print(f"Checkpoint saved at epoch {epoch} to {checkpoint_path}")
+            tqdm.write(f"Checkpoint saved at epoch {epoch} to {checkpoint_path}")
+
+        # log timing information
+        epoch_time = time.time() - epoch_start_time
+        avg_batch_time = sum(batch_times) / len(batch_times)
+        avg_critic_time = sum(critic_times) / len(critic_times)
+        avg_generator_time = sum(generator_times) / len(generator_times)
+        if writer:
+            writer.add_scalar("Timing/Epoch", epoch_time, epoch)
+            writer.add_scalar("Timing/Avg_Batch", avg_batch_time, epoch)
+            writer.add_scalar("Timing/Avg_Critic", avg_critic_time, epoch)
+            writer.add_scalar("Timing/Avg_Generator", avg_generator_time, epoch)
+        if master_process and epoch % n_print_output_epochs == 0:
+            tqdm.write(
+                f"[Epoch {epoch}] Time: {epoch_time:.2f}s | "
+                f"Avg Batch: {avg_batch_time:.2f}s | "
+                f"Critic: {avg_critic_time:.2f}s | Generator: {avg_generator_time:.2f}s"
+            )
 
     if writer:
         writer.close()
@@ -575,7 +617,7 @@ if __name__ == "__main__":
     max_epochs = ncm_config["training"]["max_epochs"]
 
     #  make the GAN model
-    gan_model = make_gan_ncm_model(latent_dim=32)
+    gan_model = make_gan_ncm_model(config=ncm_config)
     lr = ncm_config["optimizer"]["lr"]
     if ncm_config["optimizer"]["gan_mode"] == "wgan":
         optim_func = torch.optim.RMSprop
