@@ -19,7 +19,7 @@ NUM_GPUS=2
 
 # Set the environment variable for the GPU
 export CUDA_VISIBLE_DEVICES=$GPU_INDEX
-LOG_FILE="ncm_nf_exp1_${SCRIPT_NAME}_${GPU_INDEX}gpus.log"
+LOG_FILE="ncm_nf_exp3_${SCRIPT_NAME}_${GPU_INDEX}gpus.log"
 CMD="python3 $SCRIPT_NAME"
 #  --config ./experiment.yml" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 

@@ -83,6 +83,7 @@ class SCMFunc(nn.Module):
         #     print("In SCM func: ", pa.keys(), u.keys())
 
         if len(u.keys()) == 0:
+            print("Inside forward SCM func: ", [k for k in self.pa])
             inp = torch.cat([pa[k] for k in self.pa], dim=1)
         elif len(pa.keys()) == 0 or len(set(pa.keys()).intersection(self.set_pa)) == 0:
             inp = torch.cat([u[k] for k in self.u], dim=1)

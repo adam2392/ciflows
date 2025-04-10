@@ -1,5 +1,7 @@
+import sys
 import os
 import shutil
+import time
 from contextlib import nullcontext
 from pathlib import Path
 
@@ -17,27 +19,36 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 from tqdm import tqdm
 
-from ciflows.datasets.causalmnist import CausalMNIST
+from ciflows.datasets.causalmnist import CausalMNIST, CausalMNISTEmbedding
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
-from ciflows.ncm import GAN_NF_NCM, MLP, ResNet, CausalGraph, log
+from ciflows.ncm import GAN_NF_NCM, MLP, CausalGraph, log, ResNet
 from ciflows.training import TopKModelSaver
+from ciflows.ncm.flows import make_img_flow_model
 
 
-def make_gan_ncm_model(
-    latent_dim=32,
-    v_dim=128*128*3,
-) -> GAN_NF_NCM:
+def make_gan_ncm_model(config) -> GAN_NF_NCM:
     V_list = ["style", "digit", "digit-color", "bar-color"]
+    img_size = config["data"]["img_size"]
+
+    # latent dim is the total number of dimensions in the image
+    latent_dim = img_size * img_size * 3
+
+    h_layers = config["model"].get("h_layers", 2)
+    h_size = config["model"].get("h_size", 256)
+
+    # number of normalizing flow blocks
+    K = config["model"].get("K", 32)
+
     default_u_size = int(latent_dim / len(V_list))
-    default_v_size = int(v_dim / len(V_list))
+    default_v_size = int(latent_dim / len(V_list))
     hyperparams = {
-        "h-layers": 5,
-        "h-size": 128,
+        "h-layers": h_layers,
+        "h-size": h_size,
         "layer-norm": False,
         "neural-pu": False,
         "single-disc": True,
-        "output_shape": (3, 128, 128),
+        "K": K,
         # "do-var-list": ["digit-color", "bar-color", "bar-color"],
     }
 
@@ -58,17 +69,20 @@ def make_gan_ncm_model(
     ]
     cg = CausalGraph(V_list, directed_edges=directed_edges, bidirected_edges=bidirected_edges)
 
+    flow_model = make_img_flow_model(K=K, L=3, hidden_channels=h_size)
 
     gan_model = GAN_NF_NCM(
         cg=cg,
         delta_v_list=delta_v_list,
         default_u_size=default_u_size,
         default_v_size=default_v_size,
+        # f=
         hyperparams=hyperparams,
-        disc_module=ResNet,
+        disc_module=MLP,
         default_gen_module=ResNet,
         gen_use_sigmoid=True,
         disc_use_sigmoid=True,
+        flow_model=flow_model,
     )
 
     return gan_model
@@ -104,7 +118,7 @@ def configure_optimizers(model, learning_rate, betas, weight_decay=0.0):
 def data_loader(root_dir, dataset, graph_type, num_workers, batch_size, img_size, debug=False):
     """Loads CausalMNIST dataset with stratified sampling.
 
-    Loads both the VAE-32-dim embeddings and the original CausalMNIST (32, 32, 3) datasets.
+    Loads the original CausalMNIST (32, 32, 3) datasets.
     """
     causal_dataset = CausalMNISTEmbedding(root=root_dir, graph_type=graph_type, fast_dev_run=False)
 
@@ -132,15 +146,6 @@ def data_loader(root_dir, dataset, graph_type, num_workers, batch_size, img_size
     )
 
     return DataLoader(
-        shuffle=False,
-        dataset=causal_dataset,
-        batch_size=batch_size,
-        sampler=train_sampler,
-        drop_last=True,
-        num_workers=num_workers,
-        pin_memory=True,
-        persistent_workers=True,
-    ), DataLoader(
         shuffle=False,
         dataset=dataset,
         batch_size=batch_size,
@@ -242,8 +247,8 @@ def train_wgan_gp(
     checkpoint_dir="./checkpoints",
     master_process=True,
     tensorboard_log_dir=None,
-    vae_model=None,
     debug=False,
+    n_print_output_epochs=10,
 ):
     """
     Train the GAN_NCM model using the Wasserstein GAN loss with gradient penalty.
@@ -264,11 +269,6 @@ def train_wgan_gp(
     # Setup TensorBoard writer if logging is enabled
     writer = SummaryWriter(log_dir=tensorboard_log_dir) if tensorboard_log_dir else None
 
-    # Assume that the discriminator is accessible via gan_model.f_disc
-    # and the generator via gan_model.gens.
-    # For simplicity, we assume a single critic (single_disc=True).
-    critic = gan_model.f_disc
-
     # Set models to training mode and move to device
     gan_model.to(device).train()
     # generator.to(device).train()
@@ -280,10 +280,18 @@ def train_wgan_gp(
         print()
 
     # Begin training loop
-    for epoch in tqdm(range(1, max_epochs + 1), desc="Epochs"):
-        for batch_idx, (real_imgs, distr_idx, target, meta_label) in tqdm(
-            enumerate(dataloader), leave=False, desc="Batches"
-        ):
+    for epoch in tqdm(range(1, max_epochs + 1), leave=False, desc="Epochs"):
+        epoch_start_time = time.time()
+        batch_times = []
+        critic_times = []
+        generator_times = []
+
+        # for batch_idx, (real_imgs, distr_idx, target, meta_label) in tqdm(
+        #     enumerate(dataloader), leave=False, desc="Batches", dynamic_ncols=False, file=sys.stdout
+        # ):
+        for batch_idx, (real_imgs, distr_idx, target, meta_label) in enumerate(dataloader):
+            batch_start_time = time.time()
+
             batch_size = real_imgs.size(0)
             real_imgs = real_imgs.to(device)
 
@@ -298,6 +306,7 @@ def train_wgan_gp(
             #  Train Critic / Discriminator
             # -----------------------------
             for d_iter in range(n_critic):
+                critic_start = time.time()
                 optimizer_critic.zero_grad()
 
                 for distr_ind in range(len(gan_model.delta_v_list)):
@@ -330,13 +339,13 @@ def train_wgan_gp(
                         fake_imgs_batch, index=distr_ind, debug=debug
                     )
 
-                    if debug:
-                        print("About to compute gradient penalty")
-                        print(dist_real_imgs_dict.keys())
-                        print(dist_real_imgs.shape)
-                        print(lambda_gp)
-                        print(fake_imgs_batch.keys())
-                        print(device)
+                    # if debug:
+                    # print("About to compute gradient penalty")
+                    # print(dist_real_imgs_dict.keys())
+                    # print(dist_real_imgs.shape)
+                    # print(lambda_gp)
+                    # print(fake_imgs_batch.keys())
+                    # print(device)
 
                     # Compute gradient penalty.
                     gp = compute_gradient_penalty(
@@ -364,10 +373,14 @@ def train_wgan_gp(
                 # update the critic with backprop
                 optimizer_critic.step()
 
+            critic_end = time.time()
+            critic_times.append(critic_end - critic_start)
+
             # ---------------------
             #  Train Generator
             # ---------------------
             total_loss_gen = 0.0
+            generator_start = time.time()
             optimizer_generator.zero_grad()
             for distr_ind in range(len(gan_model.delta_v_list)):
                 ncm_batch = gan_model.sample_mixture(
@@ -390,12 +403,22 @@ def train_wgan_gp(
 
             # Update generator with backprop
             optimizer_generator.step()
+            generator_end = time.time()
+            generator_times.append(generator_end - generator_start)
 
+            batch_times.append(time.time() - batch_start_time)
             # Print training status every few iterations.
             if batch_idx % 50 == 0 and master_process:
-                print(
+                tqdm.write(
                     f"[Epoch {epoch}/{max_epochs}] [Batch {distr_ind}/{len(dataloader)}] "
                     f"[D loss: {loss_critic.item():.4f}] [G loss: {loss_generator.item():.4f}]"
+                )
+                avg_batch_time = sum(batch_times) / len(batch_times)
+                avg_critic_time = sum(critic_times) / len(critic_times)
+                avg_generator_time = sum(generator_times) / len(generator_times)
+                tqdm.write(
+                    f"Avg Batch: {avg_batch_time:.2f}s | "
+                    f"Critic: {avg_critic_time:.2f}s | Generator: {avg_generator_time:.2f}s"
                 )
 
         # TensorBoard Logging
@@ -411,10 +434,7 @@ def train_wgan_gp(
                 with torch.no_grad():
                     for idx, delta_v in enumerate(gan_model.delta_v_list):
                         # Generate samples for the current distribution index
-                        sample_imgs = gan_model.sample_mixture(n=16, idx=[idx])[0]
-
-                        # use VAE to decode the images
-                        sample_imgs = vae_model.decode(sample_imgs)
+                        sample_imgs = gan_model.sample_mixture(n=16, idx=[idx])[0]["X"]
 
                         # Create grid of images
                         grid = torchvision.utils.make_grid(sample_imgs, normalize=True, nrow=4)
@@ -434,7 +454,24 @@ def train_wgan_gp(
                 },
                 checkpoint_path,
             )
-            print(f"Checkpoint saved at epoch {epoch} to {checkpoint_path}")
+            tqdm.write(f"Checkpoint saved at epoch {epoch} to {checkpoint_path}")
+
+        # log timing information
+        epoch_time = time.time() - epoch_start_time
+        avg_batch_time = sum(batch_times) / len(batch_times)
+        avg_critic_time = sum(critic_times) / len(critic_times)
+        avg_generator_time = sum(generator_times) / len(generator_times)
+        if writer:
+            writer.add_scalar("Timing/Epoch", epoch_time, epoch)
+            writer.add_scalar("Timing/Avg_Batch", avg_batch_time, epoch)
+            writer.add_scalar("Timing/Avg_Critic", avg_critic_time, epoch)
+            writer.add_scalar("Timing/Avg_Generator", avg_generator_time, epoch)
+        if master_process and epoch % n_print_output_epochs == 0:
+            tqdm.write(
+                f"[Epoch {epoch}] Time: {epoch_time:.2f}s | "
+                f"Avg Batch: {avg_batch_time:.2f}s | "
+                f"Critic: {avg_critic_time:.2f}s | Generator: {avg_generator_time:.2f}s"
+            )
 
     if writer:
         writer.close()
@@ -443,17 +480,9 @@ def train_wgan_gp(
 if __name__ == "__main__":
     # Load configuration
     root = Path("/local/eb/adam2392/")
-    root = Path("/Users/adam2392/pytorch_data/")
-    ncm_config_path = "/home/adam2392/projects/ciflows/scripts/ncm/ncm_vae_experiment.yml"
-    ncm_config_path = "/Users/adam2392/Documents/ciflows/scripts/ncm/ncm_vae_experiment.yml"
+    # root = Path("/Users/adam2392/pytorch_data/")
+    ncm_config_path = "/home/adam2392/projects/ciflows/scripts/ncm/ncm_experiment.yml"
     ncm_config = load_experiment_config(ncm_config_path)
-
-    # Load VAE Configuration
-    vae_checkpoint_dir = (
-        Path(ncm_config["vae"]["checkpoint_dir"]) / ncm_config["vae"]["experiment_name"]
-    )
-    vae_config_path = vae_checkpoint_dir / "experiment_config.yaml"
-    vae_config = load_experiment_config(vae_config_path)
 
     # Paths and Experiment Settings
     exp_name = ncm_config["exp_name"]
@@ -521,27 +550,7 @@ if __name__ == "__main__":
     )
     ctx = nullcontext()
 
-    # Load Pretrained VAE Model
-    vae_checkpoint_dir = (
-        Path(ncm_config["vae"]["checkpoint_dir"]) / ncm_config["vae"]["experiment_name"]
-    )
-    vae_checkpoint_file = vae_checkpoint_dir / ncm_config["vae"]["vae_checkpoint_fname"]
-
     img_size = ncm_config["data"]["img_size"]
-    vae_model = DeepResNetMNISTVAE(
-        latent_dim=vae_config["model"]["latent_dim"],
-        num_blocks_per_stage=vae_config["model"]["num_blocks_per_stage"],
-    )
-    vae_model, _ = load_model(vae_model, vae_checkpoint_file, device)
-    vae_model.to(device)
-
-    # Optimizer and Scheduler for VAE - optional
-    # optimizer_vae = configure_optimizers(
-    #     vae_model,
-    #     learning_rate=ncm_config["optimizer"]["lr"],
-    #     betas=tuple(ncm_config["optimizer"]["betas"]),
-    #     weight_decay=ncm_config["optimizer"]["weight_decay"],
-    # )
 
     if master_process:
         print(
@@ -549,10 +558,9 @@ if __name__ == "__main__":
         )
         print(f"Batch size: {ncm_config['data']['batch_size']}")
         print(f"Gradient accumulation steps: {grad_accum_steps}")
-        print(f"Loading VAE model from {vae_checkpoint_file}")
 
     # DataLoader
-    train_loader, orig_train_loader = data_loader(
+    orig_train_loader = data_loader(
         root_dir=root,
         dataset=ncm_config["data"]["graph_type"],
         graph_type=ncm_config["data"]["graph_type"],
@@ -566,7 +574,6 @@ if __name__ == "__main__":
 
     # Model Saving Utility
     top_k_saver = TopKModelSaver(ncm_checkpoint_dir, k=5)
-    # top_k_saver_vae = TopKModelSaver(nf_checkpoint_dir, k=5)
 
     # Enable mixed precision training if AMP is enabled
     scaler = torch.GradScaler(device=device, enabled=(dtype == "float16"))
@@ -576,16 +583,17 @@ if __name__ == "__main__":
     max_epochs = ncm_config["training"]["max_epochs"]
 
     #  make the GAN model
-    gan_model = make_gan_ncm_model(latent_dim=32)
-    lr = ncm_config["optimizer"]["lr"]
+    gan_model = make_gan_ncm_model(config=ncm_config)
+    gen_lr = ncm_config["optimizer"]["gen_lr"]
+    disc_lr = ncm_config["optimizer"]["disc_lr"]
     if ncm_config["optimizer"]["gan_mode"] == "wgan":
         optim_func = torch.optim.RMSprop
         kwargs = dict()
     else:
         optim_func = torch.optim.Adam
         kwargs = {"betas": (0.0, 0.9)}
-    optimizer_critic = optim_func(gan_model.discriminator_parameters(), lr=lr, **kwargs)
-    optimizer_generator = optim_func(gan_model.generator_parameters(), lr=lr, **kwargs)
+    optimizer_critic = optim_func(gan_model.discriminator_parameters(), lr=disc_lr, **kwargs)
+    optimizer_generator = optim_func(gan_model.generator_parameters(), lr=gen_lr, **kwargs)
     # scheduler = CosineAnnealingLR(
     #     optimizer_nf, T_max=ncm_config["training"]["max_epochs"], eta_min=1e-5
     # )
@@ -607,16 +615,15 @@ if __name__ == "__main__":
     # Wrap with DDP if needed
     if ddp:
         gan_model = DDP(gan_model, device_ids=[ddp_local_rank])
-        vae_model = DDP(vae_model, device_ids=[ddp_local_rank])
 
     if master_process:
         print(
-            f"Training NF model with {sum(p.numel() for p in gan_model.parameters() if p.requires_grad):,} parameters"
+            f"Training NCM GAN model with {sum(p.numel() for p in gan_model.parameters() if p.requires_grad):,} parameters"
         )
 
     train_wgan_gp(
         gan_model,
-        train_loader,
+        orig_train_loader,
         device,
         max_epochs=max_epochs,
         optimizer_critic=optimizer_critic,
@@ -627,12 +634,10 @@ if __name__ == "__main__":
         checkpoint_dir=ncm_checkpoint_dir,
         tensorboard_log_dir=ncm_checkpoint_dir / "logs",
         debug=ncm_config["debug"],
-        vae_model=vae_model,
     )
 
     # Save Final Model
     if master_process:
         torch.save(gan_model.state_dict(), ncm_checkpoint_dir / "final_model.pt")
-        torch.save(vae_model.state_dict(), ncm_checkpoint_dir / "final_vae_model.pt")
 
     print("Training Complete!")

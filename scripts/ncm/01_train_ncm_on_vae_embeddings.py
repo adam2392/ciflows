@@ -1,3 +1,4 @@
+import sys
 import os
 import shutil
 import time
@@ -288,9 +289,10 @@ def train_wgan_gp(
         critic_times = []
         generator_times = []
 
-        for batch_idx, (real_imgs, distr_idx, target, meta_label) in tqdm(
-            enumerate(dataloader), leave=False, desc="Batches"
-        ):
+        # for batch_idx, (real_imgs, distr_idx, target, meta_label) in tqdm(
+        #     enumerate(dataloader), leave=False, desc="Batches", dynamic_ncols=False, file=sys.stdout
+        # ):
+        for batch_idx, (real_imgs, distr_idx, target, meta_label) in enumerate(dataloader):
             batch_start_time = time.time()
 
             batch_size = real_imgs.size(0)
@@ -436,7 +438,7 @@ def train_wgan_gp(
                     for idx, delta_v in enumerate(gan_model.delta_v_list):
                         # Generate samples for the current distribution index
                         sample_imgs = gan_model.sample_mixture(n=16, idx=[idx])[0]['X']
-        
+
                         # use VAE to decode the images
                         sample_imgs = vae_model.decode(sample_imgs)
 
@@ -618,15 +620,16 @@ if __name__ == "__main__":
 
     #  make the GAN model
     gan_model = make_gan_ncm_model(config=ncm_config)
-    lr = ncm_config["optimizer"]["lr"]
+    gen_lr = ncm_config["optimizer"]["gen_lr"]
+    disc_lr = ncm_config["optimizer"]["disc_lr"]
     if ncm_config["optimizer"]["gan_mode"] == "wgan":
         optim_func = torch.optim.RMSprop
         kwargs = dict()
     else:
         optim_func = torch.optim.Adam
         kwargs = {"betas": (0.0, 0.9)}
-    optimizer_critic = optim_func(gan_model.discriminator_parameters(), lr=lr, **kwargs)
-    optimizer_generator = optim_func(gan_model.generator_parameters(), lr=lr, **kwargs)
+    optimizer_critic = optim_func(gan_model.discriminator_parameters(), lr=disc_lr, **kwargs)
+    optimizer_generator = optim_func(gan_model.generator_parameters(), lr=gen_lr, **kwargs)
     # scheduler = CosineAnnealingLR(
     #     optimizer_nf, T_max=ncm_config["training"]["max_epochs"], eta_min=1e-5
     # )
@@ -652,7 +655,7 @@ if __name__ == "__main__":
 
     if master_process:
         print(
-            f"Training NF model with {sum(p.numel() for p in gan_model.parameters() if p.requires_grad):,} parameters"
+            f"Training NCM GAN model with {sum(p.numel() for p in gan_model.parameters() if p.requires_grad):,} parameters"
         )
 
     train_wgan_gp(

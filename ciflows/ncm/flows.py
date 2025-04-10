@@ -219,7 +219,7 @@ def make_flow_model(input_dim=32, num_layers=32, hidden_dim=128, num_hidden_laye
 
     # print number of parameters
     num_params = sum(p.numel() for p in model.parameters())
-    print(f"Number of parameters: {num_params}")
+    print(f"Number of parameters for flow model: {num_params}")
     print()
     return model
 
@@ -254,21 +254,19 @@ def test_model():
     assert torch.allclose(z, z_recon, atol=atol), "Inversion (z -> x -> z) failed"
 
 
-def make_img_flow_model():
+def make_img_flow_model(K=16, L=3, hidden_channels=256):
     # Set up model
 
     # Define flows
     L = 3
-    K = 16
     torch.manual_seed(0)
 
     input_shape = (3, 32, 32)
     n_dims = np.prod(input_shape)
     channels = 3
-    hidden_channels = 256
+
     split_mode = "channel"
     scale = True
-    num_classes = 10
 
     # Set up flows, distributions and merge operations
     merges = []
@@ -311,7 +309,7 @@ def make_img_flow_model():
 
     # print number of parameters
     num_params = sum(p.numel() for p in model.parameters())
-    print(f"Number of parameters: {num_params}")
+    print(f"Number of parameters for img flow model: {num_params}")
     print()
 
 

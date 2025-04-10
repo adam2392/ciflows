@@ -3,7 +3,7 @@ debug: False
 compile: false
 load_from_checkpoint: False
 checkpoint_file: "model_epoch_850.pt"
-exp_name: "causalmnist_ncm_vae_exp3"   # NF-specific experiment name
+exp_name: "causalmnist_ncm_exp1"   # NF-specific experiment name
 
 system:
   device: "cuda"
@@ -35,18 +35,11 @@ training:
   use_amp: False
 
 model:
-  K: 16
-  latent_dim: 32
+  K: 32
+  latent_dim: 
   h_layers: 3
   h_size: 64
 
 scheduler:
   type: "cosine"
   lr_min: 6e-5
-
-vae:
-  experiment_name: "causalmnist_exp2_betamax005"   # Identifier for linking to the VAE config
-  checkpoint_dir: "/local/eb/adam2392/CausalMNIST/vae_reduction/"
-  # checkpoint_dir: "/Users/adam2392/pytorch_data/CausalMNIST/vae_reduction/"
-  latent_dim: 32
-  vae_checkpoint_fname: "final_model.pt"

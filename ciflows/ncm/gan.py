@@ -336,6 +336,7 @@ class GAN_NF_NCM(GAN_NCM):
         disc_module=MLP,
         gen_use_sigmoid=True,
         disc_use_sigmoid=True,
+        flow_model=None
     ):
         # get the size of the output generation, which is the sum of the sizes of
         # the variables in the causal graph generated
@@ -370,13 +371,16 @@ class GAN_NF_NCM(GAN_NCM):
         #         )
         #     ]
         # self.f_X = nn.ModuleList(flows)
-
-        self.f_X = make_flow_model(
-            input_dim=self.x_size,
-            num_layers=K_flows,
-            hidden_dim=net_hidden_dim,
-            num_hidden_layers=net_hidden_layers,
-        )
+        if flow_model is None:
+            self.f_X = make_flow_model(
+                input_dim=self.x_size,
+                num_layers=K_flows,
+                hidden_dim=net_hidden_dim,
+                num_hidden_layers=net_hidden_layers,
+            )
+        else:
+            self.f_X = flow_model
+        self.add_module("f_X", self.f_X)
 
     def _init_discriminator(self, disc_module, disc_use_sigmoid, hyperparams):
         """Discriminator operates over X."""
