@@ -243,6 +243,7 @@ def train_wgan_gp(
     n_critic=5,
     lambda_gp=10,
     save_interval=10,
+    grad_clip=0.01,
     gan_mode="wgan",
     checkpoint_dir="./checkpoints",
     master_process=True,
@@ -294,6 +295,10 @@ def train_wgan_gp(
 
             batch_size = real_imgs.size(0)
             real_imgs = real_imgs.to(device)
+
+            # Track per-batch gp and critic losses for TensorBoard
+            batch_gp_total = 0.0
+            batch_critic_loss_total = 0.0
 
             # create list of dictionaries
             batch_x_list = []
@@ -347,32 +352,47 @@ def train_wgan_gp(
                     # print(fake_imgs_batch.keys())
                     # print(device)
 
-                    # Compute gradient penalty.
-                    gp = compute_gradient_penalty(
-                        gan_model,
-                        dist_real_imgs_dict,
-                        fake_imgs_batch,
-                        distr_index=distr_ind,
-                        device=device,
-                        lambda_gp=lambda_gp,
-                        grad_clamp=grad_clip,
-                    )
-
                     # Wasserstein critic loss
                     if gan_mode == "wgan" or gan_mode == "wgan-gp":
-                        loss_critic = -fake_validity.mean() - real_validity.mean()
+                        loss_critic = fake_validity.mean() - real_validity.mean()
                     else:
                         loss_critic = -torch.mean(log(fake_validity) + log(1 - real_validity))
                         # loss_critic = -F.binary_cross_entropy_with_logits(fake_validity, torch.ones_like(fake_validity)) + \
                         #               F.binary_cross_entropy_with_logits(real_validity, torch.zeros_like(real_validity))
 
-                    loss_critic += gp
-                    loss_critic.backward()
+                    # Log values
+                    batch_gp_total += gp.item()
+                    batch_critic_loss_total += loss_critic.item()
+
+                    if gan_mode == 'wgan-gp':
+                        # Compute gradient penalty.
+                        gp = compute_gradient_penalty(
+                            gan_model,
+                            dist_real_imgs_dict,
+                            fake_imgs_batch,
+                            distr_index=distr_ind,
+                            device=device,
+                            lambda_gp=lambda_gp,
+                            grad_clamp=grad_clip,
+                        )
+
+                        loss_critic += gp
+                    
                     total_loss_critic += loss_critic.item()
+                    loss_critic.backward()
 
                 # update the critic with backprop
                 optimizer_critic.step()
+                
+                if gan_mode == "wgan":
+                    for p in gan_model.f_disc.parameters():
+                        p.data.clamp_(-grad_clip, grad_clip)
 
+            if writer:
+                global_step = epoch * len(dataloader) + batch_idx
+                writer.add_scalar("Loss/GradientPenalty", batch_gp_total, global_step)
+                writer.add_scalar("Loss/Critic", batch_critic_loss_total, global_step)
+                
             critic_end = time.time()
             critic_times.append(critic_end - critic_start)
 
@@ -398,8 +418,8 @@ def train_wgan_gp(
                 # normalize by the number of distributions it must fit
                 loss_generator /= len(gan_model.delta_v_list)
 
-                loss_generator.backward()
                 total_loss_gen += loss_generator.item()
+                loss_generator.backward()
 
             # Update generator with backprop
             optimizer_generator.step()
@@ -631,6 +651,7 @@ if __name__ == "__main__":
         n_critic=1,
         lambda_gp=10,
         save_interval=10,
+        grad_clip=grad_clip,
         checkpoint_dir=ncm_checkpoint_dir,
         tensorboard_log_dir=ncm_checkpoint_dir / "logs",
         debug=ncm_config["debug"],
