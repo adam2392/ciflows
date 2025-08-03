@@ -446,7 +446,7 @@ def chain_style_scm(intervention_idx, labels):
         #     mask = digit == i
         #     num_samples = mask.sum().item()
         #     width[mask] = torch.normal(width_means[-i], 0.1, size=(num_samples,))
-        causal_labels["intervention_targets"] = torch.Tensor([[1, 0, 0, 0]] * n_samples)
+        causal_labels["intervention_targets"] = torch.Tensor([[0, 0, 1]] * n_samples)
     else:
         raise ValueError("Invalid intervention_idx. Must be 0, 1, 2 or 3.")
 

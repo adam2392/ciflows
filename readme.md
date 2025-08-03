@@ -52,3 +52,5 @@ pip install -e .
 
 
 pip install numpy scipy pandas tqdm joblib PyYAML scikit-learn normflows lightning torch torchvision torchaudio
+pip install pandas matplotlib seaborn scikit-image
+pip install -e .

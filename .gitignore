@@ -8,6 +8,7 @@ __pycache__/
 *.so
 *.ckpt
 data/
+output/
 
 # Distribution / packaging
 .Python

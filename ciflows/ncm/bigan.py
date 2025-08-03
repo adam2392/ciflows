@@ -1,3 +1,4 @@
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -61,54 +62,75 @@ class ResBlockTranspose(nn.Module):
 #   BiGAN Core Modules
 # ------------------------
 class Encoder(nn.Module):
-    def __init__(self, img_channels=3, z_dim=32):
+    def __init__(self, img_channels=3, z_dim=32, debug=False):
         super().__init__()
-        self.initial = nn.Conv2d(img_channels, 64, kernel_size=3, stride=1, padding=1)
+        self.debug = debug
+        self.initial = nn.Conv2d(img_channels, 32, kernel_size=3, stride=1, padding=1)
         self.resblocks = nn.Sequential(
+            ResBlock(32, 64, downsample=True),
             ResBlock(64, 128, downsample=True),
             ResBlock(128, 256, downsample=True),
             ResBlock(256, 256)
         )
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(256 * 7 * 7, z_dim)
+        self.fc = nn.Linear(256 * 16, z_dim)
 
     def forward(self, x):
+        if self.debug:
+            print(x.shape)
         x = self.initial(x)
+        if self.debug:
+            print(x.shape)
         x = self.resblocks(x)
+        if self.debug:
+            print(x.shape)
         x = self.flatten(x)
+        if self.debug:
+            print(x.shape)
         return self.fc(x)
 
 
 class Decoder(nn.Module):
-    def __init__(self, z_dim=32, img_channels=3):
+    def __init__(self, z_dim=32, img_channels=3, debug=False ):
         super().__init__()
-        self.fc = nn.Linear(z_dim, 256 * 7 * 7)
+        self.debug = debug
+        self.fc = nn.Linear(z_dim, 256 * 4 * 4)
         self.resblocks = nn.Sequential(
             ResBlockTranspose(256, 256),
             ResBlockTranspose(256, 128, upsample=True),
-            ResBlockTranspose(128, 64, upsample=True)
+            ResBlockTranspose(128, 64, upsample=True),
+            ResBlockTranspose(64, 32, upsample=True)
         )
-        self.final = nn.Conv2d(64, img_channels, kernel_size=3, stride=1, padding=1)
+        self.final = nn.Conv2d(32, img_channels, kernel_size=3, stride=1, padding=1)
         self.activation = nn.Sigmoid()
 
     def forward(self, z):
-        x = self.fc(z).view(-1, 256, 7, 7)
+        if self.debug:
+            print(z.shape)
+            print(self.fc(z).shape)
+        x = self.fc(z).view(-1, 256, 4, 4)
+        if self.debug:
+            print(x.shape)
         x = self.resblocks(x)
+        if self.debug:
+            print(x.shape)
+            print(self.final(x).shape)
         return self.activation(self.final(x))
 
 
 class JointDiscriminator(nn.Module):
     def __init__(self, img_channels=3, z_dim=32):
         super().__init__()
-        self.initial = nn.Conv2d(img_channels, 64, kernel_size=3, stride=1, padding=1)
+        self.initial = nn.Conv2d(img_channels, 32, kernel_size=3, stride=1, padding=1)
         self.resblocks = nn.Sequential(
+            ResBlock(32, 64, downsample=True),
             ResBlock(64, 128, downsample=True),
             ResBlock(128, 256, downsample=True),
             ResBlock(256, 256)
         )
         self.flatten = nn.Flatten()
         self.fc = nn.Sequential(
-            nn.Linear(256 * 7 * 7 + z_dim, 512),
+            nn.Linear(256 * 4 * 4 + z_dim, 512),
             nn.LeakyReLU(0.2),
             nn.Linear(512, 128),
             nn.LeakyReLU(0.2),
@@ -127,7 +149,7 @@ if __name__ == "__main__":
     # Define dimensions
     batch_size = 8
     img_channels = 3
-    height = width = 28
+    height = width = 32
     z_dim = 32
 
     # Instantiate models

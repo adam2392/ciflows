@@ -6,13 +6,16 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms, utils
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from ciflows.datasets.causalmnist import CausalMNIST, CausalMNISTEmbedding
+from ciflows.datasets.causalmnistv2 import CausalMNIST_v2
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.ncm.bigan import Encoder, Decoder, JointDiscriminator
+from torch.utils.tensorboard import SummaryWriter
 
 
 def train_bigan(
+    root_dir,
     output_dir,
+    distr_labels,
     epochs=100,
     batch_size=64,
     z_dim=32,
@@ -23,6 +26,8 @@ def train_bigan(
     multi_gpu=False,
     use_scheduler=False,
     device=None,
+    num_workers=4,
+    img_size=32,
 ):
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -30,19 +35,60 @@ def train_bigan(
     sample_dir = os.path.join(output_dir, "samples")
     os.makedirs(sample_dir, exist_ok=True)
 
-    transform = transforms.Compose([
-        transforms.Resize((28, 28)),
-        transforms.ToTensor(),
-        lambda x: x.expand(3, -1, -1)
-    ])
+    # create a TensorBoard writer
+    writer = SummaryWriter(log_dir=os.path.join(output_dir, "tb_logs"))
 
-    dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
+    image_transform = transforms.Compose(
+        [transforms.Resize((28, 28)), transforms.ToTensor(), lambda x: x.expand(3, -1, -1)]
+    )
+
+    # dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
+    # Initialize the dataset (replace with your desired dataset settings)
+    # Define image transformations
+    image_transform = transforms.Compose(
+        [
+            transforms.Resize((img_size, img_size)),
+            transforms.CenterCrop(img_size),
+            transforms.ToTensor(),
+        ]
+    )
+    dataset = CausalMNIST_v2(
+        root=root_dir,
+        distr_labels=distr_labels,
+        # graph_type=graph_type,
+        transform=image_transform,
+    )
+
+    # print("The distribution index labels: ", distr_labels)
+    orig_distr_labels_list = dataset.get_distribution_labels()
+
     val_len = int(val_split * len(dataset))
     train_len = len(dataset) - val_len
     train_set, val_set = torch.utils.data.random_split(dataset, [train_len, val_len])
-
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False)
+    distr_labels_list = [orig_distr_labels_list[idx] for idx in train_set.indices]
+    train_sampler = StratifiedSampler(distr_labels_list, batch_size)
+    train_loader = DataLoader(
+        shuffle=False,
+        dataset=train_set,
+        batch_size=batch_size,
+        sampler=train_sampler,
+        drop_last=True,
+        num_workers=num_workers,
+        pin_memory=True,
+        persistent_workers=True,
+    )
+    val_loader = DataLoader(
+        shuffle=False,
+        dataset=dataset,
+        batch_size=batch_size,
+        # sampler=train_sampler,
+        drop_last=True,
+        num_workers=num_workers,
+        pin_memory=True,
+        persistent_workers=True,
+    )
+    # train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
+    # val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False)
 
     encoder = Encoder(z_dim=z_dim)
     decoder = Decoder(z_dim=z_dim)
@@ -61,11 +107,13 @@ def train_bigan(
     dis_opt = torch.optim.Adam(discriminator.parameters(), lr=lr)
 
     if use_scheduler:
-        scheduler = ReduceLROnPlateau(gen_opt, mode='min', factor=0.5, patience=5)
+        scheduler = ReduceLROnPlateau(gen_opt, mode="min", factor=0.5, patience=5)
 
     best_models = []  # list of tuples: (loss, path)
 
     for epoch in range(1, epochs + 1):
+        print(f"Epoch {epoch}/{epochs}...")
+
         encoder.train(), decoder.train(), discriminator.train()
         total_d_loss, total_g_loss = 0, 0
 
@@ -75,7 +123,7 @@ def train_bigan(
 
             # Encode
             z_enc = encoder(x)
-            x_fake = decoder(z_enc)
+            # x_fake = decoder(z_enc)
 
             # Random latent
             z_rand = torch.randn(batch_size, z_dim).to(device)
@@ -98,6 +146,7 @@ def train_bigan(
 
             total_d_loss += d_loss.item()
             total_g_loss += g_loss.item()
+            break
 
         avg_d_loss = total_d_loss / len(train_loader)
         avg_g_loss = total_g_loss / len(train_loader)
@@ -110,29 +159,48 @@ def train_bigan(
                 x_val = x_val.to(device)
                 z_val = encoder(x_val)
                 x_recon = decoder(z_val)
-                val_loss += F.mse_loss(x_recon, x_val, reduction='sum').item()
+                val_loss += F.mse_loss(x_recon, x_val, reduction="sum").item()
         val_loss /= len(val_loader.dataset)
 
         if use_scheduler:
             scheduler.step(val_loss)
 
+        # ——— LOG TO TENSORBOARD ———
+        writer.add_scalar("Loss/Discriminator", avg_d_loss, epoch)
+        writer.add_scalar("Loss/Generator", avg_g_loss, epoch)
+        writer.add_scalar("Loss/Validation", val_loss, epoch)
+
         # Log
         if epoch % log_every == 0:
-            print(f"Epoch {epoch}: D Loss = {avg_d_loss:.4f}, G Loss = {avg_g_loss:.4f}, Val Loss = {val_loss:.4f}")
+            print(
+                f"Epoch {epoch}: D Loss = {avg_d_loss:.4f}, G Loss = {avg_g_loss:.4f}, Val Loss = {val_loss:.4f}"
+            )
             with torch.no_grad():
                 z_sample = torch.randn(64, z_dim).to(device)
                 x_sample = decoder(z_sample)
-                utils.save_image(x_sample, os.path.join(sample_dir, f"sample_epoch_{epoch}.png"), nrow=8, normalize=True)
+                utils.save_image(
+                    x_sample,
+                    os.path.join(sample_dir, f"sample_epoch_{epoch}.png"),
+                    nrow=8,
+                    normalize=True,
+                )
+
+                # shape: (B, C, H, W), values in [0,1]
+                writer.add_images('Generated/Samples', x_sample, global_step=epoch)
+
 
         # Save top-k models
         model_path = os.path.join(output_dir, f"model_epoch_{epoch}.pt")
-        torch.save({
-            'encoder': encoder.state_dict(),
-            'decoder': decoder.state_dict(),
-            'discriminator': discriminator.state_dict(),
-            'val_loss': val_loss,
-            'epoch': epoch,
-        }, model_path)
+        torch.save(
+            {
+                "encoder": encoder.state_dict(),
+                "decoder": decoder.state_dict(),
+                "discriminator": discriminator.state_dict(),
+                "val_loss": val_loss,
+                "epoch": epoch,
+            },
+            model_path,
+        )
 
         best_models.append((val_loss, model_path))
         best_models = sorted(best_models, key=lambda x: x[0])[:save_top_k]
@@ -142,21 +210,11 @@ def train_bigan(
                 os.remove(path)
 
 
-def data_loader(root_dir, dataset, graph_type, num_workers, batch_size, img_size, debug=False):
+def data_loader(root_dir, num_workers, batch_size, img_size, debug=False):
     """Loads CausalMNIST dataset with stratified sampling.
 
     Loads the original CausalMNIST (32, 32, 3) datasets.
     """
-    causal_dataset = CausalMNISTEmbedding(root=root_dir, graph_type=graph_type, fast_dev_run=False)
-
-    if debug:
-        print("Debugging data loader...")
-        print(causal_dataset[0])
-
-    distr_labels = [x[1] for x in causal_dataset]
-    # print("The distribution index labels: ", distr_labels)
-    train_sampler = StratifiedSampler(distr_labels, batch_size)
-
     # Initialize the dataset (replace with your desired dataset settings)
     # Define image transformations
     image_transform = transforms.Compose(
@@ -166,11 +224,16 @@ def data_loader(root_dir, dataset, graph_type, num_workers, batch_size, img_size
             transforms.ToTensor(),
         ]
     )
-    dataset = CausalMNIST(
+    dataset = CausalMNIST_v2(
         root=root_dir,
-        graph_type=graph_type,
+        # graph_type=graph_type,
         transform=image_transform,
     )
+
+    distr_labels_list = dataset.get_distribution_labels()
+
+    # print("The distribution index labels: ", distr_labels)
+    train_sampler = StratifiedSampler(distr_labels_list, batch_size)
 
     return DataLoader(
         shuffle=False,
@@ -183,26 +246,31 @@ def data_loader(root_dir, dataset, graph_type, num_workers, batch_size, img_size
         persistent_workers=True,
     )
 
+
 if __name__ == "__main__":
     # Configuration
     config = {
-        'output_dir': './output/bigan_causal',
-        'epochs': 5,
-        'batch_size': 128,
-        'z_dim': 32,
-        'lr': 1e-4,
-        'log_every': 10,
-        'val_split': 0.1,
-        'save_top_k': 5,
-        'multi_gpu': torch.cuda.device_count() > 1,
-        'use_scheduler': True,
-        'device': 'cuda' if torch.cuda.is_available() else 'cpu',
-        'num_workers': 4,
-        'img_size': 32,
-        'graph_type': 'chain',  # or whichever causal structure you want to test
-        'debug': False
-    }  
+        "output_dir": "./output/bigan_causal",
+        "epochs": 5,
+        "batch_size": 128,
+        "z_dim": 32,
+        "lr": 1e-4,
+        "log_every": 10,
+        "val_split": 0.1,
+        "save_top_k": 5,
+        "multi_gpu": torch.cuda.device_count() > 1,
+        "use_scheduler": True,
+        "device": (
+            "cuda" if torch.cuda.is_available() else "mps" if torch.mps.is_available() else "cpu"
+        ),
+        "num_workers": 4,
+        "img_size": 32,
+        "graph_type": "chain",  # or whichever causal structure you want to test
+        "debug": False,
+    }
     root = Path("/local/eb/adam2392/")
+    root = Path("/Users/adam2392/pytorch_data/")
+    distr_labels = ["observational", "int_colorbar_0", "int_colorbar_1", "int_colorbar_2"]
 
     # Pre-warm CUDA to avoid cuBLAS warning
     if torch.cuda.is_available():
@@ -227,29 +295,33 @@ if __name__ == "__main__":
 
     print("=============================================================")
 
-
     # Load training data
-    train_loader = data_loader(
-        root_dir=root,
-        dataset='CausalMNIST',
-        graph_type=config['graph_type'],
-        num_workers=config['num_workers'],
-        batch_size=config['batch_size'],
-        img_size=config['img_size'],
-        debug=config['debug']
-    )
+    # train_loader = data_loader(
+    #     root_dir=root,
+    #     # dataset='CausalMNIST',
+    #     # graph_type=config['graph_type'],
+    #     num_workers=config['num_workers'],
+    #     batch_size=config['batch_size'],
+    #     img_size=config['img_size'],
+    #     debug=config['debug']
+    # )
 
     # Start training
     train_bigan(
-        output_dir=config['output_dir'],
-        epochs=config['epochs'],
-        batch_size=config['batch_size'],
-        z_dim=config['z_dim'],
-        lr=config['lr'],
-        log_every=config['log_every'],
-        val_split=config['val_split'],
-        save_top_k=config['save_top_k'],
-        multi_gpu=config['multi_gpu'],
-        use_scheduler=config['use_scheduler'],
-        device=config['device']
+        root_dir=root,
+        output_dir=config["output_dir"],
+        distr_labels=distr_labels,
+        # data_loader=train_loader,
+        epochs=config["epochs"],
+        batch_size=config["batch_size"],
+        z_dim=config["z_dim"],
+        lr=config["lr"],
+        log_every=config["log_every"],
+        val_split=config["val_split"],
+        save_top_k=config["save_top_k"],
+        multi_gpu=config["multi_gpu"],
+        use_scheduler=config["use_scheduler"],
+        device=config["device"],
+        num_workers=config["num_workers"],
+        img_size=config["img_size"],
     )
