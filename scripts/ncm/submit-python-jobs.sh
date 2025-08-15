@@ -2,6 +2,7 @@
 
 # Directory containing the Python script
 SCRIPT_NAME="01_train_ncm_on_vae_embeddings.py"
+SCRIPT_NAME="train_gan.py"
 
 LOG_DIR="/home/adam2392/projects/logs/"
 
@@ -9,17 +10,17 @@ LOG_DIR="/home/adam2392/projects/logs/"
 # cd "$SCRIPT_DIR"
 
 # Calculate the GPU index to use for this job
-GPU_INDEX=1
+GPU_INDEX=2
 
 # Specify the GPUs to use
 # GPU_INDICES="0,1,2"  # Adjust this as per available GPUs and your requirement
 # GPU_INDICES="1,2"  # Adjust this as per available GPUs and your requirement
 # Number of GPUs available
-NUM_GPUS=2
+NUM_GPUS=1
 
 # Set the environment variable for the GPU
 export CUDA_VISIBLE_DEVICES=$GPU_INDEX
-LOG_FILE="ncm_nf_exp2_${SCRIPT_NAME}_${GPU_INDEX}gpus.log"
+LOG_FILE="gan_exp9_l1loss_${SCRIPT_NAME}_${GPU_INDEX}gpus.log"
 CMD="python3 $SCRIPT_NAME"
 #  --config ./experiment.yml" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 

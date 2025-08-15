@@ -1,6 +1,6 @@
-import sys
 import os
 import shutil
+import sys
 import time
 from contextlib import nullcontext
 from pathlib import Path
@@ -22,9 +22,9 @@ from tqdm import tqdm
 from ciflows.datasets.causalmnist import CausalMNIST, CausalMNISTEmbedding
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
-from ciflows.ncm import GAN_NF_NCM, MLP, CausalGraph, log, ResNet
-from ciflows.training import TopKModelSaver
+from ciflows.ncm import GAN_NF_NCM, MLP, CausalGraph, ResNet, log
 from ciflows.ncm.flows import make_img_flow_model
+from ciflows.training import TopKModelSaver
 
 
 def make_gan_ncm_model(config) -> GAN_NF_NCM:
@@ -364,7 +364,7 @@ def train_wgan_gp(
                     batch_gp_total += gp.item()
                     batch_critic_loss_total += loss_critic.item()
 
-                    if gan_mode == 'wgan-gp':
+                    if gan_mode == "wgan-gp":
                         # Compute gradient penalty.
                         gp = compute_gradient_penalty(
                             gan_model,
@@ -377,13 +377,13 @@ def train_wgan_gp(
                         )
 
                         loss_critic += gp
-                    
+
                     total_loss_critic += loss_critic.item()
                     loss_critic.backward()
 
                 # update the critic with backprop
                 optimizer_critic.step()
-                
+
                 if gan_mode == "wgan":
                     for p in gan_model.f_disc.parameters():
                         p.data.clamp_(-grad_clip, grad_clip)
@@ -392,7 +392,7 @@ def train_wgan_gp(
                 global_step = epoch * len(dataloader) + batch_idx
                 writer.add_scalar("Loss/GradientPenalty", batch_gp_total, global_step)
                 writer.add_scalar("Loss/Critic", batch_critic_loss_total, global_step)
-                
+
             critic_end = time.time()
             critic_times.append(critic_end - critic_start)
 

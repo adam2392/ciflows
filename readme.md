@@ -54,3 +54,9 @@ pip install -e .
 pip install numpy scipy pandas tqdm joblib PyYAML scikit-learn normflows lightning torch torchvision torchaudio
 pip install pandas matplotlib seaborn scikit-image
 pip install -e .
+
+# To sync remote to local
+
+    rsync -avh --progress adam2392@eb0.cs.columbia.edu:/local/eb/adam2392/bigan_causal/initial/ /Users/adam2392/pytorch_data/causalmnist-output/
+
+    pkill -u $USER -f python

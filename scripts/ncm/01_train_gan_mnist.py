@@ -6,20 +6,21 @@ from pathlib import Path
 import torch
 import torch.autograd as autograd
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
-from torchvision import transforms, datasets, utils
-from torch.utils.tensorboard import SummaryWriter
 import yaml
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+from torchvision import datasets, transforms, utils
 from tqdm import tqdm
 
-from ciflows.ncm import GAN_NF_NCM, MLP, CausalGraph
 from ciflows.datasets.causalmnist import CausalMNIST
-from ciflows.ncm.nn.biggan import BigGANDisc, BigGANDeconv
+from ciflows.ncm import GAN_NF_NCM, MLP, CausalGraph
+from ciflows.ncm.nn.biggan import BigGANDeconv, BigGANDisc
 
 
 def load_config(path):
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         return yaml.safe_load(f)
+
 
 def make_simple_gan(latent_dim, h_layers, h_size, flow_blocks):
     # Single node causal graph
@@ -46,6 +47,7 @@ def make_simple_gan(latent_dim, h_layers, h_size, flow_blocks):
         disc_use_sigmoid=True,
     )
 
+
 def gradient_penalty(model, real, fake, device, λ=10.0, clamp=1.0):
     b = real.size(0)
     α = torch.rand(b, 1, 1, 1, device=device)
@@ -53,25 +55,23 @@ def gradient_penalty(model, real, fake, device, λ=10.0, clamp=1.0):
     # get critic score
     score, inp = model.get_disc_outputs({"X": interp}, index=0, include_inp=True)
     grads = autograd.grad(
-        outputs=score, inputs=inp,
+        outputs=score,
+        inputs=inp,
         grad_outputs=torch.ones_like(score),
-        create_graph=True, retain_graph=True
+        create_graph=True,
+        retain_graph=True,
     )[0].view(b, -1)
     norm = grads.norm(2, dim=1)
     penalty = torch.relu(norm - clamp) ** 2
     return λ * penalty.mean()
 
-def train(
-    model, dataloader, device,
-    opt_D, opt_G,
-    epochs, n_critic, λ_gp,
-    log_dir, save_dir
-):
+
+def train(model, dataloader, device, opt_D, opt_G, epochs, n_critic, λ_gp, log_dir, save_dir):
     writer = SummaryWriter(log_dir) if log_dir else None
     model.to(device).train()
     os.makedirs(save_dir, exist_ok=True)
 
-    for epoch in range(1, epochs+1):
+    for epoch in range(1, epochs + 1):
         pbar = tqdm(dataloader, desc=f"Epoch {epoch}/{epochs}")
         for i, (imgs, _, _, _) in enumerate(pbar):
             real = imgs.to(device)
@@ -115,16 +115,22 @@ def train(
                 writer.add_image("Samples", grid, epoch)
 
         if epoch % 10 == 0:
-            torch.save(model.state_dict(), Path(save_dir)/f"gan_epoch_{epoch}.pt")
+            torch.save(model.state_dict(), Path(save_dir) / f"gan_epoch_{epoch}.pt")
 
     if writer:
         writer.close()
 
+
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser("Train simple GAN on raw CausalMNIST")
-    parser.add_argument("--config", type=str, default='./ncm_experiment.yml', help="YAML config path")
-    parser.add_argument("--save_dir", type=str, default="./checkpoints", help="Where to save models")
+    parser.add_argument(
+        "--config", type=str, default="./ncm_experiment.yml", help="YAML config path"
+    )
+    parser.add_argument(
+        "--save_dir", type=str, default="./checkpoints", help="Where to save models"
+    )
     parser.add_argument("--log_dir", type=str, default="./logs", help="TensorBoard log dir")
     args = parser.parse_args()
 
@@ -132,12 +138,18 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Data
-    transform = transforms.Compose([
-        transforms.Resize(cfg["data"]["img_size"]),
-        transforms.ToTensor(),
-    ])
-    dataset = CausalMNIST(root=cfg["data"]["model_dir"], graph_type=cfg["data"]["graph_type"], transform=transform)
-    loader = DataLoader(dataset, batch_size=cfg["data"]["batch_size"], shuffle=True, num_workers=4, pin_memory=True)
+    transform = transforms.Compose(
+        [
+            transforms.Resize(cfg["data"]["img_size"]),
+            transforms.ToTensor(),
+        ]
+    )
+    dataset = CausalMNIST(
+        root=cfg["data"]["model_dir"], graph_type=cfg["data"]["graph_type"], transform=transform
+    )
+    loader = DataLoader(
+        dataset, batch_size=cfg["data"]["batch_size"], shuffle=True, num_workers=4, pin_memory=True
+    )
 
     # Model
     gan = make_simple_gan(
@@ -148,8 +160,12 @@ if __name__ == "__main__":
     )
 
     # Optimizers
-    opt_D = torch.optim.Adam(gan.discriminator_parameters(), lr=cfg["optimizer"]["disc_lr"], betas=(0.0, 0.9))
-    opt_G = torch.optim.Adam(gan.generator_parameters(),    lr=cfg["optimizer"]["gen_lr"],  betas=(0.0, 0.9))
+    opt_D = torch.optim.Adam(
+        gan.discriminator_parameters(), lr=cfg["optimizer"]["disc_lr"], betas=(0.0, 0.9)
+    )
+    opt_G = torch.optim.Adam(
+        gan.generator_parameters(), lr=cfg["optimizer"]["gen_lr"], betas=(0.0, 0.9)
+    )
 
     # Train
     train(

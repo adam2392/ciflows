@@ -20,7 +20,7 @@ from tqdm import tqdm
 from ciflows.datasets.causalmnist import CausalMNIST
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.eval import load_model
-from ciflows.ncm import GAN_NF_NCM, MLP, ResNet, CausalGraph, log
+from ciflows.ncm import GAN_NF_NCM, MLP, CausalGraph, ResNet, log
 from ciflows.training import TopKModelSaver
 
 
@@ -73,12 +73,11 @@ def make_gan_ncm_model(
     return gan_model
 
 
-
-
 def visualize_images(imgs, title="Generated Images", nrow=4):
     """Visualize a batch of images (assumes shape [B, C, H, W])."""
     import matplotlib.pyplot as plt
     import torchvision.utils as vutils
+
     grid = vutils.make_grid(imgs.cpu(), nrow=nrow, normalize=True, scale_each=True)
     plt.figure(figsize=(8, 8))
     plt.axis("off")
@@ -92,17 +91,15 @@ def test_ganv2_ncm_generation_and_discrimination(model: GAN_NF_NCM, batch_size=4
 
     # --- Step 1: Generate samples ---
     with torch.no_grad():
-        generated_samples = model.sample(
-            n=batch_size, idx=[0]
-        )  # index=0 = base distribution
+        generated_samples = model.sample(n=batch_size, idx=[0])  # index=0 = base distribution
         for img_dict in generated_samples:
             print(f"Generated : {img_dict.keys()}")
 
         # produce mixture
         generated_samples = model.sample_mixture(generated_samples)
 
-        img = generated_samples[0] # bar-color is your image node
-        print("Generated image tensor shape:", img['X'].shape)  # Should be [B, 3, 128, 128]
+        img = generated_samples[0]  # bar-color is your image node
+        print("Generated image tensor shape:", img["X"].shape)  # Should be [B, 3, 128, 128]
 
         # Visualize
         visualize_images(img, title="Generated Images from GAN_NCM")

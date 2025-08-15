@@ -1,21 +1,17 @@
-from torch.utils.data import Dataset
-from PIL import Image
-import torchvision.transforms as T
-import torch
-import torch.nn as nn
-from torchvision import models
-
 import logging
 from pathlib import Path
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+import torchvision.transforms as T
 import torchvision.transforms as transforms
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset
+from torchvision import models
 from tqdm import tqdm
 
 # Import user-defined dataset and model
-from ciflows.datasets.causalmnistv2 import CausalMNIST_v2    # adjust import path as needed
+from ciflows.datasets.causalmnistv2 import CausalMNIST_v2  # adjust import path as needed
 
 
 class MultiTaskCNN(nn.Module):
@@ -52,9 +48,9 @@ def train_one_epoch(model, loader, optimizer, criterion, device):
     for imgs, meta in tqdm(loader, desc="Training", leave=False):
         imgs = imgs.to(device)
         targets = {
-            'digit':       meta['digit'].to(device),
-            'digit_color': meta['color_digit'].to(device),
-            'bar_color':   meta['color_bar'].to(device)
+            "digit": meta["digit"].to(device),
+            "digit_color": meta["color_digit"].to(device),
+            "bar_color": meta["color_bar"].to(device),
         }
         outputs = model(imgs)
         loss = sum(criterion(outputs[k], targets[k]) for k in outputs)
@@ -69,15 +65,15 @@ def train_one_epoch(model, loader, optimizer, criterion, device):
 
 def evaluate(model, loader, device):
     model.eval()
-    correct = {'digit': 0, 'digit_color': 0, 'bar_color': 0}
+    correct = {"digit": 0, "digit_color": 0, "bar_color": 0}
     total = 0
     with torch.no_grad():
         for imgs, meta in tqdm(loader, desc="Evaluating", leave=False):
             imgs = imgs.to(device)
             targets = {
-                'digit':       meta['digit'].to(device),
-                'digit_color': meta['color_digit'].to(device),
-                'bar_color':   meta['color_bar'].to(device)
+                "digit": meta["digit"].to(device),
+                "digit_color": meta["color_digit"].to(device),
+                "bar_color": meta["color_bar"].to(device),
             }
             outputs = model(imgs)
             total += imgs.size(0)
@@ -86,17 +82,23 @@ def evaluate(model, loader, device):
                 correct[k] += (preds == targets[k]).sum().item()
     return {k: correct[k] / total for k in correct}
 
+
 if __name__ == "__main__":
     # ----- Configuration -----
-    root_dir = "/path/to/data"                # root data directory
-    distr_labels = ['observational', 'int_colorbar_0', 'int_colorbar_1', 'int_colorbar_2']                 # list of distribution labels
+    root_dir = "/path/to/data"  # root data directory
+    distr_labels = [
+        "observational",
+        "int_colorbar_0",
+        "int_colorbar_1",
+        "int_colorbar_2",
+    ]  # list of distribution labels
     batch_size = 128
     num_epochs = 10
     learning_rate = 1e-3
 
     # Load device settings
     if torch.cuda.is_available():
-        device = torch.device('cuda')
+        device = torch.device("cuda")
         # accelerator = sys_cfg.get("accelerator", "cuda")
     elif torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -109,22 +111,24 @@ if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     # ----- Transforms -----
-    transform = transforms.Compose([
-        transforms.Resize((32, 32)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-    ])
+    transform = transforms.Compose(
+        [
+            transforms.Resize((32, 32)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+        ]
+    )
 
     # ----- Datasets & Dataloaders -----
     train_ds = CausalMNIST_v2(root=root_dir, distr_labels=distr_labels, transform=transform)
-    val_ds   = CausalMNIST_v2(root=root_dir, distr_labels=distr_labels, transform=transform)
+    val_ds = CausalMNIST_v2(root=root_dir, distr_labels=distr_labels, transform=transform)
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=4)
-    val_loader   = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=4)
+    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=4)
 
     # ----- Model, Loss, Optimizer -----
     model = MultiTaskCNN(num_digit_colors=5, num_bar_colors=5).to(device)

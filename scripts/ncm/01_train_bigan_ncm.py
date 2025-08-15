@@ -1,14 +1,16 @@
-from pathlib import Path
 import os
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms, utils
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+
 from ciflows.datasets.causalmnist import CausalMNIST, CausalMNISTEmbedding
 from ciflows.datasets.multidistr import StratifiedSampler
-from ciflows.ncm.bigan import Encoder, Decoder, JointDiscriminator
+from ciflows.ncm.bigan import Decoder, Encoder, JointDiscriminator
 
 
 def train_bigan(
@@ -30,13 +32,11 @@ def train_bigan(
     sample_dir = os.path.join(output_dir, "samples")
     os.makedirs(sample_dir, exist_ok=True)
 
-    transform = transforms.Compose([
-        transforms.Resize((28, 28)),
-        transforms.ToTensor(),
-        lambda x: x.expand(3, -1, -1)
-    ])
+    transform = transforms.Compose(
+        [transforms.Resize((28, 28)), transforms.ToTensor(), lambda x: x.expand(3, -1, -1)]
+    )
 
-    dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
+    dataset = datasets.MNIST(root="./data", train=True, transform=transform, download=True)
     val_len = int(val_split * len(dataset))
     train_len = len(dataset) - val_len
     train_set, val_set = torch.utils.data.random_split(dataset, [train_len, val_len])
@@ -61,7 +61,7 @@ def train_bigan(
     dis_opt = torch.optim.Adam(discriminator.parameters(), lr=lr)
 
     if use_scheduler:
-        scheduler = ReduceLROnPlateau(gen_opt, mode='min', factor=0.5, patience=5)
+        scheduler = ReduceLROnPlateau(gen_opt, mode="min", factor=0.5, patience=5)
 
     best_models = []  # list of tuples: (loss, path)
 
@@ -110,7 +110,7 @@ def train_bigan(
                 x_val = x_val.to(device)
                 z_val = encoder(x_val)
                 x_recon = decoder(z_val)
-                val_loss += F.mse_loss(x_recon, x_val, reduction='sum').item()
+                val_loss += F.mse_loss(x_recon, x_val, reduction="sum").item()
         val_loss /= len(val_loader.dataset)
 
         if use_scheduler:
@@ -118,21 +118,31 @@ def train_bigan(
 
         # Log
         if epoch % log_every == 0:
-            print(f"Epoch {epoch}: D Loss = {avg_d_loss:.4f}, G Loss = {avg_g_loss:.4f}, Val Loss = {val_loss:.4f}")
+            print(
+                f"Epoch {epoch}: D Loss = {avg_d_loss:.4f}, G Loss = {avg_g_loss:.4f}, Val Loss = {val_loss:.4f}"
+            )
             with torch.no_grad():
                 z_sample = torch.randn(64, z_dim).to(device)
                 x_sample = decoder(z_sample)
-                utils.save_image(x_sample, os.path.join(sample_dir, f"sample_epoch_{epoch}.png"), nrow=8, normalize=True)
+                utils.save_image(
+                    x_sample,
+                    os.path.join(sample_dir, f"sample_epoch_{epoch}.png"),
+                    nrow=8,
+                    normalize=True,
+                )
 
         # Save top-k models
         model_path = os.path.join(output_dir, f"model_epoch_{epoch}.pt")
-        torch.save({
-            'encoder': encoder.state_dict(),
-            'decoder': decoder.state_dict(),
-            'discriminator': discriminator.state_dict(),
-            'val_loss': val_loss,
-            'epoch': epoch,
-        }, model_path)
+        torch.save(
+            {
+                "encoder": encoder.state_dict(),
+                "decoder": decoder.state_dict(),
+                "discriminator": discriminator.state_dict(),
+                "val_loss": val_loss,
+                "epoch": epoch,
+            },
+            model_path,
+        )
 
         best_models.append((val_loss, model_path))
         best_models = sorted(best_models, key=lambda x: x[0])[:save_top_k]
@@ -183,25 +193,26 @@ def data_loader(root_dir, dataset, graph_type, num_workers, batch_size, img_size
         persistent_workers=True,
     )
 
+
 if __name__ == "__main__":
     # Configuration
     config = {
-        'output_dir': './output/bigan_causal',
-        'epochs': 5,
-        'batch_size': 128,
-        'z_dim': 32,
-        'lr': 1e-4,
-        'log_every': 10,
-        'val_split': 0.1,
-        'save_top_k': 5,
-        'multi_gpu': torch.cuda.device_count() > 1,
-        'use_scheduler': True,
-        'device': 'cuda' if torch.cuda.is_available() else 'cpu',
-        'num_workers': 4,
-        'img_size': 32,
-        'graph_type': 'chain',  # or whichever causal structure you want to test
-        'debug': False
-    }  
+        "output_dir": "./output/bigan_causal",
+        "epochs": 5,
+        "batch_size": 128,
+        "z_dim": 32,
+        "lr": 1e-4,
+        "log_every": 10,
+        "val_split": 0.1,
+        "save_top_k": 5,
+        "multi_gpu": torch.cuda.device_count() > 1,
+        "use_scheduler": True,
+        "device": "cuda" if torch.cuda.is_available() else "cpu",
+        "num_workers": 4,
+        "img_size": 32,
+        "graph_type": "chain",  # or whichever causal structure you want to test
+        "debug": False,
+    }
     root = Path("/local/eb/adam2392/")
 
     # Pre-warm CUDA to avoid cuBLAS warning
@@ -227,29 +238,28 @@ if __name__ == "__main__":
 
     print("=============================================================")
 
-
     # Load training data
     train_loader = data_loader(
         root_dir=root,
-        dataset='CausalMNIST',
-        graph_type=config['graph_type'],
-        num_workers=config['num_workers'],
-        batch_size=config['batch_size'],
-        img_size=config['img_size'],
-        debug=config['debug']
+        dataset="CausalMNIST",
+        graph_type=config["graph_type"],
+        num_workers=config["num_workers"],
+        batch_size=config["batch_size"],
+        img_size=config["img_size"],
+        debug=config["debug"],
     )
 
     # Start training
     train_bigan(
-        output_dir=config['output_dir'],
-        epochs=config['epochs'],
-        batch_size=config['batch_size'],
-        z_dim=config['z_dim'],
-        lr=config['lr'],
-        log_every=config['log_every'],
-        val_split=config['val_split'],
-        save_top_k=config['save_top_k'],
-        multi_gpu=config['multi_gpu'],
-        use_scheduler=config['use_scheduler'],
-        device=config['device']
+        output_dir=config["output_dir"],
+        epochs=config["epochs"],
+        batch_size=config["batch_size"],
+        z_dim=config["z_dim"],
+        lr=config["lr"],
+        log_every=config["log_every"],
+        val_split=config["val_split"],
+        save_top_k=config["save_top_k"],
+        multi_gpu=config["multi_gpu"],
+        use_scheduler=config["use_scheduler"],
+        device=config["device"],
     )

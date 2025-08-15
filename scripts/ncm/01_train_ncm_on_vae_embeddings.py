@@ -1,6 +1,6 @@
-import sys
 import os
 import shutil
+import sys
 import time
 from contextlib import nullcontext
 from pathlib import Path
@@ -32,9 +32,9 @@ def make_gan_ncm_model(config) -> GAN_NF_NCM:
     latent_dim = config["model"]["latent_dim"]
     h_layers = config["model"].get("h_layers", 2)
     h_size = config["model"].get("h_size", 128)
-    
+
     # number of normalizing flow blocks
-    K = config["model"].get("K", 16)  
+    K = config["model"].get("K", 16)
 
     default_u_size = int(latent_dim / len(V_list))
     default_v_size = int(latent_dim / len(V_list))
@@ -344,12 +344,12 @@ def train_wgan_gp(
                     )
 
                     # if debug:
-                        # print("About to compute gradient penalty")
-                        # print(dist_real_imgs_dict.keys())
-                        # print(dist_real_imgs.shape)
-                        # print(lambda_gp)
-                        # print(fake_imgs_batch.keys())
-                        # print(device)
+                    # print("About to compute gradient penalty")
+                    # print(dist_real_imgs_dict.keys())
+                    # print(dist_real_imgs.shape)
+                    # print(lambda_gp)
+                    # print(fake_imgs_batch.keys())
+                    # print(device)
 
                     # Wasserstein critic loss
                     if gan_mode == "wgan" or gan_mode == "wgan-gp":
@@ -443,7 +443,7 @@ def train_wgan_gp(
                 with torch.no_grad():
                     for idx, delta_v in enumerate(gan_model.delta_v_list):
                         # Generate samples for the current distribution index
-                        sample_imgs = gan_model.sample_mixture(n=16, idx=[idx])[0]['X']
+                        sample_imgs = gan_model.sample_mixture(n=16, idx=[idx])[0]["X"]
 
                         # use VAE to decode the images
                         sample_imgs = vae_model.decode(sample_imgs)

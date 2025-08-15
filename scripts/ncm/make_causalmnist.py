@@ -1,26 +1,20 @@
 from pathlib import Path
-import math
-import pandas as pd
-from tqdm import tqdm
+
 import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
-from joblib import Parallel, delayed
 import pandas as pd
-from pathlib import Path
+import seaborn as sns
+import torch
+import torchvision
+from joblib import Parallel, delayed
+from torchvision import transforms
+from torchvision.datasets import MNIST
+from tqdm import tqdm
 
 from ciflows.datasets.causalmnist_scm.scm import (
     alter_digitbar_img,
     causal_mnist_scm,
-    alter_digitbar_style_img,
 )
-from ciflows.datasets.causalmnist import CausalMNIST
-
-import torch
-from torch.utils.data import DataLoader
-from torchvision import transforms
-import torchvision
-from torchvision.datasets import MNIST
 
 
 def log_scm_visualizations(scm_causal_labels, fpath):
@@ -79,6 +73,7 @@ def process_and_save_image(idx, img, color_digit, color_bar, save_dir, cmap):
 if __name__ == "__main__":
     # where is the data to be saved?
     root = Path("/Users/adam2392/pytorch_data/")
+    root = Path("/local/eb/adam2392/")
     dataset_name = "CausalMNIST_v2"
     img_size = 32
     graph_type = "chain_style"
@@ -121,13 +116,13 @@ if __name__ == "__main__":
         0: "observational",
         1: "int_colorbar_0",
         2: "int_colorbar_1",
-        3: "int_colordigit_0",
+        3: "int_colorbar_2",
     }
 
     # save each dataset
-    for intervention_idx in [0, 1, 2, 3]:
-        if intervention_idx != 3:
-            continue
+    for intervention_idx in [0, 1, 2, 
+                            #  3
+                             ]:
         distr_folder = root / dataset_name / save_dir_name[intervention_idx]
         img_distr_folder = distr_folder / "images"
         img_distr_folder.mkdir(exist_ok=True, parents=True)
