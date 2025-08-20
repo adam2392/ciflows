@@ -20,7 +20,7 @@ NUM_GPUS=1
 
 # Set the environment variable for the GPU
 export CUDA_VISIBLE_DEVICES=$GPU_INDEX
-LOG_FILE="gan_exp9_l1loss_${SCRIPT_NAME}_${GPU_INDEX}gpus.log"
+LOG_FILE="gan_exp3_newsetup_${SCRIPT_NAME}_${GPU_INDEX}gpus.log"
 CMD="python3 $SCRIPT_NAME"
 #  --config ./experiment.yml" # --seed $TRAINING_SEED --log_dir $LOG_DIR"
 

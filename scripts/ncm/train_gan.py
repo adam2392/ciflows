@@ -1,4 +1,5 @@
 from csv import writer
+import time
 import os
 import json
 from pathlib import Path
@@ -15,26 +16,92 @@ from ciflows.datasets.causalmnistv2 import CausalMNIST_v2
 from ciflows.datasets.multidistr import StratifiedSampler
 from ciflows.ncm.bigan import Decoder, Encoder, JointDiscriminator
 
+def get_instance_noise_sigma(epoch, total_epochs, start_sigma=0.2, end_sigma=0.0):
+    """Linearly decays sigma from start_sigma → end_sigma over training."""
+    progress = epoch / total_epochs
+    return max(start_sigma * (1 - progress) + end_sigma * progress, end_sigma)
 
-def gradient_penalty(D, x_real, z_real, x_fake, z_fake, lambda_=10, device='cpu'):
-    alpha = torch.rand(x_real.size(0), 1, 1, 1, device=device)
-    interpolated_x = alpha * x_real + (1 - alpha) * x_fake
-    alpha_z = alpha.view(-1, 1)  # broadcast for z
-    interpolated_z = alpha_z * z_real + (1 - alpha_z) * z_fake
-    interpolated_x.requires_grad_(True)
-    interpolated_z.requires_grad_(True)
-    prob = D(interpolated_x, interpolated_z)
+
+# Optional: pretrain encoder-decoder as an autoencoder
+def pretrain_autoencoder(encoder, decoder, train_loader, device, epochs=5, lr=1e-3):
+    print(">>> Pretraining encoder-decoder (autoencoder mode)...")
+    opt = torch.optim.Adam(list(encoder.parameters()) + list(decoder.parameters()), lr=lr)
+    for ep in range(epochs):
+        encoder.train(), decoder.train()
+        total_loss = 0
+        for x, _ in train_loader:
+            x = x.to(device)
+            z = encoder(x)
+            x_recon = decoder(z)
+            loss = F.l1_loss(x_recon, x)
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+            total_loss += loss.item()
+        avg = total_loss / len(train_loader)
+        print(f"Autoencoder pretrain epoch {ep+1}/{epochs}: Recon Loss = {avg:.4f}")
+
+
+# def gradient_penalty(D, x_real, z_real, x_fake, z_fake, lambda_=10, device='cpu'):
+#     alpha = torch.rand(x_real.size(0), 1, 1, 1, device=device)
+#     interpolated_x = alpha * x_real + (1 - alpha) * x_fake
+#     alpha_z = alpha.view(-1, 1)  # broadcast for z
+#     interpolated_z = alpha_z * z_real + (1 - alpha_z) * z_fake
+#     interpolated_x.requires_grad_(True)
+#     interpolated_z.requires_grad_(True)
+#     prob = D(interpolated_x, interpolated_z)
+#     grads = torch.autograd.grad(
+#         outputs=prob, inputs=[interpolated_x, interpolated_z],
+#         grad_outputs=torch.ones_like(prob),
+#         create_graph=True, retain_graph=True
+#     )
+#     # combine grads of x and z
+#     grad_norm = torch.sqrt(
+#         grads[0].view(grads[0].size(0), -1).pow(2).sum(1) +
+#         grads[1].view(grads[1].size(0), -1).pow(2).sum(1)
+#     )
+#     return lambda_ * ((grad_norm - 1) ** 2).mean()
+
+
+def gradient_penalty(discriminator, x_real, z_real, x_fake, z_fake, lambda_, device):
+    batch_size = x_real.size(0)
+
+    # Interpolate between real and fake
+    eps = torch.rand(batch_size, 1, 1, 1, device=device, requires_grad=True)
+    x_hat = eps * x_real + (1 - eps) * x_fake
+    eps_z = torch.rand(batch_size, 1, device=device, requires_grad=True)
+    z_hat = eps_z * z_real + (1 - eps_z) * z_fake
+    x_hat.requires_grad_(True)
+    z_hat.requires_grad_(True)
+
+    # Forward pass
+    d_hat = discriminator(x_hat, z_hat)
+
+    # Compute gradients wrt interpolated inputs
     grads = torch.autograd.grad(
-        outputs=prob, inputs=[interpolated_x, interpolated_z],
-        grad_outputs=torch.ones_like(prob),
-        create_graph=True, retain_graph=True
+        outputs=d_hat,
+        inputs=[x_hat, z_hat],
+        grad_outputs=torch.ones_like(d_hat),
+        create_graph=True,
+        retain_graph=True,
+        only_inputs=True,
     )
-    # combine grads of x and z
-    grad_norm = torch.sqrt(
-        grads[0].view(grads[0].size(0), -1).pow(2).sum(1) +
-        grads[1].view(grads[1].size(0), -1).pow(2).sum(1)
-    )
-    return lambda_ * ((grad_norm - 1) ** 2).mean()
+
+    # Flatten and concat
+    grad_x, grad_z = grads
+    grad = torch.cat([grad_x.view(batch_size, -1), grad_z.view(batch_size, -1)], dim=1)
+
+    grad_norm = grad.norm(2, dim=1)
+
+    # Avoid NaN/Inf
+    grad_norm = grad.norm(2, dim=1) + 1e-12
+
+    # if torch.isnan(grad_norm).any() or torch.isinf(grad_norm).any():
+    #     print("Gradient norm exploded:", grad_norm)
+        # grad_norm = torch.clamp(grad_norm, 0, 10)  # clip extreme values
+
+    gp = ((grad_norm - 1.0) ** 2).mean() * lambda_
+    return gp
 
 
 def count_parameters(model):
@@ -47,9 +114,9 @@ def train_bigan(
     distr_labels,
     epochs=100,
     batch_size=64,
-    z_dim=32,
+    z_dim=128,
     gen_lr=1e-4,
-    disc_lr=1e-5,
+    disc_lr=5e-5,
     log_every=10,
     val_split=0.1,
     save_top_k=5,
@@ -59,8 +126,9 @@ def train_bigan(
     num_workers=4,
     img_size=32,
     gp_lambda=10.,
-    lambda_recon    = 10.0,
+    lambda_recon    = 1.0,
     blocks_per_stage=2,
+    n_critic = 5  # (i.e., skip every other nth step for the critic learning)
 ):
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -125,6 +193,7 @@ def train_bigan(
     default_channels = [32, 64, 128]
     encoder = Encoder(z_dim=z_dim, img_channels=3, img_size=32, channels=default_channels, blocks_per_stage=blocks_per_stage)
     decoder = Decoder(z_dim=z_dim, img_channels=3, img_size=32, channels=default_channels, blocks_per_stage=blocks_per_stage)
+    default_channels = [64, 128, 256]
     discriminator = JointDiscriminator(z_dim=z_dim, img_channels=3, img_size=32, channels=default_channels, blocks_per_stage=blocks_per_stage)
 
     encoder_params = count_parameters(encoder)
@@ -144,15 +213,22 @@ def train_bigan(
     decoder.to(device)
     discriminator.to(device)
 
-    gen_opt = torch.optim.Adam(list(encoder.parameters()) + list(decoder.parameters()), lr=gen_lr)
-    dis_opt = torch.optim.Adam(discriminator.parameters(), lr=disc_lr)
+    # Optional: Pretrain autoencoder
+    pretrain_autoencoder(encoder, decoder, train_loader, device, epochs=5)
 
+    # DCGAN uses Adam with β1=0.5, β2=0.9
+    gen_opt = torch.optim.Adam(
+    list(encoder.parameters()) + list(decoder.parameters()), 
+        lr=gen_lr, betas=(0.5, 0.9)
+    )
+    dis_opt = torch.optim.Adam(
+        discriminator.parameters(), 
+        lr=disc_lr, betas=(0.5, 0.9)
+    )
     if use_scheduler:
         scheduler = ReduceLROnPlateau(gen_opt, mode="min", factor=0.5, patience=5)
 
     best_models = []  # list of tuples: (loss, path)
-
-    n_critic = 5  # (i.e., skip every other nth step for the critic learning)
 
     def add_instance_noise(x, sigma):
         return x + sigma * torch.randn_like(x)
@@ -161,16 +237,21 @@ def train_bigan(
     print(f"Using device: {device}")
     print(f"Batch size: {batch_size}, Z dimension: {z_dim}")
 
+    start = time.time()
+
     global_step = 0
+    d_global_step = 0 
     for epoch in range(1, epochs + 1):
         print(f"Epoch {epoch}/{epochs}...")
 
         encoder.train(), decoder.train(), discriminator.train()
         total_d_loss, total_g_loss = 0, 0
 
+        sigma = get_instance_noise_sigma(epoch, epochs, start_sigma=0.2, end_sigma=0.01)
+
         for batch_idx, (x, meta_labels) in enumerate(train_loader):
-            sigma = max(0.1 * (1 - epoch/epochs), 0.01)
             x = add_instance_noise(x.to(device), sigma)
+
             # if idx % 20 == 0:
             #     print(f"Batch {idx}/{len(train_loader)}...")
             #     print(f"Meta Labels: {len(meta_labels)}, {meta_labels.keys()}")
@@ -183,10 +264,10 @@ def train_bigan(
             x_recon = decoder(z_enc)
 
             # Reconstruction loss (tune λ_recon)
-            l2_recon_loss = F.mse_loss(x_recon, x, reduction='mean')
+            # l2_recon_loss = F.mse_loss(x_recon, x, reduction='mean')
 
             # l1 loss
-            recon_loss = F.l1_loss(x_recon, x, reduction='mean') + l2_recon_loss
+            recon_loss = F.l1_loss(x_recon, x, reduction='mean')# + l2_recon_loss
 
             d_loss_accum = 0
             # update discriminator less often
@@ -202,6 +283,10 @@ def train_bigan(
                 dis_opt.zero_grad()
                 real_score = discriminator(x, z_enc.detach())
                 fake_score = discriminator(x_rand, z_rand)
+
+                # optional clampging to avoid NaN/Inf
+                # real_score = torch.clamp(real_score, -1e4, 1e4)
+                # fake_score = torch.clamp(fake_score, -1e4, 1e4)
 
                 # 1) Wasserstein critic loss
                 d_wass = fake_score.mean() - real_score.mean()
@@ -219,6 +304,13 @@ def train_bigan(
                 d_loss.backward()
                 dis_opt.step()
                 d_loss_accum += d_loss.item()
+
+                # if torch.isnan(gp).any() or torch.isinf(gp).any():
+                #     print("WARNING: Gradient penalty has NaNs or Infs!")
+
+                writer.add_scalar("Loss/GradientPenalty_step", gp.item(), d_global_step)
+                writer.add_scalar("Loss/D_Wasserstein_step", d_wass.item(), d_global_step)
+                d_global_step+=1
             total_d_loss += d_loss_accum
             
             # Generator step
@@ -242,10 +334,12 @@ def train_bigan(
             writer.add_scalar("Loss/Discriminator_batch", avg_d_loss_batch, global_step)
             writer.add_scalar("Loss/G_Wasserstein_batch", g_wass.item(), global_step)
             writer.add_scalar("Loss/Recon_batch", recon_loss.item(), global_step)
-            writer.add_scalar("Loss/D_Wasserstein_batch", d_wass.item(), global_step)
-            writer.add_scalar("Loss/GradientPenalty_batch", gp.item(), global_step)
+            # writer.add_scalar("Loss/GradientPenalty_batch", gp.item(), global_step)
 
             global_step += 1
+
+            if batch_idx == 0:
+                print("First batch took", time.time() - start, "seconds")
 
         avg_d_loss = total_d_loss / len(train_loader)
         avg_g_loss = total_g_loss / len(train_loader)
@@ -265,9 +359,10 @@ def train_bigan(
             scheduler.step(val_loss)
 
         # ——— LOG TO TENSORBOARD ———
-        writer.add_scalar("Loss/Discriminator", avg_d_loss, epoch)
-        writer.add_scalar("Loss/Generator", avg_g_loss, epoch)
-        writer.add_scalar("Loss/Validation", val_loss, epoch)
+        writer.add_scalar("Loss/Discriminator_epoch", avg_d_loss, epoch)
+        writer.add_scalar("Loss/Generator_epoch", avg_g_loss, epoch)
+        writer.add_scalar("Loss/Validation_epoch", val_loss, epoch)
+        writer.add_scalar('InstanceNoise/Sigma_epoch', sigma, epoch)
 
         # Log
         print(
@@ -275,18 +370,29 @@ def train_bigan(
         )
         if epoch % log_every == 0:
             with torch.no_grad():
-                print(f"Generating samples... and saving to {sample_dir}")  
+                # Random latent → generated images
                 z_sample = torch.randn(64, z_dim).to(device)
                 x_sample = decoder(z_sample)
+
+                # Real images → encode → decode
+                x_val, _ = next(iter(val_loader))
+                x_val = x_val.to(device)[:8]
+                z_val = encoder(x_val)
+                x_val_recon = decoder(z_val)
+
+                # Save images
                 utils.save_image(
-                    x_sample,
-                    os.path.join(sample_dir, f"sample_epoch_{epoch}.png"),
-                    nrow=8,
-                    normalize=True,
+                    x_sample, os.path.join(sample_dir, f"random_epoch_{epoch}.png"),
+                    nrow=8, normalize=True
+                )
+                utils.save_image(
+                    x_val_recon, os.path.join(sample_dir, f"recon_epoch_{epoch}.png"),
+                    nrow=8, normalize=True
                 )
 
-                # shape: (B, C, H, W), values in [0,1]
-                writer.add_images("Generated/Samples", x_sample, global_step=epoch)
+                # TensorBoard
+                writer.add_images("Generated/RandomLatent", x_sample, global_step=epoch)
+                writer.add_images("Generated/Reconstruction", x_val_recon, global_step=epoch)
 
         # Save top-k models
         # Inside training loop after computing val_loss
@@ -370,10 +476,10 @@ if __name__ == "__main__":
     config = {
         "output_dir": unique_output_dir,
         "epochs": 500,
-        "batch_size": 2048,
+        "batch_size": 256,
         "z_dim": 64,
         "gen_lr": 1e-4,
-        "disc_lr": 1e-5,
+        "disc_lr": 4e-4,
         "log_every": 10,
         "val_split": 0.1,
         "save_top_k": 3,
