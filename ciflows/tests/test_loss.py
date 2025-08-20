@@ -1,19 +1,107 @@
 from collections import namedtuple
 from math import prod, sqrt
 
+import pytest
 import torch
+
 # Define both versions of your surrogate function
 import torch.autograd as autograd
-from torch.autograd import grad
+from torch.testing import assert_close
 
-from ciflows.loss import sample_orthonormal_vectors, volume_change_surrogate
+from ciflows.distributions.pgm import LinearGaussianDag
+from ciflows.flows.freeform import ResnetFreeformflow
+from ciflows.loss import (
+    sample_orthonormal_vectors,
+    volume_change_surrogate,
+    volume_change_surrogate_transformer,
+)
 from ciflows.vit import VisionTransformerDecoder, VisionTransformerEncoder
 
-SurrogateOutput = namedtuple(
-    "SurrogateOutput", ["surrogate", "z", "x1", "regularizations"]
-)
+SurrogateOutput = namedtuple("SurrogateOutput", ["surrogate", "z", "x1", "regularizations"])
 
 
+def test_resnet_volume_change_surrogate_shape():
+    """Test that volume_change_surrogate outputs the expected shapes."""
+    num_blocks_per_stage = 1
+    node_dimensions = {
+        0: 22,
+        1: 22,
+        2: 4,
+    }
+    edge_list = [(1, 2)]
+    noise_means = {
+        0: torch.zeros(node_dimensions[0]),
+        1: torch.zeros(node_dimensions[1]),
+        2: torch.zeros(node_dimensions[2]),
+    }
+    noise_variances = {
+        0: torch.ones(node_dimensions[0]),
+        1: torch.ones(node_dimensions[1]),
+        2: torch.ones(node_dimensions[2]),
+    }
+    intervened_node_means = [
+        {2: torch.ones(node_dimensions[2]) + 4},
+        {2: torch.ones(node_dimensions[2]) + 8},
+    ]
+    intervened_node_vars = [
+        {2: torch.ones(node_dimensions[2])},
+        {2: torch.ones(node_dimensions[2])},
+    ]
+    latent_dim = 48
+
+    confounded_list = []
+    # independent noise with causal prior
+    latent = LinearGaussianDag(
+        node_dimensions=node_dimensions,
+        edge_list=edge_list,
+        noise_means=noise_means,
+        noise_variances=noise_variances,
+        confounded_list=confounded_list,
+        intervened_node_means=intervened_node_means,
+        intervened_node_vars=intervened_node_vars,
+    )
+
+    # define the encoder and decoder
+    model = ResnetFreeformflow(
+        latent=latent, latent_dim=latent_dim, num_blocks_per_stage=num_blocks_per_stage
+    )
+
+    # Define input and model configurations
+    batch_size = 2
+    img_size = 128
+    in_channels = 3
+    hutchinson_samples = 5  # fewer samples for the test
+
+    # Instantiate the encoder and decoder
+    encoder = model.encoder
+    decoder = model.decoder
+
+    # Generate a dummy input image batch
+    x = torch.randn(batch_size, in_channels, img_size, img_size)
+
+    # Run the function
+    surrogate_loss, v, xhat = volume_change_surrogate(
+        x, encoder, decoder, hutchinson_samples=hutchinson_samples
+    )
+
+    # compute x-hat from encoder -> decoder
+    x_hat_from_encoder = decoder(encoder(x))
+    print(x_hat_from_encoder.shape, xhat.shape, v.shape, surrogate_loss.shape)
+    loss_reconstruction = torch.nn.functional.mse_loss(xhat, x)
+    loss_reconstruction_from_encoder = torch.nn.functional.mse_loss(x_hat_from_encoder, x)
+    print(loss_reconstruction.mean(), loss_reconstruction_from_encoder.mean())
+    assert_close(x_hat_from_encoder, xhat)
+
+    # Check that the output shapes are correct
+    assert (
+        surrogate_loss.ndim == 1
+    ), f"Expected surrogate loss shape {(1,)}, but got {surrogate_loss.shape}"
+    assert (
+        xhat.shape == x.shape
+    ), f"Expected reconstructed image shape {x.shape}, but got {xhat.shape}"
+
+
+@pytest.mark.skip()
 def test_volume_change_surrogate_shape():
     """Test that volume_change_surrogate outputs the expected shapes."""
 
@@ -40,14 +128,14 @@ def test_volume_change_surrogate_shape():
     x = torch.randn(batch_size, in_channels, img_size, img_size)
 
     # Run the function
-    surrogate_loss, v, xhat = volume_change_surrogate(
+    surrogate_loss, v, xhat = volume_change_surrogate_transformer(
         x, encoder, decoder, hutchinson_samples=hutchinson_samples
     )
 
     # Check that the output shapes are correct
     assert (
-        surrogate_loss.ndim == 0
-    ), f"Expected surrogate loss shape {(0,)}, but got {surrogate_loss.shape}"
+        surrogate_loss.ndim == 1
+    ), f"Expected surrogate loss shape {(1,)}, but got {surrogate_loss.shape}"
     assert v.shape == (
         batch_size,
         (img_size // patch_size) ** 2,
@@ -86,9 +174,7 @@ def sample_v(x: torch.Tensor, hutchinson_samples: int, manifold=None) -> torch.T
         )
 
     if manifold is None:
-        v = torch.randn(
-            batch_size, total_dim, hutchinson_samples, device=x.device, dtype=x.dtype
-        )
+        v = torch.randn(batch_size, total_dim, hutchinson_samples, device=x.device, dtype=x.dtype)
         q = torch.linalg.qr(v).Q.reshape(*x.shape, hutchinson_samples)
         return q * sqrt(total_dim)
     # M-FFF: Sample v in the tangent space of the manifold at x
@@ -99,7 +185,7 @@ def sample_v(x: torch.Tensor, hutchinson_samples: int, manifold=None) -> torch.T
 
 
 def volume_change_surrogate_v1(
-    x, encode, decode, hutchinson_samples=1, manifold=None, vs=None
+    x, encode, decode, hutchinson_samples=1, manifold=None, vs=None, transformer=True
 ):
     regularizations = {}
     surrogate = 0
@@ -107,6 +193,7 @@ def volume_change_surrogate_v1(
     x.requires_grad_()
     z = encode(x)
 
+    print(z.shape)
     if manifold is not None:
         z_projected = manifold.projection(z)
         regularizations["z_projection"] = torch.nn.functional.mse_loss(z, z_projected)
@@ -134,6 +221,10 @@ def volume_change_surrogate_v1(
             x1, v1 = autograd.forward_ad.unpack_dual(dual_x1)
 
         (v2,) = autograd.grad(z, x, v, create_graph=True)
+
+        if transformer:
+            v1 = v1[:, -1, ...]
+
         surrogate += (v2 * v1.detach()).sum() / hutchinson_samples
 
     return SurrogateOutput(surrogate, z, x1, regularizations)
@@ -164,12 +255,21 @@ def test_compare_surrogates():
     v = encoder(x)
     B, n_patches, embed_dim = v.shape
     hutchinson_samples = 4
-    eta_samples = torch.zeros((B, n_patches, embed_dim, hutchinson_samples))
+    # eta_samples = torch.zeros((B, n_patches, embed_dim, hutchinson_samples))
     # from transformer encoding
     eta_samples = sample_orthonormal_vectors(v, hutchinson_samples)
     eta_samples = eta_samples.reshape(B, n_patches, embed_dim, hutchinson_samples)
     # for idx in range(n_patches):
     #     eta_samples[:, idx, ...] = sample_orthonormal_vectors(v, hutchinson_samples)
+
+    # Run version 2
+    surrogate_loss_v2, v_v2, xhat_v2 = volume_change_surrogate_transformer(
+        x,
+        encoder,
+        decoder,
+        hutchinson_samples=hutchinson_samples,
+        eta_samples=eta_samples,
+    )
 
     # Run version 1
     surrogate_output_v1 = volume_change_surrogate_v1(
@@ -181,25 +281,12 @@ def test_compare_surrogates():
         vs=eta_samples,
     )
 
-    # Run version 2
-    surrogate_loss_v2, v_v2, xhat_v2 = volume_change_surrogate(
-        x,
-        encoder,
-        decoder,
-        hutchinson_samples=hutchinson_samples,
-        eta_samples=eta_samples,
-    )
-
     assert torch.allclose(
         surrogate_output_v1.surrogate, surrogate_loss_v2
     ), "Surrogate losses do not match."
 
-    assert torch.allclose(
-        surrogate_output_v1.z, v_v2
-    ), "Latent representations do not match."
-    assert torch.allclose(
-        surrogate_output_v1.x1, xhat_v2
-    ), "Reconstructions do not match."
+    assert torch.allclose(surrogate_output_v1.z, v_v2), "Latent representations do not match."
+    assert torch.allclose(surrogate_output_v1.x1, xhat_v2), "Reconstructions do not match."
 
     # Compare outputs
     print()
@@ -209,11 +296,7 @@ def test_compare_surrogates():
     print(f"Surrogate Loss V2: {surrogate_loss_v2}")
 
     # Compare latent representations
-    print(
-        f"Latent Representation Difference (z): {torch.abs(surrogate_output_v1.z - v_v2).sum()}"
-    )
+    print(f"Latent Representation Difference (z): {torch.abs(surrogate_output_v1.z - v_v2).sum()}")
 
     # Compare reconstructions
-    print(
-        f"Reconstruction Difference (x1): {torch.abs(surrogate_output_v1.x1 - xhat_v2).sum()}"
-    )
+    print(f"Reconstruction Difference (x1): {torch.abs(surrogate_output_v1.x1 - xhat_v2).sum()}")

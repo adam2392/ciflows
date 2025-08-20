@@ -1,0 +1,191 @@
+import normflows as nf
+import torch
+
+from ciflows.distributions.pgm import LinearGaussianDag
+from ciflows.distributions.pgmv2 import LinearGaussianDag as LinearGaussianDagV2
+from ciflows.flows.model import CausalNormalizingFlow
+
+
+def make_celeba_nf_model(
+    K=32, hc_dim=4, debug=False, trainable_edges=False, trainable_exogenous_weights=True
+):
+    """Make normalizing flow model."""
+    # Define list of flows
+    if debug:
+        # K = 32
+        net_hidden_layers = 3
+        net_hidden_dim = 128
+    else:
+        # K = 8  # v1
+        # K = 32  # v2
+        net_hidden_layers = 3
+        net_hidden_dim = 128
+
+    latent_dim = 48
+
+    flows = []
+    for i in range(K):
+        flows += [
+            nf.flows.AutoregressiveRationalQuadraticSpline(
+                latent_dim, net_hidden_layers, net_hidden_dim
+            )
+        ]
+
+    if hc_dim == 4:
+        node_dimensions = {
+            0: 22,
+            1: 22,
+            2: 4,
+        }
+    elif hc_dim == 8:
+        node_dimensions = {
+            0: 20,
+            1: 20,
+            2: 8,
+        }
+    elif hc_dim == 16:
+        node_dimensions = {
+            0: 16,
+            1: 16,
+            2: 16,
+        }
+    edge_list = [(1, 2)]
+    # edge_list = []
+    noise_means = {
+        0: torch.rand(node_dimensions[0]),
+        1: torch.rand(node_dimensions[1]),
+        2: torch.rand(node_dimensions[2]),
+    }
+    noise_variances = {
+        0: torch.ones(node_dimensions[0]),
+        1: torch.ones(node_dimensions[1]) * 2.0,
+        2: torch.ones(node_dimensions[2]) * 1.5,
+    }
+    intervened_node_means = [
+        {2: torch.ones(node_dimensions[2]) + 1},  # 0
+        {2: torch.ones(node_dimensions[2]) - 1},  # 1
+        {2: torch.ones(node_dimensions[2]) + 3},  # 2
+        # {2: torch.ones(node_dimensions[2]) + 3},  # 3
+        # {2: torch.ones(node_dimensions[2]) + 6},  # 4
+    ]
+    intervened_node_vars = [
+        {2: torch.ones(node_dimensions[2])},
+        {2: torch.ones(node_dimensions[2]) * 0.5},
+        {2: torch.ones(node_dimensions[2]) * 2},
+        # {2: torch.ones(node_dimensions[2])},
+        # {2: torch.ones(node_dimensions[2]) * 2},
+    ]
+    confounded_list = [(0, 1)]
+    confounded_list = []
+
+    # independent noise with causal prior
+    q0 = LinearGaussianDag(
+        node_dimensions=node_dimensions,
+        edge_list=edge_list,
+        noise_means=noise_means,
+        noise_variances=noise_variances,
+        confounded_list=confounded_list,
+        intervened_node_means=intervened_node_means,
+        intervened_node_vars=intervened_node_vars,
+        trainable_edges=trainable_edges,
+        trainable_exogenous_weights=trainable_exogenous_weights,
+    )
+
+    # Construct flow model with the multiscale architecture
+    model = CausalNormalizingFlow(q0, flows)
+    return model
+
+
+def make_mnist_nf_model(
+    K=32, hc_dim=4, debug=False, trainable_edges=False, trainable_exogenous_weights=True
+):
+    """Make normalizing flow model."""
+    # Define list of flows
+    latent_dim = 32
+    if debug:
+        # K = 32
+        net_hidden_layers = 3
+        net_hidden_dim = 128
+    else:
+        # K = 8  # v1
+        # K = 32  # v2
+        net_hidden_layers = 3
+        net_hidden_dim = 128
+
+    flows = []
+    for i in range(K):
+        flows += [
+            nf.flows.AutoregressiveRationalQuadraticSpline(
+                latent_dim, net_hidden_layers, net_hidden_dim
+            )
+        ]
+
+    # node_dimensions = {
+    #     0: 10,
+    #     1: 10,
+    #     2: 10,
+    #     3: 2,
+    # }
+
+    node_dimensions = {
+        0: 12,
+        1: 10,
+        2: 10,
+    }
+    # elif hc_dim == 8:
+    #     node_dimensions = {
+    #         0: 20,
+    #         1: 20,
+    #         2: 8,
+    #     }
+    # elif hc_dim == 16:
+    #     node_dimensions = {
+    #         0: 16,
+    #         1: 16,
+    #         2: 16,
+    #     }
+    edge_list = [(0, 1), (1, 2)]
+    # edge_list = []
+    noise_means = {
+        0: torch.rand(node_dimensions[0]),
+        1: torch.rand(node_dimensions[1]),
+        2: torch.rand(node_dimensions[2]),
+    }
+    noise_variances = {
+        0: torch.ones(node_dimensions[0]),
+        1: torch.ones(node_dimensions[1]) * 2.0,
+        2: torch.ones(node_dimensions[2]) * 1.5,
+    }
+    intervened_node_means = [
+        {2: torch.ones(node_dimensions[2]) + 2},  # 0
+        {2: torch.ones(node_dimensions[2]) - 3},  # 1
+        {2: torch.ones(node_dimensions[2]) + 5},  # 2
+        # {2: torch.ones(node_dimensions[2]) + 3},  # 3
+        # {2: torch.ones(node_dimensions[2]) + 6},  # 4
+    ]
+    intervened_node_vars = [
+        {2: torch.ones(node_dimensions[2])},
+        {2: torch.ones(node_dimensions[2]) * 0.5},
+        {2: torch.ones(node_dimensions[2]) * 2},
+        # {2: torch.ones(node_dimensions[2])},
+        # {2: torch.ones(node_dimensions[2]) * 2},
+    ]
+    confounded_list = [(0, 3)]
+    confounded_list = []
+
+    # independent noise with causal prior
+    q0 = LinearGaussianDagV2(
+        node_dimensions=node_dimensions,
+        edge_list=edge_list,
+        noise_means=noise_means,
+        noise_variances=noise_variances,
+        confounded_list=confounded_list,
+        intervened_node_means=intervened_node_means,
+        intervened_node_vars=intervened_node_vars,
+        trainable_edges=trainable_edges,
+        trainable_exogenous_weights=trainable_exogenous_weights,
+    )
+
+    # Construct flow model with the multiscale architecture
+    model = CausalNormalizingFlow(q0, flows)
+    return model
